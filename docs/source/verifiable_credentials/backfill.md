@@ -1,12 +1,12 @@
 # Backfilling Verifiable Credentials
 
-This page covers when verifiable credentials are created automatically, the ways to create them for certificates that don't have one, and what to check before and after a backfill.
+This page covers when verifiable credentials are created automatically, the ways to create them for certificates that don't have one, and what to [check before](#checking-certificate-page-configuration) and after a backfill.
 
 ## How credentials are normally created
 
 Every path, automatic or manual, goes through `courses.api.create_verifiable_credential()`. It:
 
-1. Finds the `CertificatePage` that the certificate's `certificate_page_revision` belongs to and reads the page as it is now. It does not use the revision that was in place when the certificate was issued, so fixing a page later lets you backfill certificates issued earlier.
+1. Finds the `CertificatePage` that the certificate's `certificate_page_revision` belongs to and reads the page's latest published version. It does not use the revision that was in place when the certificate was issued, so fixing a page later lets you backfill certificates issued earlier.
 2. Checks that the page is eligible (at the time of writing, this means the certificate page having a value for `verifiable_credential_criteria` and `should_provision_verifiable_credential=True`. If those are not populated, it returns without doing anything and without raising an error.
 3. Builds the credential payload: the learner's current name, the course or program URL, the page's criteria (and its description, if the `mitxonline-credential-metadata-authoring` feature flag is on), the feature image, the enrollment date and the certificate issue date.
 4. Sends the payload to the signer at `VERIFIABLE_CREDENTIAL_SIGNER_URL`, authenticating with `VERIFIABLE_CREDENTIAL_BEARER_TOKEN`.
@@ -27,7 +27,7 @@ Two admin pages have a backfill action:
 
 To use it:
 
-1. Check the `CertificatePage` configuration for required fields in the CMS.
+1. Check the `CertificatePage` configuration for required fields in the CMS. See [Checking certificate page configuration](#checking-certificate-page-configuration) for details.
 2. Open the Programs or Course runs list, tick the rows you want, choose the backfill action from the **Action** dropdown, and click **Go**.
 3. Read the message shown at the top of the page:
    - **Info**: `Successfully requested verifiable credential backfill for N program certificates.` (or `courserun certificates`). *N* counts every certificate that had no credential, **including ones skipped because their page isn't eligible**, so be advised that it isn't a count of credentials created.
@@ -45,7 +45,7 @@ Things to know:
 The following commands can be run from a web or celery worker container.
 
 ```bash
-# Dry run: list the certificates for a program by courseware ID which would be backfilled, without creating any credentials.
+# Dry run: list the certificates for a program by courseware ID which would be processed, without creating any credentials. Note that this output will include certificates without correctly configured CertificatePages.
 manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+DEDP
 
 # Execute backfill for a program by courseware ID, pausing half a second between signer calls
@@ -60,3 +60,7 @@ manage.py backfill_verifiable_credentials --uuid 3f1c0e2a-0000-0000-0000-0000000
 ```
 
 Note that `--force` deletes the existing credential non-transactionally *before* requesting a new one.
+
+## Checking certificate page configuration
+As noted earlier, verifiable credentials are only populated if the corresponding CertificatePages has a value for `verifiable_credential_criteria` and `should_provision_verifiable_credential=True`. If those are not populated, a verifiable credential will not be created for an issued Certificate.
+This can be checked manually, but it can also be checked via the `check_verifiable_credential_config` management command for specific Programs or Courses or by visiting the `/admin/courses/verifiablecredential/stats/` page to see a summary of all Programs and Courses with their configuration status.
