@@ -2693,24 +2693,32 @@ def test_cull_stale_pending_orders(settings, user):
 
 
 @pytest.mark.parametrize(
-    "stripe_status",
+    ("stripe_status", "payment_intent_id"),
     [
-        STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
-        STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
-        STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
-        None,
+        (STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, "pi_test_stale"),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, ""),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PENDING, ""),
+        (None, ""),
     ],
 )
-def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_status):
+def test_cull_stale_pending_orders_checks_stripe(
+    mocker, settings, user, stripe_status, payment_intent_id
+):
     """
     Stale Stripe orders should be checked with Stripe first: only cancelled
-    sessions are culled, paid ones are resolved, and the rest are kept. A
+    sessions are culled, paid ones are resolved, and the rest are kept. A paid
+    session with no PaymentIntent to record the payment under is kept too. A
     status of None means the Stripe lookup failed.
     """
     settings.PENDING_ORDER_CULL_AGE_DAYS = 60
     mock_status = mocker.patch(
         "ecommerce.api.process_stripe_checkout_session_status",
-        return_value={"status": stripe_status, "transaction": {"id": "cs_test"}},
+        return_value={
+            "status": stripe_status,
+            "payment_intent_id": payment_intent_id,
+            "transaction": {"id": "cs_test"},
+        },
         side_effect=None if stripe_status else APIConnectionError("Stripe is down"),
     )
     mock_fulfill = mocker.patch("ecommerce.models.OrderFlow.fulfill")
@@ -2739,7 +2747,7 @@ def test_cull_stale_pending_orders_checks_stripe(mocker, settings, user, stripe_
     assert Order.objects.filter(pk=order.pk).exists() is not (
         stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED
     )
-    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID:
+    if stripe_status == STRIPE_OVERALL_CHECKOUT_STATUS_PAID and payment_intent_id:
         mock_fulfill.assert_called_once_with(
             {"id": "cs_test"}, already_enrolled=False, skip_receipt=False
         )
@@ -2760,6 +2768,7 @@ def test_cull_stale_pending_orders_fulfills_outside_a_transaction(
         "ecommerce.api.process_stripe_checkout_session_status",
         return_value={
             "status": STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
+            "payment_intent_id": "pi_test_stale",
             "transaction": {"id": "cs_test"},
         },
     )
