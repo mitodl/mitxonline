@@ -40,9 +40,12 @@ from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
     IDP_PROTOCOL_OIDC,
     IDP_PROTOCOL_SAML,
+    IDP_STATE_ACTIVE,
+    IDP_STATE_DISABLED,
     IDP_STATE_DRAFT,
     IDP_STATE_KEYCLOAK_FLAGS,
     ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_ADOPTED,
     PROVISIONING_ACTION_IDP_CREATED,
     PROVISIONING_ACTION_IDP_DELETED,
     PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
@@ -54,6 +57,8 @@ from b2b.constants import (
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    IdentityProviderNotAdoptableError,
+    IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -66,7 +71,10 @@ from b2b.keycloak_admin_api import (
     get_keycloak_model,
     import_identity_provider_config,
 )
-from b2b.keycloak_admin_dataclasses import IdentityProviderMapperRepresentation
+from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderMapperRepresentation,
+    IdentityProviderRepresentation,
+)
 from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationIndexPage,
@@ -126,6 +134,36 @@ def _locked(instance):
     """
 
     return type(instance).objects.select_for_update().get(pk=instance.pk)
+
+
+def _refuse_pulumi_managed(identity_provider):
+    """
+    Refuse to change an IdP that Pulumi still declares.
+
+    Raises:
+    - IdentityProviderPulumiManagedError: the IdP is pulumi_managed
+    """
+
+    if identity_provider.pulumi_managed:
+        msg = (
+            f"The identity provider '{identity_provider.alias}' is still "
+            "managed by Pulumi in ol-infrastructure. Change it there until "
+            "it has been moved out of Pulumi and released."
+        )
+        raise IdentityProviderPulumiManagedError(msg)
+
+
+def _locked_unmanaged(identity_provider):
+    """
+    Lock an IdP row, refusing one that Pulumi still declares.
+
+    Must be called inside transaction.atomic(). Checked under the lock so a
+    release or adoption racing the change can't slip past it.
+    """
+
+    identity_provider = _locked(identity_provider)
+    _refuse_pulumi_managed(identity_provider)
+    return identity_provider
 
 
 def _onboarding_snapshot(onboarding):
@@ -1157,6 +1195,198 @@ def create_identity_provider(  # noqa: PLR0913
     return identity_provider
 
 
+def _adopted_metadata_source(keycloak_idp):
+    """
+    Return the metadata URL to record for an IdP created outside this API.
+
+    ol-infrastructure configures a SAML IdP from its metadata URL as
+    metadataDescriptorUrl, and keeps only the issuer from an OIDC IdP's
+    discovery document. The discovery document is at a fixed path under the
+    issuer (OpenID Connect Discovery 1.0, section 4).
+
+    Args:
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    Returns:
+    - str: the URL, or None when Keycloak holds nothing to refresh from
+    """
+
+    config = keycloak_idp.config or {}
+
+    if keycloak_idp.provider_id == IDP_PROTOCOL_SAML:
+        return config.get("metadataDescriptorUrl") or None
+
+    issuer = config.get("issuer")
+    if keycloak_idp.provider_id == IDP_PROTOCOL_OIDC and issuer:
+        return f"{issuer.rstrip('/')}/.well-known/openid-configuration"
+
+    return None
+
+
+def adoption_metadata_source(keycloak_idp, metadata_source=None):
+    """
+    Return the metadata source adopt_identity_provider would record.
+
+    Separate so a dry run can tell which IdPs a real run would skip.
+
+    Args:
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    - metadata_source (str): a source supplied by the caller, if any
+    Returns:
+    - str: the supplied source, or one derived from Keycloak's config
+    Raises:
+    - IdentityProviderNotAdoptableError: it isn't SAML or OIDC, or no source
+      was supplied and Keycloak holds no metadata URL or issuer for it
+    """
+
+    if keycloak_idp.provider_id not in (IDP_PROTOCOL_SAML, IDP_PROTOCOL_OIDC):
+        msg = (
+            f"The identity provider '{keycloak_idp.alias}' is a "
+            f"{keycloak_idp.provider_id} provider, not SAML or OIDC."
+        )
+        raise IdentityProviderNotAdoptableError(msg)
+
+    metadata_source = metadata_source or _adopted_metadata_source(keycloak_idp)
+    if metadata_source is None:
+        msg = (
+            f"The identity provider '{keycloak_idp.alias}' "
+            f"({keycloak_idp.provider_id}) has no metadata URL or issuer in "
+            "Keycloak to record as its metadata source. Pass one with --source."
+        )
+        raise IdentityProviderNotAdoptableError(msg)
+
+    return metadata_source
+
+
+def organization_identity_providers(connection, organization):
+    """
+    Return the IdPs Keycloak links to an organization.
+
+    Read from organizations/{id}/identity-providers, the association
+    create_identity_provider writes, so this doesn't depend on which link
+    field Keycloak's IdP representation carries (organizationId is
+    deprecated in favor of organizationLinks in Keycloak 26.8).
+
+    Args:
+    - connection (KeycloakConnection): the Keycloak connection to use
+    - organization (OrganizationPage): an organization linked to Keycloak
+    Returns:
+    - list[IdentityProviderRepresentation]: the linked IdPs
+    """
+
+    return connection.client.list(
+        f"organizations/{organization.sso_organization_id}/{ORG_IDP_ASSOCIATION}",
+        IdentityProviderRepresentation,
+    )
+
+
+def adopt_identity_provider(
+    organization, keycloak_idp, *, metadata_source=None, actor=None
+):
+    """
+    Record an IdP that ol-infrastructure created, without changing Keycloak.
+
+    The record is pulumi_managed, so the dashboard lists it and the
+    provisioning API refuses to change it until release_pulumi_identity_provider
+    runs. That happens once the IdP is out of Pulumi state.
+
+    The lifecycle state comes from Keycloak's `enabled`. Testing and active
+    set the same Keycloak flags (IDP_STATE_KEYCLOAK_FLAGS), so an enabled IdP
+    is recorded as active: Pulumi only declares IdPs partners sign in through.
+    No metadata is fetched, so metadata_artifact stays empty. The attribute
+    mappers aren't stored here at all; they are read from Keycloak whenever
+    they're needed.
+
+    Args:
+    - organization (OrganizationPage): the organization Keycloak links it to
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    - metadata_source (str): the metadata URL or XML to record, for an IdP
+      whose source Keycloak doesn't hold or holds wrongly; derived from
+      Keycloak's config when omitted
+    - actor (User): who ran the adoption, for the audit trail
+    Returns:
+    - OrganizationIdentityProvider: the new record
+    Raises:
+    - IdentityProviderNotAdoptableError: it isn't SAML or OIDC, or no source
+      was supplied and Keycloak holds no metadata URL or issuer for it
+    - AliasCollisionError: the alias is already recorded here
+    """
+
+    metadata_source = adoption_metadata_source(keycloak_idp, metadata_source)
+    lifecycle_state = IDP_STATE_ACTIVE if keycloak_idp.enabled else IDP_STATE_DISABLED
+
+    with transaction.atomic():
+        if OrganizationIdentityProvider.objects.filter(
+            alias=keycloak_idp.alias
+        ).exists():
+            msg = f"An identity provider with alias '{keycloak_idp.alias}' already exists."
+            raise AliasCollisionError(msg)
+
+        identity_provider = OrganizationIdentityProvider.objects.create(
+            organization=organization,
+            alias=keycloak_idp.alias,
+            protocol=keycloak_idp.provider_id,
+            lifecycle_state=lifecycle_state,
+            display_name=keycloak_idp.display_name or "",
+            internal_id=keycloak_idp.internal_id or "",
+            metadata_source=metadata_source,
+            pulumi_managed=True,
+        )
+        _audit(
+            organization,
+            PROVISIONING_ACTION_IDP_ADOPTED,
+            actor=actor,
+            identity_provider_alias=keycloak_idp.alias,
+            data_after={
+                "protocol": keycloak_idp.provider_id,
+                "display_name": identity_provider.display_name,
+                "lifecycle_state": lifecycle_state,
+                # An inline XML source is recorded, but not copied into the
+                # audit row.
+                "metadata_source": (
+                    metadata_source
+                    if not metadata_source.lstrip().startswith("<")
+                    else "(inline XML)"
+                ),
+                "pulumi_managed": True,
+            },
+        )
+
+    return identity_provider
+
+
+def release_pulumi_identity_provider(identity_provider, *, actor=None):
+    """
+    Let the provisioning API change an IdP that Pulumi no longer declares.
+
+    Run once the IdP is out of Pulumi state (removed from olapps.py and
+    deployed with retain_on_delete), so a later change isn't reverted.
+
+    Args:
+    - identity_provider (OrganizationIdentityProvider): the IdP to release
+    - actor (User): who released it, for the audit trail
+    Returns:
+    - OrganizationIdentityProvider: the updated record
+    """
+
+    with transaction.atomic():
+        identity_provider = _locked(identity_provider)
+        if not identity_provider.pulumi_managed:
+            return identity_provider
+
+        identity_provider.pulumi_managed = False
+        identity_provider.save()
+        _audit(
+            identity_provider.organization,
+            PROVISIONING_ACTION_IDP_UPDATED,
+            actor=actor,
+            identity_provider_alias=identity_provider.alias,
+            data_before={"pulumi_managed": True},
+            data_after={"pulumi_managed": False},
+        )
+
+    return identity_provider
+
+
 def _replace_metadata_config(
     config, identity_provider, metadata_artifact, metadata_url
 ):
@@ -1333,6 +1563,8 @@ def update_identity_provider(  # noqa: PLR0913
     - OrganizationIdentityProvider: the updated record
     """
 
+    # Before the metadata parse, which asks Keycloak to fetch the new source.
+    _refuse_pulumi_managed(identity_provider)
     connection = connection or KeycloakConnection()
 
     metadata_source = metadata_url or metadata_xml
@@ -1349,7 +1581,7 @@ def update_identity_provider(  # noqa: PLR0913
     update_mappers = attribute_map is not None or attribute_name_map is not None
 
     with transaction.atomic():
-        identity_provider = _locked(identity_provider)
+        identity_provider = _locked_unmanaged(identity_provider)
 
         keycloak_idp = connection.identity_providers.get(identity_provider.alias)
         payload = keycloak_idp.model_dump(by_alias=True, exclude_none=True)
@@ -1451,7 +1683,7 @@ def refresh_identity_provider_metadata(
     with transaction.atomic():
         # Locked before the fetch, so an update that changes the source while
         # this is fetching cannot be overwritten with the old source's metadata.
-        identity_provider = _locked(identity_provider)
+        identity_provider = _locked_unmanaged(identity_provider)
         source = identity_provider.metadata_source
         metadata_url = source if not source.lstrip().startswith("<") else None
 
@@ -1522,7 +1754,7 @@ def transition_identity_provider(
     connection = connection or KeycloakConnection()
 
     with transaction.atomic():
-        identity_provider = _locked(identity_provider)
+        identity_provider = _locked_unmanaged(identity_provider)
         current = identity_provider.lifecycle_state
 
         if state not in IDP_ALLOWED_TRANSITIONS[current]:
@@ -1571,7 +1803,7 @@ def delete_identity_provider(identity_provider, *, connection=None, actor=None):
     connection = connection or KeycloakConnection()
 
     with transaction.atomic():
-        identity_provider = _locked(identity_provider)
+        identity_provider = _locked_unmanaged(identity_provider)
         _require_provisioned(identity_provider.organization)
         _audit(
             identity_provider.organization,

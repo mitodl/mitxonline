@@ -4286,6 +4286,7 @@ components:
       - organization_updated
       - onboarding_changed
       - identity_provider_created
+      - identity_provider_adopted
       - identity_provider_updated
       - identity_provider_transitioned
       - identity_provider_metadata_refreshed
@@ -4298,6 +4299,7 @@ components:
         * `organization_updated` - Organization updated
         * `onboarding_changed` - Onboarding state changed
         * `identity_provider_created` - Identity provider created
+        * `identity_provider_adopted` - Identity provider adopted
         * `identity_provider_updated` - Identity provider updated
         * `identity_provider_transitioned` - Identity provider state changed
         * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
@@ -4309,6 +4311,7 @@ components:
       - Organization updated
       - Onboarding state changed
       - Identity provider created
+      - Identity provider adopted
       - Identity provider updated
       - Identity provider state changed
       - Identity provider metadata refreshed
@@ -7261,6 +7264,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7291,6 +7301,7 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
     OrganizationIdentityProviderDetail:
@@ -7341,6 +7352,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7383,6 +7401,7 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
     OrganizationManagerCheck:

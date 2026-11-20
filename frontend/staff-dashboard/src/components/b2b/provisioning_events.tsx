@@ -11,6 +11,7 @@ const ACTION_LABELS: Record<string, string> = {
     organization_updated: "Organization updated",
     onboarding_changed: "Onboarding state changed",
     identity_provider_created: "Identity provider created",
+    identity_provider_adopted: "Identity provider adopted",
     identity_provider_transitioned: "Identity provider moved",
     identity_provider_metadata_refreshed: "Identity provider metadata refreshed",
     identity_provider_deleted: "Identity provider deleted",
