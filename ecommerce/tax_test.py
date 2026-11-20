@@ -4,10 +4,12 @@ from decimal import Decimal
 
 import pytest
 import reversion
+from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ValidationError
 from reversion.models import Version
 
 from courses.factories import ProgramFactory
+from ecommerce.admin import TaxRateAdmin
 from ecommerce.factories import ProductFactory, TaxRateFactory
 from ecommerce.models import Product, TaxRate
 from ecommerce.tax import (
@@ -43,7 +45,7 @@ def test_calculate_tax(amount, rate, expected_tax):
     assert result.tax_amount == expected_tax
     assert result.total == amount + expected_tax
     assert result.tax_rate_name == tax_rate.tax_rate_name
-    assert result.is_taxed == (expected_tax > 0)
+    assert result.is_taxed is True
 
 
 @pytest.mark.parametrize("amount", [Decimal("100.00"), Decimal(0)])
@@ -60,14 +62,29 @@ def test_calculate_tax_no_rate(amount):
     assert result.is_taxed is False
 
 
-def test_calculate_tax_zero_amount():
-    """A free item owes no tax, and records no rate."""
+@pytest.mark.parametrize("amount", [Decimal(0), Decimal("-5.00")])
+def test_calculate_tax_zero_amount(amount):
+    """A free item in a taxed locale owes no tax, but still records the rate."""
 
-    result = calculate_tax(Decimal(0), TaxRateFactory.create(country_code="IN"))
+    tax_rate = TaxRateFactory.create(country_code="IN")
 
-    assert result.tax_rate is None
+    result = calculate_tax(amount, tax_rate)
+
+    assert result.tax_rate == tax_rate
     assert result.tax_amount == 0
-    assert result.total == 0
+    assert result.total == amount
+    assert result.is_taxed is True
+
+
+def test_calculate_tax_float_amount():
+    """A float amount doesn't carry its binary error into the result."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(10))
+
+    result = calculate_tax(19.99, tax_rate)
+
+    assert result.taxable_amount == Decimal("19.99")
+    assert result.total == Decimal("21.99")
 
 
 @pytest.mark.parametrize("country_code", ["IN", "in"])
@@ -119,7 +136,7 @@ def test_tax_rate_unique_active_locale():
     TaxRateFactory.create(country_code="IN")
 
 
-@pytest.mark.parametrize("bad_rate", [Decimal(-1), Decimal(101)])
+@pytest.mark.parametrize("bad_rate", [Decimal(-1), Decimal("100.0001")])
 def test_tax_rate_range(bad_rate):
     """The rate must be a percentage between 0 and 100."""
 
@@ -127,14 +144,27 @@ def test_tax_rate_range(bad_rate):
         TaxRateFactory.build(country_code="IN", tax_rate=bad_rate).save()
 
 
-def test_tax_rate_is_versioned():
-    """Changing a rate keeps the old rate in its version history."""
+def test_tax_rate_allows_100():
+    """A rate of 100% fits the field."""
 
-    with reversion.create_revision():
-        tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    tax_rate = TaxRateFactory.build(country_code="IN", tax_rate=Decimal(100))
+    tax_rate.save()
 
-    with reversion.create_revision():
-        tax_rate.tax_rate = Decimal(20)
+    tax_rate.refresh_from_db()
+    assert tax_rate.tax_rate == Decimal(100)
+
+
+@pytest.mark.parametrize("in_revision", [True, False])
+def test_tax_rate_is_versioned(in_revision):
+    """Every change to a rate records a version, inside a revision or not."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+
+    tax_rate.tax_rate = Decimal(20)
+    if in_revision:
+        with reversion.create_revision():
+            tax_rate.save()
+    else:
         tax_rate.save()
 
     versions = Version.objects.get_for_object(tax_rate)
@@ -143,6 +173,35 @@ def test_tax_rate_is_versioned():
         Decimal(20),
         Decimal(18),
     ]
+    assert tax_rate.current_version == versions.first()
+
+
+def test_tax_rate_delete_is_versioned():
+    """Deleting a rate records a version showing it inactive."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN")
+
+    tax_rate.delete()
+
+    assert tax_rate.current_version.field_dict["is_active"] is False
+
+
+def test_tax_rate_admin_bulk_delete_is_versioned():
+    """The admin's bulk delete versions each deletion."""
+
+    rates = [
+        TaxRateFactory.create(country_code="IN"),
+        TaxRateFactory.create(country_code="GB"),
+    ]
+
+    TaxRateAdmin(TaxRate, AdminSite()).delete_queryset(
+        None, TaxRate.objects.filter(pk__in=[rate.pk for rate in rates])
+    )
+
+    for rate in rates:
+        rate.refresh_from_db()
+        assert rate.is_active is False
+        assert rate.current_version.field_dict["is_active"] is False
 
 
 @pytest.mark.parametrize("taxed", [True, False])

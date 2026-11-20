@@ -143,6 +143,8 @@ class TaxRateAdmin(VersionAdmin):
         "id",
         "is_active",
         "country_code",
+        "subdivision_1_code",
+        "subdivision_2_code",
         "tax_rate",
         "tax_rate_name",
     )
@@ -153,6 +155,16 @@ class TaxRateAdmin(VersionAdmin):
         """Use the all_objects manager, so we can see deleted rates."""
 
         return self.model.all_objects.get_queryset()
+
+    def delete_queryset(self, request, queryset):  # noqa: ARG002
+        """
+        Delete each rate on its own, so each deletion is versioned.
+
+        A queryset delete is a bulk update, which records no versions.
+        """
+
+        for tax_rate in queryset:
+            tax_rate.delete()
 
 
 @admin.register(Basket)

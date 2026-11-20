@@ -184,7 +184,7 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
     )
     tax_rate = models.DecimalField(
         help_text="The tax rate, as a percentage (e.g. 18 for 18%).",
-        max_digits=6,
+        max_digits=7,
         decimal_places=4,
         validators=[MinValueValidator(Decimal(0)), MaxValueValidator(Decimal(100))],
     )
@@ -211,6 +211,27 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
 
     def __str__(self):
         return f"{self.tax_rate}% {self.tax_rate_name} for {self.country_code}"
+
+    def save(self, *args, **kwargs):
+        """
+        Save the rate, always recording a version of it.
+
+        Tax records will point at the version of the rate they used, so every
+        change has to produce one - not just the ones made in the admin.
+        """
+
+        if reversion.is_active():
+            super().save(*args, **kwargs)
+            return
+
+        with reversion.create_revision():
+            super().save(*args, **kwargs)
+
+    @property
+    def current_version(self) -> Version | None:
+        """Return the newest version of this rate, which matches the saved row."""
+
+        return Version.objects.get_for_object(self).first()
 
 
 class Basket(TimestampedModel):

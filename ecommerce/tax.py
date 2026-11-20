@@ -47,9 +47,9 @@ class CalculatedTax:
 
     @property
     def is_taxed(self) -> bool:
-        """Return True if any tax is owed."""
+        """Return True if a tax rate applied, even if the tax came to zero."""
 
-        return self.tax_amount > 0
+        return self.tax_rate is not None
 
 
 def get_tax_rate_for_locale(
@@ -90,9 +90,10 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
     - CalculatedTax: the rate applied, the tax, and the total
     """
 
-    amount = Decimal(amount)
+    # str() first so a float doesn't carry its binary error into the result.
+    amount = Decimal(str(amount))
 
-    if tax_rate is None or amount <= 0:
+    if tax_rate is None:
         return CalculatedTax(
             tax_rate=None,
             rate=Decimal(0),
@@ -101,8 +102,13 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
             total=amount,
         )
 
-    tax_amount = (amount * tax_rate.tax_rate / Decimal(100)).quantize(
-        CENTS, rounding=ROUND_HALF_UP
+    # A free item in a taxed locale still records the rate, so a record can
+    # tell "taxed at 0" apart from "not taxed".
+    tax_amount = max(
+        (amount * tax_rate.tax_rate / Decimal(100)).quantize(
+            CENTS, rounding=ROUND_HALF_UP
+        ),
+        Decimal("0.00"),
     )
 
     return CalculatedTax(
