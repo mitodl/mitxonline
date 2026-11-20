@@ -53,10 +53,14 @@ of them through this API; the next `pulumi up` will revert the change.
 An organization's IdPs show in the staff dashboard only when they have an
 `OrganizationIdentityProvider` row, and only this API wrote those, so the IdPs
 Pulumi created were missing there. `manage.py adopt_keycloak_identity_providers
-[--dry-run] [org_key ...]` records each IdP that Keycloak links to an
-organization here (read from `organizations/{id}/identity-providers`) and has no
-row yet. It doesn't write to Keycloak, it's audited as "Identity provider
-adopted", and recorded IdPs are skipped, so it is safe to re-run.
+[--dry-run] [--source ALIAS=URL_OR_PATH ...] [org_key ...]` records each IdP
+that Keycloak links to an organization here (read from
+`organizations/{id}/identity-providers`) and has no row yet. It doesn't write to
+Keycloak, it's audited as "Identity provider adopted", and recorded IdPs are
+skipped, so it is safe to re-run. A Keycloak error listing one organization's
+IdPs is reported and the run carries on with the rest. A run without org keys
+also lists the realm IdPs that no organization here links to; those aren't
+recorded.
 
 An adopted IdP is recorded as follows:
 
@@ -64,14 +68,23 @@ An adopted IdP is recorded as follows:
   otherwise. Testing and active set the same Keycloak flags, and Pulumi only
   declares IdPs partners sign in through.
 - `metadata_source` is a SAML IdP's `metadataDescriptorUrl`, or
-  `{issuer}/.well-known/openid-configuration` for an OIDC IdP. An IdP with
-  neither (a SAML IdP configured from inline XML, or another provider type) is
-  reported and not recorded.
-- `metadata_artifact` stays empty until somebody refreshes the IdP.
+  `{issuer}/.well-known/openid-configuration` for an OIDC IdP. `--source` sets
+  it instead, as a URL or a file holding the metadata XML. Use it for a SAML IdP
+  Pulumi configured from inline XML (pass the saved copy from
+  `ol-infrastructure`'s `files/olapps/`), and for an OIDC IdP whose discovery
+  URL isn't under its issuer. An IdP with no source, or of another provider
+  type, is reported and skipped without failing the run.
+- `metadata_artifact` stays empty.
+- `pulumi_managed` is set.
 
-Adopting an IdP doesn't take it out of Pulumi. Until it leaves Pulumi state, an
-edit, refresh or transition made through the dashboard is reverted by the next
-`pulumi up`.
+The provisioning API refuses to edit, refresh, transition or delete a
+`pulumi_managed` IdP (409), and the dashboard shows it as "Managed by Pulumi"
+with no actions. Pulumi would revert those changes on its next run, and a
+refresh is worse than reverted: it replaces settings Pulumi chose on purpose
+with whatever the partner's metadata says (e.g. turning off signed
+AuthnRequests a partner asked for), which can break logins until that run.
+Once an IdP has left Pulumi state, `manage.py release_pulumi_identity_providers
+ALIAS ...` clears the flag, audited as an IdP update, and the API can change it.
 
 ## Organizations
 

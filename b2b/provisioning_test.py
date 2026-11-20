@@ -34,6 +34,7 @@ from b2b.constants import (
 from b2b.exceptions import (
     AliasCollisionError,
     IdentityProviderNotAdoptableError,
+    IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -62,10 +63,11 @@ from b2b.provisioning import (
     create_identity_provider,
     create_organization,
     delete_identity_provider,
-    find_unadopted_identity_providers,
     link_organization_to_keycloak,
+    organization_identity_providers,
     push_unconfirmed_members_to_keycloak,
     refresh_identity_provider_metadata,
+    release_pulumi_identity_provider,
     set_onboarding_state,
     transition_identity_provider,
     update_identity_provider,
@@ -2306,6 +2308,7 @@ def test_adopt_identity_provider_records_a_saml_idp(
     assert identity_provider.metadata_source == "https://idp.example.edu/metadata"
     assert identity_provider.metadata_artifact is None
     assert identity_provider.metadata_fetched_at is None
+    assert identity_provider.pulumi_managed is True
     (audit,) = _audits(organization)
     assert audit.action == PROVISIONING_ACTION_IDP_ADOPTED
     assert audit.acting_user == staff_user
@@ -2315,7 +2318,41 @@ def test_adopt_identity_provider_records_a_saml_idp(
         "display_name": "Example University",
         "lifecycle_state": lifecycle_state,
         "metadata_source": "https://idp.example.edu/metadata",
+        "pulumi_managed": True,
     }
+
+
+def test_adopt_identity_provider_records_a_supplied_xml_source():
+    """A SAML IdP configured from inline XML is recorded from a supplied copy."""
+
+    organization = OrganizationPageFactory.create()
+    keycloak_idp = IdentityProviderRepresentation(
+        alias="xml-saml", provider_id=IDP_PROTOCOL_SAML, enabled=True, config={}
+    )
+
+    identity_provider = adopt_identity_provider(
+        organization, keycloak_idp, metadata_source="<EntityDescriptor/>"
+    )
+
+    assert identity_provider.metadata_source == "<EntityDescriptor/>"
+    assert _audits(organization)[0].data_after["metadata_source"] == "(inline XML)"
+
+
+def test_adopt_identity_provider_prefers_a_supplied_url():
+    """A supplied source replaces a derived OIDC discovery URL that's wrong."""
+
+    organization = OrganizationPageFactory.create()
+
+    identity_provider = adopt_identity_provider(
+        organization,
+        _pulumi_oidc_idp(),
+        metadata_source="https://login.example.edu/openid-configuration/",
+    )
+
+    assert (
+        identity_provider.metadata_source
+        == "https://login.example.edu/openid-configuration/"
+    )
 
 
 def test_adopt_identity_provider_derives_the_oidc_discovery_url():
@@ -2370,55 +2407,118 @@ def test_adopt_identity_provider_refuses_a_recorded_alias():
         adopt_identity_provider(organization, _pulumi_saml_idp())
 
 
-def test_find_unadopted_identity_providers(connection):
-    """Each linked organization's IdPs are read, and recorded ones are left out."""
+def test_organization_identity_providers_reads_the_org_link(connection):
+    """The links come from the organization's identity-providers association."""
 
-    recorded_org = OrganizationPageFactory.create(org_key="AAA")
-    _identity_provider(recorded_org)
-    pulumi_org = OrganizationPageFactory.create(org_key="BBB")
-    OrganizationPageFactory.create(org_key="CCC", sso_organization_id=None)
-    pulumi_idp = _pulumi_saml_idp("bbb")
-    links = {
-        f"organizations/{recorded_org.sso_organization_id}/identity-providers": [
-            _pulumi_saml_idp("exampleu")
-        ],
-        f"organizations/{pulumi_org.sso_organization_id}/identity-providers": [
-            pulumi_idp
-        ],
-    }
-    connection.client.list.side_effect = lambda endpoint, _: links[endpoint]
+    organization = OrganizationPageFactory.create()
+    linked = [_pulumi_saml_idp()]
+    connection.client.list.return_value = linked
 
-    found = find_unadopted_identity_providers(connection)
-
-    assert found == [(pulumi_org, pulumi_idp)]
-    assert connection.client.list.call_count == 2
+    assert organization_identity_providers(connection, organization) == linked
+    connection.client.list.assert_called_once_with(
+        f"organizations/{organization.sso_organization_id}/identity-providers",
+        IdentityProviderRepresentation,
+    )
 
 
-def test_adopt_command_dry_run_writes_nothing(mocker, connection, capsys):
-    """--dry-run lists what it would record and leaves the table alone."""
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda idp, connection: update_identity_provider(
+            idp, display_name="Renamed", connection=connection
+        ),
+        lambda idp, connection: refresh_identity_provider_metadata(
+            idp, connection=connection
+        ),
+        lambda idp, connection: transition_identity_provider(
+            idp, IDP_STATE_DISABLED, connection=connection
+        ),
+        lambda idp, connection: delete_identity_provider(idp, connection=connection),
+    ],
+    ids=["update", "refresh", "transition", "delete"],
+)
+def test_a_pulumi_managed_idp_cannot_be_changed(
+    connection, mocked_import_config, change
+):
+    """Every IdP write refuses a Pulumi-owned IdP before touching Keycloak."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_ACTIVE)
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+
+    with pytest.raises(IdentityProviderPulumiManagedError, match="exampleu"):
+        change(identity_provider, connection)
+
+    assert connection.method_calls == []
+    mocked_import_config.assert_not_called()
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_ACTIVE
+    assert _audits(organization) == []
+
+
+def test_release_pulumi_identity_provider(connection, staff_user):
+    """A released IdP is audited and can then be changed through the API."""
+
+    organization = OrganizationPageFactory.create()
+    identity_provider = _identity_provider(organization, state=IDP_STATE_ACTIVE)
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+    connection.identity_providers.get.return_value = IdentityProviderRepresentation(
+        alias="exampleu", enabled=True, hide_on_login=True
+    )
+
+    release_pulumi_identity_provider(identity_provider, actor=staff_user)
+    transition_identity_provider(
+        identity_provider, IDP_STATE_DISABLED, connection=connection
+    )
+
+    released, transitioned = _audits(organization)
+    assert released.action == PROVISIONING_ACTION_IDP_UPDATED
+    assert released.acting_user == staff_user
+    assert released.data_before == {"pulumi_managed": True}
+    assert released.data_after == {"pulumi_managed": False}
+    assert transitioned.action == PROVISIONING_ACTION_IDP_TRANSITIONED
+
+
+def test_releasing_an_unmanaged_idp_is_not_audited():
+    """Releasing an IdP the API already owns is a no-op."""
+
+    organization = OrganizationPageFactory.create()
+
+    release_pulumi_identity_provider(_identity_provider(organization))
+
+    assert _audits(organization) == []
+
+
+@pytest.fixture
+def adopt_command(mocker, connection):
+    """Run adopt_keycloak_identity_providers against the mocked connection."""
 
     mocker.patch(
         "b2b.management.commands.adopt_keycloak_identity_providers.KeycloakConnection",
         return_value=connection,
     )
+    return lambda *args: call_command("adopt_keycloak_identity_providers", *args)
+
+
+def test_adopt_command_dry_run_writes_nothing(adopt_command, connection, capsys):
+    """--dry-run lists what it would record and leaves the table alone."""
+
     OrganizationPageFactory.create(org_key="EXAMPLEU")
     connection.client.list.return_value = [_pulumi_saml_idp()]
 
-    call_command("adopt_keycloak_identity_providers", "--dry-run")
+    adopt_command("--dry-run")
 
     assert "Would record: exampleu (saml) for EXAMPLEU" in capsys.readouterr().out
     assert not OrganizationIdentityProvider.objects.exists()
 
 
-def test_adopt_command_records_what_it_can_and_fails_on_the_rest(
-    mocker, connection, capsys
+def test_adopt_command_skips_an_idp_with_no_source_without_failing(
+    adopt_command, connection, capsys
 ):
-    """An IdP with no source is reported and fails the run; the others are recorded."""
+    """An IdP it can't record is reported; the run still succeeds."""
 
-    mocker.patch(
-        "b2b.management.commands.adopt_keycloak_identity_providers.KeycloakConnection",
-        return_value=connection,
-    )
     OrganizationPageFactory.create(org_key="EXAMPLEU")
     connection.client.list.return_value = [
         _pulumi_saml_idp(),
@@ -2427,10 +2527,95 @@ def test_adopt_command_records_what_it_can_and_fails_on_the_rest(
         ),
     ]
 
-    with pytest.raises(CommandError, match="xml-saml"):
-        call_command("adopt_keycloak_identity_providers")
+    adopt_command()
 
     assert list(
         OrganizationIdentityProvider.objects.values_list("alias", flat=True)
     ) == ["exampleu"]
-    assert "Recorded: exampleu (saml) for EXAMPLEU as active" in capsys.readouterr().out
+    output = capsys.readouterr()
+    assert "Recorded: exampleu (saml) for EXAMPLEU as active" in output.out
+    assert "Skipped xml-saml" in output.err
+
+
+def test_adopt_command_records_a_source_file(adopt_command, connection, tmp_path):
+    """--source ALIAS=PATH records the saved metadata XML."""
+
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [
+        IdentityProviderRepresentation(
+            alias="xml-saml", provider_id=IDP_PROTOCOL_SAML, enabled=True, config={}
+        )
+    ]
+    saved = tmp_path / "xml_saml_metadata.xml"
+    saved.write_text("<EntityDescriptor/>")
+
+    adopt_command("--source", f"xml-saml={saved}")
+
+    assert (
+        OrganizationIdentityProvider.objects.get(alias="xml-saml").metadata_source
+        == "<EntityDescriptor/>"
+    )
+
+
+def test_adopt_command_continues_past_an_organization_keycloak_rejects(
+    adopt_command, connection
+):
+    """One organization's Keycloak error doesn't stop the others being recorded."""
+
+    broken = OrganizationPageFactory.create(org_key="AAA")
+    OrganizationPageFactory.create(org_key="BBB")
+
+    def linked(endpoint, _representation):
+        if str(broken.sso_organization_id) in endpoint:
+            msg = "404 Client Error"
+            raise requests.HTTPError(msg)
+        return [_pulumi_saml_idp("bbb")]
+
+    connection.client.list.side_effect = linked
+
+    with pytest.raises(CommandError, match="AAA"):
+        adopt_command()
+
+    assert OrganizationIdentityProvider.objects.filter(alias="bbb").exists()
+
+
+def test_adopt_command_reports_realm_idps_no_organization_links(
+    adopt_command, connection, capsys
+):
+    """Realm IdPs that no organization here links to are listed, not recorded."""
+
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [_pulumi_saml_idp()]
+    connection.identity_providers.list_all.return_value = [
+        _pulumi_saml_idp(),
+        _pulumi_saml_idp("touchstone-idp"),
+    ]
+
+    adopt_command()
+
+    assert (
+        "Not linked to an organization here (not recorded): touchstone-idp"
+        in capsys.readouterr().out
+    )
+    assert not OrganizationIdentityProvider.objects.filter(
+        alias="touchstone-idp"
+    ).exists()
+
+
+def test_release_command(capsys):
+    """The command releases each named IdP and refuses unknown aliases."""
+
+    identity_provider = _identity_provider(OrganizationPageFactory.create())
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+
+    with pytest.raises(CommandError, match="nope"):
+        call_command("release_pulumi_identity_providers", "exampleu", "nope")
+    identity_provider.refresh_from_db()
+    assert identity_provider.pulumi_managed is True
+
+    call_command("release_pulumi_identity_providers", "exampleu")
+
+    identity_provider.refresh_from_db()
+    assert identity_provider.pulumi_managed is False
+    assert "Released: exampleu" in capsys.readouterr().out

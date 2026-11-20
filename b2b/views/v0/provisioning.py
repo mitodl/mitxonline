@@ -52,6 +52,7 @@ from b2b.exceptions import (
     AliasCollisionError,
     ContractProgramOrderError,
     ContractVariantError,
+    IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -142,6 +143,7 @@ class ProvisioningExceptionMixin:
         if isinstance(
             exc,
             AliasCollisionError
+            | IdentityProviderPulumiManagedError
             | OrganizationNameCollisionError
             | OrganizationNotProvisionedError,
         ):

@@ -36,7 +36,19 @@ class IdentityProviderNotAdoptableError(Exception):
     Every OrganizationIdentityProvider needs a metadata source to refresh from.
     Keycloak keeps one for a SAML IdP only when it was configured from a
     metadata URL, and for an OIDC IdP only as its issuer, so an IdP built from
-    inline XML, or of another provider type, has nothing to record.
+    inline XML has nothing to record unless the caller supplies the source.
+    Other provider types can't be recorded at all.
+    """
+
+
+class IdentityProviderPulumiManagedError(Exception):
+    """
+    Raised when changing an identity provider that Pulumi still declares.
+
+    The next pulumi up would revert the change. A metadata refresh is worse:
+    it replaces settings Pulumi set deliberately (e.g. signed AuthnRequests)
+    with whatever the partner's metadata says, which can break logins until
+    that next deploy.
     """
 
 

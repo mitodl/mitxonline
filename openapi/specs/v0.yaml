@@ -7264,6 +7264,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7294,6 +7301,7 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
     OrganizationIdentityProviderDetail:
@@ -7344,6 +7352,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7386,6 +7401,7 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
     OrganizationManagerCheck:

@@ -735,6 +735,29 @@ def test_transition_rejects_skipping_testing(admin_drf_client):
     assert identity_provider.lifecycle_state == IDP_STATE_DRAFT
 
 
+def test_changing_a_pulumi_managed_idp_is_a_conflict(
+    admin_drf_client, mocked_connection
+):
+    """An IdP Pulumi still declares is a 409 naming it, and Keycloak isn't called."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization, state=IDP_STATE_ACTIVE)
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+
+    response = admin_drf_client.post(
+        _identity_provider_url(organization.org_key, "exampleu", suffix="transition"),
+        {"state": IDP_STATE_TESTING},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "exampleu" in response.json()["detail"]
+    mocked_connection.identity_providers.update.assert_not_called()
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_ACTIVE
+
+
 def test_transition_to_testing(admin_drf_client, mocker):
     """The allowed move writes both systems through the provisioning layer."""
 

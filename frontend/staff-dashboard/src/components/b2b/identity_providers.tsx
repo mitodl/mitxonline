@@ -151,50 +151,62 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
                     title="State"
                     render={(_, idp) => {
                         const state = idpState(idp.lifecycle_state);
-                        return <Tag color={state?.color}>{state?.label ?? idp.lifecycle_state}</Tag>;
+                        return (
+                            <Space wrap>
+                                <Tag color={state?.color}>{state?.label ?? idp.lifecycle_state}</Tag>
+                                {idp.pulumi_managed && <Tag color="purple">Managed by Pulumi</Tag>}
+                            </Space>
+                        );
                     }}
                 />
                 <Table.Column<IOrganizationIdentityProvider>
                     title="Actions"
-                    render={(_, idp) => (
-                        <Space>
-                            <Dropdown
-                                disabled={isLoading || !IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state]}
-                                menu={{
-                                    items: (IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state] ?? []).map((state) => ({
-                                        key: state,
-                                        label: idpState(state)?.label ?? state,
-                                    })),
-                                    onClick: ({ key }) => transition(idp, key as IdpLifecycleState),
-                                }}
-                            >
-                                <Button size="small">
-                                    Move to <DownOutlined />
+                    render={(_, idp) =>
+                        // The API refuses changes to these until the IdP is out of Pulumi state:
+                        // the next pulumi up would revert them, and a refresh can drop settings
+                        // Pulumi chose on purpose.
+                        idp.pulumi_managed ? (
+                            <Typography.Text type="secondary">Change in ol-infrastructure</Typography.Text>
+                        ) : (
+                            <Space>
+                                <Dropdown
+                                    disabled={isLoading || !IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state]}
+                                    menu={{
+                                        items: (IDP_ALLOWED_TRANSITIONS[idp.lifecycle_state] ?? []).map((state) => ({
+                                            key: state,
+                                            label: idpState(state)?.label ?? state,
+                                        })),
+                                        onClick: ({ key }) => transition(idp, key as IdpLifecycleState),
+                                    }}
+                                >
+                                    <Button size="small">
+                                        Move to <DownOutlined />
+                                    </Button>
+                                </Dropdown>
+                                <Button size="small" icon={<ReloadOutlined />} disabled={isLoading} onClick={() => refreshMetadata(idp)}>
+                                    Refresh metadata
                                 </Button>
-                            </Dropdown>
-                            <Button size="small" icon={<ReloadOutlined />} disabled={isLoading} onClick={() => refreshMetadata(idp)}>
-                                Refresh metadata
-                            </Button>
-                            <Button
-                                size="small"
-                                icon={<EditOutlined />}
-                                disabled={isLoading}
-                                onClick={() =>
-                                    go({ to: `/b2b_organizations/show/${organization.org_key}/identity-providers/${idp.alias}/edit` })
-                                }
-                            >
-                                Edit
-                            </Button>
-                            <Button
-                                size="small"
-                                danger
-                                icon={<DeleteOutlined />}
-                                aria-label={`Delete identity provider ${idp.alias}`}
-                                disabled={isLoading}
-                                onClick={() => remove(idp)}
-                            />
-                        </Space>
-                    )}
+                                <Button
+                                    size="small"
+                                    icon={<EditOutlined />}
+                                    disabled={isLoading}
+                                    onClick={() =>
+                                        go({ to: `/b2b_organizations/show/${organization.org_key}/identity-providers/${idp.alias}/edit` })
+                                    }
+                                >
+                                    Edit
+                                </Button>
+                                <Button
+                                    size="small"
+                                    danger
+                                    icon={<DeleteOutlined />}
+                                    aria-label={`Delete identity provider ${idp.alias}`}
+                                    disabled={isLoading}
+                                    onClick={() => remove(idp)}
+                                />
+                            </Space>
+                        )
+                    }
                 />
             </Table>
         </Card>

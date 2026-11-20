@@ -1328,6 +1328,15 @@ class OrganizationIdentityProvider(TimestampedModel, ValidateOnSaveMixin):
         ),
     )
     metadata_fetched_at = models.DateTimeField(null=True, blank=True)
+    pulumi_managed = models.BooleanField(
+        default=False,
+        help_text=(
+            "Created by ol-infrastructure and still in its Pulumi state. The "
+            "provisioning API won't change it until it is released, because "
+            "the next pulumi up would revert the change, and a metadata "
+            "refresh can drop settings Pulumi chose on purpose."
+        ),
+    )
 
     @property
     def login_url(self):
