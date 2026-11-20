@@ -68,3 +68,7 @@ class OrganizationNotProvisionedError(Exception):
 
 class ContractVariantError(Exception):
     """Raised when a change to a contract's variant sets is not allowed."""
+
+
+class ContractProgramOrderError(Exception):
+    """Raised when a program order doesn't name each of a contract's programs once."""

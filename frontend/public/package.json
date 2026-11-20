@@ -44,7 +44,6 @@
     "redux-query-react": "3.3.1",
     "reselect": "4.1.8",
     "sanctuary": "0.13.2",
-    "slick-carousel": "^1.8.1",
     "styled-components": "4.4.1",
     "url-join": "4.0.1",
     "video.js": "7.21.7",
@@ -52,11 +51,10 @@
     "yup": "0.31.1"
   },
   "engines": {
-    "node": ">=17.8 <18"
+    "node": ">=20.18"
   },
   "scripts": {
     "build": "node ../../node_modules/.bin/webpack --bail",
-    "postinstall": "yarn build",
     "lint": "eslint ./src",
     "test": "./../../scripts/test/js_test.sh",
     "coverage": "COVERAGE=1 ./../../scripts/test/js_test.sh",
@@ -66,7 +64,7 @@
     "fmt": "LOG_LEVEL= prettier-eslint --write --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'",
     "fmt:check": "LOG_LEVEL= prettier-eslint --list-different --no-semi --ignore 'src/flow/**/*.js' 'src/**/*.js'"
   },
-  "packageManager": "yarn@3.8.7",
+  "packageManager": "yarn@4.18.1",
   "browserslist": [
     "> 1%"
   ],

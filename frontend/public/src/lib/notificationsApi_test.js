@@ -11,6 +11,7 @@ import {
   USER_MSG_TYPE_ENROLL_FAILED,
   USER_MSG_TYPE_ENROLLED,
   USER_MSG_TYPE_PAYMENT_ERROR,
+  USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
   USER_MSG_TYPE_PROFILE_INCOMPLETE
 } from "../constants"
 import IntegrationTestHelper from "../util/integration_test_helper"
@@ -40,6 +41,18 @@ describe("notifications API", () => {
         type: USER_MSG_TYPE_PAYMENT_ERROR
       })
       assert.equal(message && message.type, "danger")
+    })
+
+    it("returns the correct message properties given a 'payment pending processing' message cookie value", () => {
+      assert.deepEqual(
+        notificationsApi.parseStoredUserMessage({
+          type: USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING
+        }),
+        {
+          text: "Thank you! Your payment is being processed. Your enrollment will be updated once it is complete.",
+          type: "success"
+        }
+      )
     })
 
     it("returns the correct message properties given an 'enrolled' message cookie value", () => {

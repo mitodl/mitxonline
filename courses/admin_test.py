@@ -548,3 +548,22 @@ def test_undo_program_entitlement_verification_action_inactive(mocker, admin_cli
 
     message_texts = [str(m) for m in response.context["messages"]]
     assert any("left inactive" in t and "mitxonline-test-2" in t for t in message_texts)
+
+
+def test_downgrade_enrollment_action(mocker, admin_client):
+    """The downgrade action queues every selected enrollment for a background downgrade"""
+    selected = CourseRunEnrollmentFactory.create_batch(3)
+    mock_task = mocker.patch("courses.admin.downgrade_enrollments.delay")
+
+    response = admin_client.post(
+        reverse("admin:courses_courserunenrollment_changelist"),
+        {
+            "action": "downgrade_enrollment",
+            "_selected_action": [str(enrollment.id) for enrollment in selected],
+        },
+        follow=True,
+    )
+
+    assert sorted(mock_task.call_args.args[0]) == sorted(e.id for e in selected)
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any("Queued 3 enrollment(s)" in t for t in message_texts)

@@ -7,3 +7,57 @@
 # main, which already has the change, and release PRs compare `release` with
 # `release-candidate`. Once the change has shipped, delete its entries; left
 # in place they would hide a genuine breaking change of the same shape.
+
+# drf-spectacular 0.29 -> 0.30 schema corrections (PR #4134). No response
+# changes on the wire; only how existing values are described:
+# - `logo` (ImageField, blank=True) is now nullable. The API already returns
+#   null for an organization with no logo, so the old non-null schema was
+#   wrong (tfranzel/drf-spectacular#1493).
+# - `faq_url`/`video_url` (URLField, blank=True) are now `oneOf` a uri string
+#   or an empty string, because the field allows blank values. Clients that
+#   read them as strings are unaffected (tfranzel/drf-spectacular#1511).
+#
+# Delete this block once the bump has shipped to `release`.
+GET /api/v0/b2b/manager/organizations/ the response property `results/items/logo` became nullable for the status `200`
+GET /api/v0/b2b/manager/organizations/{id}/ the response property `logo` became nullable for the status `200`
+GET /api/v0/b2b/organizations/ the response property `items/logo` became nullable for the status `200`
+GET /api/v0/b2b/organizations/{organization_slug}/ the response property `logo` became nullable for the status `200`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/ the response property `results/items/user/b2b_organizations/items/logo` became nullable for the status `200`
+POST /api/v0/discounts/{parent_lookup_discount}/assignees/ the response property `user/b2b_organizations/items/logo` became nullable for the status `201`
+GET /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ the response property `user/b2b_organizations/items/logo` became nullable for the status `200`
+PATCH /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ the response property `user/b2b_organizations/items/logo` became nullable for the status `200`
+PUT /api/v0/discounts/{parent_lookup_discount}/assignees/{id}/ the response property `user/b2b_organizations/items/logo` became nullable for the status `200`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the response property `results/items/redeemed_by/b2b_organizations/items/logo` became nullable for the status `200`
+POST /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/ the response property `redeemed_by/b2b_organizations/items/logo` became nullable for the status `201`
+GET /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the response property `redeemed_by/b2b_organizations/items/logo` became nullable for the status `200`
+PATCH /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the response property `redeemed_by/b2b_organizations/items/logo` became nullable for the status `200`
+PUT /api/v0/discounts/{parent_lookup_redeemed_discount}/redemptions/{id}/ the response property `redeemed_by/b2b_organizations/items/logo` became nullable for the status `200`
+GET /api/v0/userinfo/ the response property `b2b_organizations/items/logo` became nullable for the status `200`
+GET /api/v0/users/current_user/ the response property `b2b_organizations/items/logo` became nullable for the status `200`
+PATCH /api/v0/users/current_user/ the response property `b2b_organizations/items/logo` became nullable for the status `200`
+GET /api/v0/users/me the response property `b2b_organizations/items/logo` became nullable for the status `200`
+PATCH /api/v0/users/me the response property `b2b_organizations/items/logo` became nullable for the status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/faq_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/video_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage added `subschema #1, subschema #2` to the `items/items/faq_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage added `subschema #1, subschema #2` to the `items/items/video_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/faq_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.coursepage the `items/items/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/faq_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/video_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage added `subschema #1, subschema #2` to the `items/items/faq_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage added `subschema #1, subschema #2` to the `items/items/video_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/faq_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/?fields=*&type=cms.programpage the `items/items/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/faq_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/video_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/faq_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/video_url` response property's maxLength was unset from `200` for the response status `200`
+GET /api/v2/pages/{id}/ added `subschema #1, subschema #2` to the `oneOf[#/components/schemas/CoursePageItem]/faq_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/{id}/ added `subschema #1, subschema #2` to the `oneOf[#/components/schemas/CoursePageItem]/video_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/{id}/ added `subschema #1, subschema #2` to the `oneOf[#/components/schemas/ProgramPageItem]/faq_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/{id}/ added `subschema #1, subschema #2` to the `oneOf[#/components/schemas/ProgramPageItem]/video_url` response property `oneOf` list for the response status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/faq_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/faq_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`

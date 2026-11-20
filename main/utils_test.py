@@ -15,6 +15,7 @@ from main.utils import (
     get_learn_base_url,
     get_learn_product_url,
     get_partitioned_set_difference,
+    keycloak_realm_url,
     parse_supplied_date,
 )
 
@@ -56,7 +57,6 @@ def test_get_js_settings(settings, rf):
         "posthog_api_host": settings.POSTHOG_API_HOST,
         "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
-        "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
         "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
         "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
         "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,
@@ -76,6 +76,22 @@ def test_get_learn_base_url(settings, base_url):
     """Test that get_learn_base_url returns the configured MIT_LEARN_BASE_URL setting"""
     settings.MIT_LEARN_BASE_URL = base_url
     assert get_learn_base_url() == base_url
+
+
+@pytest.mark.parametrize(
+    ("base_url", "expected"),
+    [
+        ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+        ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+        ("https://example.mit.edu/kc", "https://example.mit.edu/kc/realms/olapps"),
+        ("https://example.mit.edu/kc/", "https://example.mit.edu/kc/realms/olapps"),
+    ],
+)
+def test_keycloak_realm_url_keeps_a_path_in_the_base_url(settings, base_url, expected):
+    """A base URL with a path keeps it, with or without a trailing slash."""
+    settings.KEYCLOAK_BASE_URL = base_url
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    assert keycloak_realm_url() == expected
 
 
 @pytest.mark.parametrize(

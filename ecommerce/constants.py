@@ -176,15 +176,27 @@ GEOLOCATION_TYPES = [
 ]
 GEOLOCATION_CHOICES = zip(GEOLOCATION_TYPES, GEOLOCATION_TYPES)
 
+CHECKOUT_RESULT_CALLBACK_ROUTE = "checkout-result-callback"
+CHECKOUT_RESULT_SUCCESS_ROUTE = "checkout-result-success"
+CHECKOUT_RESULT_CANCEL_ROUTE = "checkout-result-cancel"
+# Routes that take the order reference number as a URL parameter.
+CHECKOUT_RESULT_ROUTES_WITH_REFERENCE = {
+    CHECKOUT_RESULT_SUCCESS_ROUTE,
+    CHECKOUT_RESULT_CANCEL_ROUTE,
+}
+
+# CyberSource POSTs a signed payload (which includes our reference number) back
+# to the callback route, so it keeps using that. Stripe only redirects the
+# user back with a GET, so it gets separate success and cancel routes.
 CHECKOUT_SUCCESS_ROUTE_MAP = {
-    "None": "checkout-result-callback",
-    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
-    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+    "None": CHECKOUT_RESULT_CALLBACK_ROUTE,
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: CHECKOUT_RESULT_CALLBACK_ROUTE,
+    MITOL_PAYMENT_GATEWAY_STRIPE: CHECKOUT_RESULT_SUCCESS_ROUTE,
 }
 CHECKOUT_CANCEL_ROUTE_MAP = {
-    "None": "checkout-result-callback",
-    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: "checkout-result-callback",
-    MITOL_PAYMENT_GATEWAY_STRIPE: "checkout-result-callback",
+    "None": CHECKOUT_RESULT_CALLBACK_ROUTE,
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE: CHECKOUT_RESULT_CALLBACK_ROUTE,
+    MITOL_PAYMENT_GATEWAY_STRIPE: CHECKOUT_RESULT_CANCEL_ROUTE,
 }
 
 STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION = "Initial CheckoutSession"

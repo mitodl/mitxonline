@@ -25,7 +25,6 @@ from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_NO_CRITERIA,
     create_run_enrollments,
     create_verifiable_credential,
-    downgrade_learner,
     summarize_verifiable_credential_certificate_statuses,
     undo_program_course_run_verification,
 )
@@ -60,6 +59,7 @@ from courses.models import (
     RelatedProgram,
     VerifiableCredential,
 )
+from courses.tasks import downgrade_enrollments
 from main.admin import (
     AuditableModelAdmin,
     DisplayOnlyAdminMixin,
@@ -104,7 +104,7 @@ class VerifiableCredentialBackfillAdminMixin:
         if failed_certificates:
             # We indicate IDs, but errors should also be logged to sentry from within create_verifiable_credential
             level = messages.WARNING
-            message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates, but encountered errors for certificates with IDs: {[cert.id for cert in failed_certificates]}"  # noqa: SLF001
+            message = f"Successfully requested verifiable credential backfill for {len(certificates)} {self.model._meta.model_name} certificates, but encountered errors for certificates with IDs: {[str(cert.uuid) for cert in failed_certificates]}"  # noqa: SLF001
 
         self.message_user(request, message, level=level)
 
@@ -649,31 +649,6 @@ class CourseRunAdmin(VerifiableCredentialBackfillAdminMixin, TimestampedModelAdm
                 ),
             )
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """
-        Show every contract in the b2b_contract dropdown, in a stable order.
-
-        The dropdown has to include inactive contracts. A run attached to one
-        - a retired run parked in the holding contract, or any run on an
-        expired contract - would otherwise render with an empty dropdown,
-        because its current value isn't among the choices. Since the field is
-        ``null=True, blank=True``, saving that form is valid and silently sets
-        ``b2b_contract`` to NULL, which turns a B2B run into a public-catalog
-        run (``CourseRunQuerySet.exclude_b2b`` treats a null contract as "not
-        B2B"). ``ContractPage.objects`` is the unfiltered manager.
-        """
-
-        if db_field.name == "b2b_contract":
-            # Imported here to avoid a circular dependency at module load time,
-            # matching ProgramContractPageInline above.
-            from b2b.models import ContractPage  # noqa: PLC0415
-
-            kwargs["queryset"] = ContractPage.objects.order_by(
-                "organization__name", "name"
-            )
-
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
     @admin.display(description="Primary?", ordering="is_primary_language")
     def primary(self, obj):
         """Return the primary language run flag."""
@@ -1048,21 +1023,23 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
             f"Reset edX enrollment repair retry count for {updated} enrollment(s).",
         )
 
-    @admin.action(description="Downgrade users enrollment")
+    @admin.action(description="Downgrade selected enrollments from verified to audit")
     def downgrade_enrollment(self, request, queryset):
-        """Admin action to change the status of users enrollment from verified to audit"""
-        enrollment = queryset.first()
-        _, enroll_success = downgrade_learner(enrollment)
-        if not enroll_success:
-            self.message_user(
-                request,
-                f"Failed to downgrade enrollment for user {enrollment.user.email}",
-            )
-        else:
-            self.message_user(
-                request,
-                f"Successfully downgraded users enrollment from verified to audit: {enrollment.user.email}.",
-            )
+        """
+        Admin action to downgrade the selected enrollments from verified to
+        audit, locally and in edX. Runs in the background, since a large
+        selection takes longer than a request may last. Inactive and
+        non-verified enrollments are skipped.
+        """
+        enrollment_ids = list(queryset.values_list("id", flat=True))
+        downgrade_enrollments.delay(enrollment_ids)
+        self.message_user(
+            request,
+            f"Queued {len(enrollment_ids)} enrollment(s) to be downgraded from "
+            "verified to audit. Inactive and non-verified ones are skipped. "
+            "Refresh this page in a few minutes to see the result.",
+            messages.SUCCESS,
+        )
 
     @admin.action(description="Undo verification from program entitlement")
     def undo_program_entitlement_verification(self, request, queryset):

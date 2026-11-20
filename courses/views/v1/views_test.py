@@ -827,7 +827,7 @@ def test_create_enrollments_failed(mocker, settings, user_client):
         HTTP_REFERER=EXAMPLE_URL,
     )
     assert resp.status_code == status.HTTP_302_FOUND
-    assert resp.url == EXAMPLE_URL
+    assert resp.url == reverse("user-dashboard")
     assert USER_MSG_COOKIE_NAME in resp.cookies
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {
@@ -847,7 +847,7 @@ def test_create_enrollments_no_run(mocker, user_client):
     )
     assert resp.status_code == status.HTTP_302_FOUND
     patched_log_error.assert_called_once()
-    assert resp.url == EXAMPLE_URL
+    assert resp.url == reverse("user-dashboard")
 
 
 def test_create_enrollments_blocked_country(mocker, user_client, user):

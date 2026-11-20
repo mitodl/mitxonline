@@ -361,6 +361,25 @@ class Program(TimestampedModel, ValidateOnSaveMixin):
             return None
 
     @cached_property
+    def has_live_product_page(self) -> bool:
+        """
+        Return true if the program has a product page that can be shown: the
+        program and its ProgramPage are live, the page is in the Learn catalog,
+        and the program isn't B2B-only.
+        """
+
+        # Keep in step with the anonymous filter in
+        # WagtailPagesAPIViewSet.get_queryset, which Learn's product page uses.
+        page = self.program_page
+        return (
+            self.live
+            and not self.b2b_only
+            and page is not None
+            and page.live
+            and bool(page.include_in_learn_catalog)
+        )
+
+    @cached_property
     def certificate_page(self):
         """Return this program's certificate page, or ``None``."""
         page = self.program_page
@@ -1323,6 +1342,23 @@ class Course(TimestampedModel, ValidateOnSaveMixin):
         """
 
         return getattr(self.course_page, "include_in_learn_catalog", False)
+
+    @cached_property
+    def has_live_product_page(self) -> bool:
+        """
+        Return true if the course has a product page that can be shown: the
+        course and its CoursePage are live and the page is in the Learn catalog.
+        """
+
+        # Keep in step with the anonymous filter in
+        # WagtailPagesAPIViewSet.get_queryset, which Learn's product page uses.
+        page = self.course_page
+        return (
+            self.live
+            and page is not None
+            and page.live
+            and bool(page.include_in_learn_catalog)
+        )
 
     @cached_property
     def ingest_content_files_for_ai(self) -> bool:

@@ -1,5 +1,6 @@
 """Tests for B2B API functions."""
 
+import logging
 from datetime import timedelta
 from decimal import Decimal
 from uuid import uuid4
@@ -9,6 +10,7 @@ import faker
 import freezegun
 import pytest
 import reversion
+from authlib.integrations.base_client.errors import OAuthError
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import caches
@@ -16,6 +18,7 @@ from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 from opaque_keys.edx.keys import CourseKey
+from requests import ConnectionError as RequestsConnectionError
 from requests import HTTPError, Response
 
 from b2b import factories
@@ -26,6 +29,7 @@ from b2b.api import (
     _get_source_runs_for_course,
     _handle_extra_enrollment_codes,
     _validate_b2b_enrollment_prerequisites,
+    add_user_org_membership,
     apply_contract_discounts_to_basket,
     create_b2b_enrollment,
     create_contract_run,
@@ -54,8 +58,12 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_MANAGED,
     ONBOARDING_STATE_ORG_CREATED,
 )
-from b2b.exceptions import SourceCourseIncompleteError
+from b2b.exceptions import (
+    KeycloakAdminImproperlyConfiguredError,
+    SourceCourseIncompleteError,
+)
 from b2b.factories import ContractPageFactory, OrganizationPageFactory
+from b2b.keycloak_admin_api import MEMBERSHIP_CREDENTIALS
 from b2b.models import (
     ContractPage,
     ContractProgramItem,
@@ -1469,21 +1477,55 @@ def test_b2b_org_attach_calls_keycloak(mocked_b2b_org_attach, has_id):
     assert (membership.added_to_keycloak_at is not None) is bool(has_id)
 
 
-def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker):
-    """A member Keycloak refused has no timestamp, so the periodic push retries."""
+@pytest.mark.parametrize(
+    "error",
+    [
+        HTTPError(response=Response()),
+        RequestsConnectionError(),
+        OAuthError(error="invalid_client"),
+        KeycloakAdminImproperlyConfiguredError("KEYCLOAK_MEMBERSHIP_CLIENT_ID"),
+    ],
+    ids=["http", "unreachable", "token", "settings"],
+)
+def test_b2b_org_attach_failure_leaves_the_member_for_the_push(mocker, caplog, error):
+    """
+    A member Keycloak refused still gets the org's contracts and has no
+    timestamp, so the periodic push retries Keycloak.
+    """
 
-    response = Response()
-    response.status_code = 500
-    mocker.patch(
-        "b2b.api.add_user_org_membership", side_effect=HTTPError(response=response)
-    )
+    attach = mocker.patch("b2b.api.add_user_org_membership", side_effect=error)
+    add_contracts = mocker.patch("b2b.models.OrganizationPage.add_user_contracts")
+    user = UserFactory.create()
 
     membership = process_add_org_membership(
-        UserFactory.create(), OrganizationPageFactory.create(), keep_until_seen=True
+        user,
+        OrganizationPageFactory.create(sso_organization_id=uuid4()),
+        keep_until_seen=True,
     )
 
+    attach.assert_called_once()
+    add_contracts.assert_called_once_with(user)
     membership.refresh_from_db()
     assert membership.keep_until_seen is True
+    assert membership.added_to_keycloak_at is None
+    [record] = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert record.exc_info[1] is error
+
+
+def test_b2b_org_attach_unexpected_error_keeps_contracts(mocker):
+    """An unexpected Keycloak error propagates, but contracts are already added."""
+
+    error = ValueError("token response is not a JSON object")
+    mocker.patch("b2b.api.add_user_org_membership", side_effect=error)
+    add_contracts = mocker.patch("b2b.models.OrganizationPage.add_user_contracts")
+    user = UserFactory.create()
+    org = OrganizationPageFactory.create(sso_organization_id=uuid4())
+
+    with pytest.raises(ValueError, match="JSON object"):
+        process_add_org_membership(user, org, keep_until_seen=True)
+
+    add_contracts.assert_called_once_with(user)
+    membership = UserOrganization.objects.get(user=user, organization=org)
     assert membership.added_to_keycloak_at is None
 
 
@@ -1538,6 +1580,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
             skip_edx=False,
             require_designated_source_run=False,
             org_prefix=None,
+            filter_variants=None,
         )
         assert result == (mock_run, mock_product)
     else:
@@ -1582,6 +1625,7 @@ def test_import_and_create_contract_run(mocker, run_exists, import_succeeds):
                 skip_edx=False,
                 require_designated_source_run=False,
                 org_prefix=None,
+                filter_variants=None,
             )
             assert result == (mock_run, mock_product)
         else:
@@ -1660,6 +1704,7 @@ def test_import_and_create_contract_run_with_all_kwargs(mocker):
         skip_edx=True,
         require_designated_source_run=True,
         org_prefix=None,
+        filter_variants=None,
     )
 
     assert result == (mock_run, mock_product)
@@ -1698,6 +1743,7 @@ def test_import_and_create_contract_run_with_string_departments(mocker):
         skip_edx=False,
         require_designated_source_run=False,
         org_prefix=None,
+        filter_variants=None,
     )
     assert result == (mock_run, mock_product)
 
@@ -3732,6 +3778,43 @@ def test_upgrade_enrollments_keeps_existing_contract(mocked_edx_upgrade_push):
     assert enrollment.b2b_contract == other_contract
 
 
+def test_import_and_create_contract_run_forwards_filter_variants(mocker):
+    """The variant filter reaches create_contract_run."""
+
+    contract = ContractPageFactory.create()
+    run = CourseRunFactory.create(is_source_run=True)
+    mock_create_contract_run = mocker.patch("b2b.api.create_contract_run")
+    filter_variants = list(contract.variant_options.all())
+
+    import_and_create_contract_run(
+        contract=contract,
+        course_run_id=run.courseware_id,
+        departments=[],
+        filter_variants=filter_variants,
+    )
+
+    assert (
+        mock_create_contract_run.call_args.kwargs["filter_variants"] == filter_variants
+    )
+
+
+def test_import_and_create_contract_run_empty_filter_imports_nothing(mocker):
+    """An empty variant filter fails before the run is imported from edX."""
+
+    contract = ContractPageFactory.create()
+    mock_import = mocker.patch("courses.api.import_courserun_from_edx")
+
+    with pytest.raises(SourceCourseIncompleteError):
+        import_and_create_contract_run(
+            contract=contract,
+            course_run_id="course-v1:MITx+6.00x+2T2023",
+            departments=[],
+            filter_variants=[],
+        )
+
+    mock_import.assert_not_called()
+
+
 @pytest.fixture
 def public_contract_run():
     """A public run, priced at 100, that's also in a contract priced at 10."""
@@ -3899,6 +3982,62 @@ def test_apply_user_discounts_applies_contract_code(public_contract_run):
     assert item.discounted_price == Decimal(10)
 
 
+def test_checkout_swaps_in_unused_contract_code(public_contract_run):
+    """
+    If the basket's one-time contract code was redeemed by someone else, checkout
+    should swap in an unused code before checking the basket's discounts, rather
+    than clearing the code and returning discount-invalid.
+    """
+
+    from ecommerce.api import generate_checkout_payload  # noqa: PLC0415
+
+    contract = public_contract_run["contract"]
+    product = public_contract_run["product"]
+
+    used_code, unused_code = [
+        OneTimeDiscountFactory.create(
+            is_bulk=True,
+            discount_type=DISCOUNT_TYPE_FIXED_PRICE,
+            amount=Decimal(0),
+            b2b_contract=contract,
+        )
+        for _ in range(2)
+    ]
+    for code in (used_code, unused_code):
+        DiscountProduct.objects.create(discount=code, product=product)
+
+    user = _make_contract_user({"c": contract}, ["c"])
+    basket = _basket_with(user, product, contract)
+    BasketDiscount.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=user,
+        redeemed_discount=used_code,
+        redeemed_basket=basket,
+    )
+
+    # Someone else in the contract uses the code before this learner checks out.
+    other_user = _make_contract_user({"c": contract}, ["c"])
+    DiscountRedemption.objects.create(
+        redemption_date=now_in_utc(),
+        redeemed_by=other_user,
+        redeemed_discount=used_code,
+        redeemed_order=OrderFactory.create(
+            purchaser=other_user, state=OrderStatus.FULFILLED
+        ),
+    )
+    assert not used_code.is_redeemable_by(user, [product])
+
+    result = generate_checkout_payload(_b2b_request(user), basket=basket)
+
+    assert "error" not in result
+    assert DiscountRedemption.objects.filter(
+        redeemed_by=user, redeemed_discount=unused_code
+    ).exists()
+    assert not DiscountRedemption.objects.filter(
+        redeemed_by=user, redeemed_discount=used_code
+    ).exists()
+
+
 @pytest.mark.parametrize("old_contract_state", ["expired", "inactive"])
 def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state):
     """Retirement removes old associations even when related managers hide them."""
@@ -3922,3 +4061,22 @@ def test_move_run_to_retirement_contract_removes_old_contract(old_contract_state
     assert set(memberships.values_list("contractpage_id", flat=True)) == {
         retirement_contract.pk
     }
+
+
+def test_add_user_org_membership_uses_the_membership_client(mocker, user):
+    """Enrollment adds the member as the membership service account."""
+
+    org = OrganizationPageFactory.create()
+    bootstrap = mocker.patch("b2b.api.bootstrap_client")
+    get_model = mocker.patch("b2b.api.get_keycloak_model")
+    org_model = get_model.return_value
+
+    assert add_user_org_membership(org, user) == org_model.associate.return_value
+
+    bootstrap.assert_called_once_with(
+        verify_realm=True, credentials=MEMBERSHIP_CREDENTIALS
+    )
+    assert get_model.call_args.kwargs["client"] is bootstrap.return_value
+    org_model.associate.assert_called_once_with(
+        "members", org.sso_organization_id, user.global_id
+    )

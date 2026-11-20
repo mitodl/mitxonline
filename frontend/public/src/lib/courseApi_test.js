@@ -1,10 +1,8 @@
 // @flow
 import {
-  isLinkableCourseRun,
   generateStartDateText,
   isFinancialAssistanceAvailable,
   learnerProgramIsCompleted,
-  extractCoursesFromNode,
   walkNodes,
   getFirstRelevantRun
 } from "./courseApi"
@@ -14,62 +12,19 @@ import moment from "moment"
 import {
   makeCourseRunDetail,
   makeLearnerRecord,
-  makeProgramWithReqTree,
-  makeProgramWithOnlyRequirements,
-  makeProgramWithOnlyElectives,
-  makeProgramWithNoElectivesOrRequirements,
-  makeProgram,
   makeCourseDetailWithRuns
 } from "../factories/course"
-import { makeUser } from "../factories/user"
 
 import type { CourseRunDetail } from "../flow/courseTypes"
-import type { LoggedInUser } from "../flow/authTypes"
 
 describe("Course API", () => {
   const past = moment().add(-10, "days").toISOString(),
     future = moment().add(10, "days").toISOString(),
-    farFuture = moment().add(50, "days").toISOString(),
     exampleUrl = "http://example.com"
-  let courseRun: CourseRunDetail, user: LoggedInUser
+  let courseRun: CourseRunDetail
 
   beforeEach(() => {
     courseRun = makeCourseRunDetail()
-    user = makeUser()
-  })
-
-  describe("isLinkableCourseRun", () => {
-    [
-      [exampleUrl, past, future, false, "run is in progress", true],
-      [
-        exampleUrl,
-        past,
-        null,
-        false,
-        "run is in progress with no end date",
-        true
-      ],
-      [
-        exampleUrl,
-        future,
-        farFuture,
-        true,
-        "logged-in user is an editor",
-        true
-      ],
-      [null, past, future, true, "run has an empty courseware url", false],
-      [exampleUrl, future, null, false, "run is not in progress", false]
-    ].forEach(
-      ([coursewareUrl, startDate, endDate, isEditor, desc, expLinkable]) => {
-        it(`returns ${String(expLinkable)} when ${desc}`, () => {
-          courseRun.courseware_url = coursewareUrl
-          courseRun.start_date = startDate
-          courseRun.end_date = endDate
-          user.is_editor = isEditor
-          assert.equal(isLinkableCourseRun(courseRun, user), expLinkable)
-        })
-      }
-    )
   })
 
   describe("generateStartDateText", () => {
@@ -165,108 +120,6 @@ describe("Course API", () => {
         })
       }
     )
-  })
-
-  describe("extractCoursesFromNode", () => {
-    it("returns a flattened list of courses for the node", () => {
-      // the learner record will generate a requirements tree in the proper
-      // format, so we're just using that factory here
-      const programEnrollment = {
-        program:     makeProgramWithReqTree(),
-        enrollments: []
-      }
-
-      const requirements = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[0],
-        programEnrollment
-      )
-      const electives = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[1],
-        programEnrollment
-      )
-
-      assert.equal(requirements.length, 3)
-      assert.equal(electives.length, 4)
-    })
-
-    it("returns a flattened list of courses for the node without any elective courses", () => {
-      // the learner record will generate a requirements tree in the proper
-      // format, so we're just using that factory here
-      const programEnrollment = {
-        program:     makeProgramWithOnlyRequirements(),
-        enrollments: []
-      }
-
-      const requirements = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[0],
-        programEnrollment
-      )
-      const electives = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[1],
-        programEnrollment
-      )
-
-      assert.equal(requirements.length, 3)
-      assert.equal(electives.length, 0)
-    })
-
-    it("returns a flattened list of courses for the node without any required courses", () => {
-      // the learner record will generate a requirements tree in the proper
-      // format, so we're just using that factory here
-      const programEnrollment = {
-        program:     makeProgramWithOnlyElectives(),
-        enrollments: []
-      }
-
-      const requirements = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[0],
-        programEnrollment
-      )
-      const electives = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[1],
-        programEnrollment
-      )
-
-      assert.equal(requirements.length, 0)
-      assert.equal(electives.length, 4)
-    })
-
-    it("returns a flattened list of courses for the node without any required courses or elective courses", () => {
-      // the learner record will generate a requirements tree in the proper
-      // format, so we're just using that factory here
-      const programEnrollment = {
-        program:     makeProgramWithNoElectivesOrRequirements(),
-        enrollments: []
-      }
-
-      const requirements = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[0],
-        programEnrollment
-      )
-      const electives = extractCoursesFromNode(
-        programEnrollment.program.req_tree[0].children[1],
-        programEnrollment
-      )
-
-      assert.equal(requirements.length, 0)
-      assert.equal(electives.length, 0)
-    })
-
-    it("returns a flattened list of courses associated with the program without nodes", () => {
-      // the learner record will generate a requirements tree in the proper
-      // format, so we're just using that factory here
-      const programEnrollment = {
-        program:     makeProgram(),
-        enrollments: []
-      }
-
-      // Pass undefined which can occur when an admin user deletes the requirement or elective sections from the program record.
-      const requirements = extractCoursesFromNode(undefined, programEnrollment)
-      const electives = extractCoursesFromNode(undefined, programEnrollment)
-
-      assert.equal(requirements.length, 0)
-      assert.equal(electives.length, 0)
-    })
   })
 
   describe("walkNodes", () => {

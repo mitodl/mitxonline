@@ -16,7 +16,6 @@ from b2b.constants import (
     CONTRACT_MEMBERSHIP_TYPE_CHOICES,
 )
 from b2b.contracts import create_contract
-from b2b.exceptions import SourceCourseIncompleteError
 from b2b.management.utils import get_contract_by_id_or_slug
 from b2b.models import (
     ContractPage,
@@ -906,46 +905,38 @@ class Command(BaseCommand):
         filter_variants = list(contract.active_variant_options())
         total_created = 0
         total_no_source = 0
+        total_invalid_key = 0
 
         for program, sort_order in programs_with_order:
             self.stdout.write(f"  Program: {program.readable_id}")
-            try:
-                created, no_source = contract.add_program_courses(
-                    program,
-                    order=sort_order,
-                    skip_edx=True,
-                    no_reruns=True,
-                    filter_variants=filter_variants,
-                )
-            except SourceCourseIncompleteError as exc:
-                self.stdout.write(
-                    self.style.WARNING(f"    Skipped (no source run): {exc}")
-                )
-                # Still attach the program so the contract structure is complete.
-                exists = ContractProgramItem.objects.filter(
-                    contract=contract, program=program
-                ).exists()
-                if not exists:
-                    ContractProgramItem(
-                        contract=contract,
-                        program=program,
-                        sort_order=sort_order,
-                    ).save(skip_run_creation=True)
-                continue
-
+            created, no_source, invalid_key = contract.add_program_courses(
+                program,
+                order=sort_order,
+                skip_edx=True,
+                no_reruns=True,
+                filter_variants=filter_variants,
+            )
             total_created += created
             total_no_source += no_source
+            total_invalid_key += invalid_key
             if no_source:
                 self.stdout.write(
                     self.style.WARNING(
                         f"    {no_source} course(s) had no source run and were skipped"
                     )
                 )
+            if invalid_key:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"    {invalid_key} course(s) had no valid contract run key and were skipped"
+                    )
+                )
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"  Created {total_created} contract run(s), "
-                f"{total_no_source} course(s) without source runs skipped"
+                f"{total_no_source} course(s) without source runs skipped, "
+                f"{total_invalid_key} with no valid contract run key skipped"
             )
         )
 

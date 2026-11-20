@@ -33,6 +33,7 @@ def test_serialize_program_enrollment(user, with_certificate, enrollment_mode):
                 "title": enrollment.program.title,
                 "program_type": enrollment.program.program_type,
                 "live": enrollment.program.live,
+                "has_live_product_page": enrollment.program.has_live_product_page,
             },
             "certificate": {"uuid": certificate.uuid, "link": certificate.link}
             if with_certificate

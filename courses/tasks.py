@@ -15,6 +15,7 @@ from courses.models import (
     LearnerProgramRecordShare,
 )
 from main.celery import app
+from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 log = logging.getLogger(__name__)
 
@@ -166,3 +167,56 @@ def upgrade_eligible_program_enrollments():
     enrollments = get_audit_program_enrollments_for_upgrade()
     for enrollment in enrollments:
         upgrade_program_enrollment_if_eligible(enrollment)
+
+
+@app.task(acks_late=True)
+def downgrade_enrollments(enrollment_ids):
+    """
+    Downgrade the given course run enrollments from verified to audit, locally
+    and in edX. Run in the background so a large admin selection doesn't hit
+    the request timeout.
+
+    Inactive and non-verified enrollments are skipped, since downgrade_learner
+    would reactivate an inactive one. Each row is re-read just before it's
+    checked, so a learner who unenrolled earlier in the batch is skipped.
+    """
+    from courses.api import downgrade_learner
+
+    downgraded, failed, skipped = 0, [], 0
+    for enrollment_id in enrollment_ids:
+        enrollment = (
+            CourseRunEnrollment.all_objects.select_related("user", "run")
+            .filter(id=enrollment_id)
+            .first()
+        )
+        if (
+            enrollment is None
+            or not enrollment.active
+            or enrollment.enrollment_mode != EDX_ENROLLMENT_VERIFIED_MODE
+        ):
+            skipped += 1
+            continue
+        try:
+            local_enrollments, edx_success = downgrade_learner(enrollment)
+            if not edx_success:
+                # Give the repair job fresh retries to push audit to edX,
+                # even if an earlier failure used them up.
+                CourseRunEnrollment.all_objects.filter(id=enrollment_id).update(
+                    edx_enrollment_retry_count=0
+                )
+        except Exception:
+            log.exception("Failed to downgrade enrollment %s", enrollment_id)
+            local_enrollments, edx_success = [], False
+        if local_enrollments and edx_success:
+            downgraded += 1
+        else:
+            failed.append(enrollment_id)
+
+    log.info(
+        "Downgraded %d enrollment(s) from verified to audit, %d failed, %d skipped",
+        downgraded,
+        len(failed),
+        skipped,
+    )
+    if failed:
+        log.error("Failed to downgrade enrollment(s) %s", failed)

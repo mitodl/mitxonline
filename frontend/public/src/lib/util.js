@@ -152,9 +152,6 @@ export const formatPrettyDate = (momentDate: Moment) =>
 export const formatPrettyShortDate = (momentDate: Moment) =>
   momentDate.format("MMM D, YYYY")
 
-export const formatPrettyMonthDate = (momentDate: Moment) =>
-  momentDate.format("MMMM D")
-
 export const formatPrettyDateUtc = (momentDate: Moment) =>
   momentDate.tz("UTC").format("MMMM D, YYYY")
 

@@ -29,7 +29,6 @@ from b2b.api import (
     get_active_contracts_from_basket_items,
     is_discount_supplied_for_b2b_purchase,
 )
-from compliance.exceptions import ExportComplianceDataError
 from courses.api import (
     create_run_enrollments,
     deactivate_run_enrollment,
@@ -44,6 +43,7 @@ from ecommerce.constants import (
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
     CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
     CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -99,6 +99,8 @@ from ecommerce.models import (
     OrderStatus,
     PendingOrder,
     Product,
+    RefundRequest,
+    RefundRequestStatus,
     StripeEventLog,
     Transaction,
     UserDiscount,
@@ -110,13 +112,8 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
-    USER_MSG_TYPE_BASKET_EMPTY,
-    USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-    USER_MSG_TYPE_DISCOUNT_INVALID,
-    USER_MSG_TYPE_ENROLL_BLOCKED,
-    USER_MSG_TYPE_ENROLL_DUPLICATED,
-    USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
+from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
 from openedx.api import create_user
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
@@ -125,31 +122,53 @@ from openedx.tasks import create_user_from_id
 log = logging.getLogger(__name__)
 
 
-def get_checkout_success_url(gateway_type):
+def _get_checkout_return_url(route_map, gateway_type, reference_number):
+    """
+    Build an absolute return URL for the gateway from the given route map.
+
+    Routes that identify the order in the URL get the reference number built
+    in; the others (CyberSource's callback) are returned as-is.
+    """
+
+    route = route_map[gateway_type]
+
+    if route in CHECKOUT_RESULT_ROUTES_WITH_REFERENCE:
+        if not reference_number:
+            msg = f"Gateway {gateway_type} requires an order reference number"
+            raise ValidationError(msg)
+
+        path = reverse(route, kwargs={"reference_number": reference_number})
+    else:
+        path = reverse(route)
+
+    return urljoin(settings.SITE_BASE_URL, path)
+
+
+def get_checkout_success_url(gateway_type, reference_number=None):
     """Get the success endpoint for the gateway type."""
 
     if gateway_type not in CHECKOUT_SUCCESS_ROUTE_MAP:
         msg = f"Gateway {gateway_type} has no success route mapped"
         raise ValidationError(msg)
 
-    return urljoin(
-        settings.SITE_BASE_URL, reverse(CHECKOUT_SUCCESS_ROUTE_MAP[gateway_type])
+    return _get_checkout_return_url(
+        CHECKOUT_SUCCESS_ROUTE_MAP, gateway_type, reference_number
     )
 
 
-def get_checkout_cancel_url(gateway_type):
+def get_checkout_cancel_url(gateway_type, reference_number=None):
     """Get the cancel endpoint for the gateway type."""
 
     if gateway_type not in CHECKOUT_CANCEL_ROUTE_MAP:
         msg = f"Gateway {gateway_type} has no cancel route mapped"
         raise ValidationError(msg)
 
-    return urljoin(
-        settings.SITE_BASE_URL, reverse(CHECKOUT_CANCEL_ROUTE_MAP[gateway_type])
+    return _get_checkout_return_url(
+        CHECKOUT_CANCEL_ROUTE_MAP, gateway_type, reference_number
     )
 
 
-def _validate_basket_steps_for_b2b(basket):
+def validate_basket_steps_for_b2b(basket):
     """
     Validate the basket for B2B.
 
@@ -190,7 +209,43 @@ def _validate_basket_steps_for_b2b(basket):
     return {}
 
 
-def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
+def _run_checkout_preflight(
+    request, basket, *, skip_discount_check=False, raise_compliance_data_errors=False
+):
+    """
+    Run the checkout pre-flight hooks, in order.
+
+    See the checkout_* hookspecs in ecommerce/hookspecs.py for what each step
+    is for. The discount steps are skipped if skip_discount_check is set.
+
+    Returns:
+    - dict|None: the error payload from the first check that failed, or None
+    """
+    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
+
+    pm = get_plugin_manager()
+
+    if result := pm.hook.checkout_validate_basket(
+        request=request,
+        basket=basket,
+        options={
+            "raise_compliance_data_errors": raise_compliance_data_errors,
+        },
+    ):
+        return result
+
+    if not skip_discount_check:
+        apply_contract_discounts_to_basket(basket)
+
+    if not skip_discount_check and (
+        result := pm.hook.checkout_validate_discounts(request=request, basket=basket)
+    ):
+        return result
+
+    return pm.hook.checkout_finalize_basket(request=request, basket=basket)
+
+
+def generate_checkout_payload(  # noqa: PLR0913
     request,
     *,
     basket=None,
@@ -222,9 +277,6 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
     - raise_compliance_data_errors: raise ExportComplianceDataError rather than
       returning a profile_incomplete payload (default False)
     """
-
-    from b2b.api import apply_contract_discounts_to_basket  # noqa: PLC0415
-
     if basket is None:
         basket = establish_basket(request)
 
@@ -239,65 +291,15 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
-    try:
-        has_blocked_products = basket.has_user_blocked_products(basket.user)
-    except ExportComplianceDataError as exc:
-        if raise_compliance_data_errors:
-            raise
-        # The learner can fix this themselves, unlike a compliance denial.
-        log.info(
-            "Checkout blocked on incomplete profile for user=%s: missing %s",
-            basket.user.id,
-            exc.missing_fields,
-        )
-        return {
-            "profile_incomplete": True,
-            "error": USER_MSG_TYPE_PROFILE_INCOMPLETE,
-            "missing_fields": exc.profile_fields,
-        }
+    preflight_error = _run_checkout_preflight(
+        request,
+        basket,
+        skip_discount_check=skip_discount_check,
+        raise_compliance_data_errors=raise_compliance_data_errors,
+    )
 
-    if has_blocked_products:
-        return {
-            "country_blocked": True,
-            "error": USER_MSG_TYPE_ENROLL_BLOCKED,
-        }
-
-    if basket.has_user_purchased_same_courserun(basket.user):
-        return {
-            "purchased_same_courserun": True,
-            "error": USER_MSG_TYPE_ENROLL_DUPLICATED,
-        }
-
-    if basket.has_user_purchased_non_upgradable_courserun():
-        return {
-            "purchased_non_upgradeable_courserun": True,
-            "error": USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
-        }
-
-    if not skip_discount_check:
-        # Pick up contract pricing for anything in the basket that's in one of
-        # the user's contracts, if it isn't there already.
-        apply_contract_discounts_to_basket(basket)
-
-    if not skip_discount_check and not check_basket_discounts_for_validity(basket):
-        # We only allow one discount per basket so clear all of them here.
-        basket.discounts.all().delete()
-        apply_user_discounts(basket)
-        return {
-            "invalid_discounts": True,
-            "error": USER_MSG_TYPE_DISCOUNT_INVALID,
-        }
-
-    b2b_validation_result = _validate_basket_steps_for_b2b(basket)
-
-    if b2b_validation_result:
-        return b2b_validation_result
-
-    if not basket.basket_items.count():
-        return {
-            "basket_empty": True,
-            "error": USER_MSG_TYPE_BASKET_EMPTY,
-        }
+    if preflight_error:
+        return preflight_error
 
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
@@ -345,8 +347,8 @@ def generate_checkout_payload(  # noqa: PLR0911, PLR0913, C901
     payload = PaymentGateway.start_payment(
         gateway_type,
         gateway_order,
-        get_checkout_success_url(gateway_type),
-        get_checkout_cancel_url(gateway_type),
+        get_checkout_success_url(gateway_type, order.reference_number),
+        get_checkout_cancel_url(gateway_type, order.reference_number),
         merchant_fields=[basket.id],
     )
 
@@ -955,6 +957,67 @@ def refund_order(*, order_id: int = None, reference_number: str = None, **kwargs
     return True, message
 
 
+def auto_refund_request(refund_request_id: int) -> tuple[bool, str]:
+    """
+    Refund the order behind a pending refund request when it qualifies for
+    automatic approval (`Order.is_auto_refund_eligible`) and its payment can be
+    refunded through the gateway, and mark the request approved. The learner is
+    unenrolled, as on the Google Sheets path.
+
+    The order row is locked while the request is checked and claimed
+    (marked approved), and that is committed before the gateway is called, so
+    concurrent or repeated runs see a non-pending request, or another request
+    for the order already being refunded, and do nothing. The
+    refund itself runs outside that transaction, so the refund record is
+    committed as soon as the gateway responds. If the refund fails, the
+    request goes back to pending for support.
+
+    Returns:
+        (auto_refunded, error): error is set only when a refund was attempted
+        and failed; the request is then left pending for support.
+    """
+    with transaction.atomic():
+        refund_request = RefundRequest.objects.get(pk=refund_request_id)
+        order = Order.objects.select_for_update().get(pk=refund_request.order_id)
+        # Re-read under the lock: another task may have decided it already.
+        refund_request.refresh_from_db()
+        if (
+            refund_request.status != RefundRequestStatus.PENDING
+            or not order.is_auto_refund_eligible
+            # Stripe, admin-fulfilled, PayPal and $0 orders can't be refunded
+            # through the gateway, so they go to support without an attempt.
+            or order.total_price_paid <= 0
+            or not _has_gateway_refundable_payment(order)
+            # Claiming a request only protects that request. Another request
+            # for this order already being refunded would double-refund it.
+            or order.refund_requests.filter(status=RefundRequestStatus.APPROVED)
+            .exclude(pk=refund_request.pk)
+            .exists()
+        ):
+            return False, ""
+
+        refund_request.status = RefundRequestStatus.APPROVED
+        refund_request.save(update_fields=["status", "updated_on"])
+
+    try:
+        refunded, message = refund_order(
+            order_id=order.id,
+            refund_reason=f"Auto-approved refund request {refund_request.id}",
+            unenroll=True,
+        )
+        if not refunded:
+            raise Exception(message)  # noqa: TRY002, TRY301
+    except Exception as exc:
+        log.exception(
+            "Automatic refund failed for refund request %s; leaving it pending",
+            refund_request_id,
+        )
+        refund_request.status = RefundRequestStatus.PENDING
+        refund_request.save(update_fields=["status", "updated_on"])
+        return False, str(exc)
+    return True, ""
+
+
 def find_paid_program_order_for_zero_value_order(order: Order) -> Order | None:
     """
     Find the order where the learner actually paid for the program.
@@ -1062,7 +1125,7 @@ def record_order_refund(
 
     # If unenroll requested, perform unenrollment after successful refund
     if unenroll:
-        perform_downgrade_from_order.delay(order.id)
+        transaction.on_commit(lambda: perform_downgrade_from_order.delay(order.id))
 
     return refund_transaction
 
