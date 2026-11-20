@@ -1736,8 +1736,8 @@ def test_checkout_interstitial_compliance_declined(
     mocked_export_compliance, user, user_client, products
 ):
     """
-    An export compliance decline sends the learner back to the dashboard with
-    its CS_700 support code, not a country block message (mitodl/hq#14499).
+    An export compliance decline sends the learner back to the cart with its
+    CS_700 support code, not a country block message (mitodl/hq#14499).
     """
     mocked_export_compliance.return_value = SimpleNamespace(
         accepted=False, decision="DECLINED", reason_code=700, request_id="x"
@@ -1747,7 +1747,7 @@ def test_checkout_interstitial_compliance_declined(
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
+    assert resp.url == reverse("cart")
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED, "code": "CS_700"}
     )

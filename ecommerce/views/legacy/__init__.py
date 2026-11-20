@@ -1164,9 +1164,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
             )
         if "compliance_declined" in checkout_payload:
-            # Support recognizes the code and does a manual review.
+            # Support recognizes the code and does a manual review. Back to
+            # the cart, since the dashboard is now on MIT Learn and wouldn't
+            # show this message.
             return redirect_with_user_message(
-                reverse("user-dashboard"),
+                reverse("cart"),
                 {
                     "type": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
                     "code": checkout_payload["reason_code"],
