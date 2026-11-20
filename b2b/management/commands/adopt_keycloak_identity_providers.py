@@ -22,6 +22,7 @@ from b2b.models import OrganizationIdentityProvider, OrganizationPage
 from b2b.provisioning import (
     KeycloakConnection,
     adopt_identity_provider,
+    adoption_metadata_source,
     organization_identity_providers,
 )
 
@@ -101,9 +102,20 @@ class Command(BaseCommand):
                 elif outcome == "failed":
                     failed.append(keycloak_idp.alias)
 
-        if not options["org_keys"]:
+        # An organization whose listing failed would make its IdPs look unlinked.
+        if not options["org_keys"] and not failed:
             self._report_unlinked(connection, recorded | linked_aliases)
+        self._report_outcome(sources, linked_aliases, skipped, failed)
 
+    def _report_outcome(self, sources, linked_aliases, skipped, failed):
+        """Report unused --source aliases and skipped IdPs, then fail on errors."""
+
+        unused_sources = sorted(set(sources) - linked_aliases)
+        if unused_sources:
+            self.stderr.write(
+                "--source given for IdPs no organization here links to "
+                "(aliases are case-sensitive): " + ", ".join(unused_sources)
+            )
         if skipped:
             # Not a failure: re-run with --source for the SAML ones.
             self.stderr.write(
@@ -139,6 +151,11 @@ class Command(BaseCommand):
         )
 
         if dry_run:
+            try:
+                adoption_metadata_source(keycloak_idp, sources.get(keycloak_idp.alias))
+            except IdentityProviderNotAdoptableError as exc:
+                self.stderr.write(f"Would skip {label}: {exc}")
+                return "skipped"
             state = "enabled" if keycloak_idp.enabled else "disabled"
             self.stdout.write(f"Would record: {label}, {state} in Keycloak")
             return "dry-run"

@@ -86,6 +86,13 @@ AuthnRequests a partner asked for), which can break logins until that run.
 Once an IdP has left Pulumi state, `manage.py release_pulumi_identity_providers
 ALIAS ...` clears the flag, audited as an IdP update, and the API can change it.
 
+Releasing doesn't make a refresh safe. A refresh still replaces every setting
+the partner's metadata covers, and with Pulumi gone nothing puts a deliberate
+override back. Before refreshing a released IdP, check its old `olapps.py`
+block for overrides such as `want_authn_requests_signed` (UKM) or
+`name_id_format` (NTUA). Keeping those through a refresh is still to do, and
+has to land before the Pulumi handover releases any IdP.
+
 ## Organizations
 
 ```

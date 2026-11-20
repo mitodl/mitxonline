@@ -35,3 +35,9 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(f"Released: {identity_provider.alias}")
             )
+        self.stderr.write(
+            "A metadata refresh on a released IdP replaces every setting the "
+            "partner's metadata covers, including ones Pulumi set on purpose "
+            "(e.g. signed AuthnRequests, the NameID format). Check its "
+            "olapps.py block before refreshing it."
+        )

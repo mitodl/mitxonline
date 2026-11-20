@@ -2514,6 +2514,44 @@ def test_adopt_command_dry_run_writes_nothing(adopt_command, connection, capsys)
     assert not OrganizationIdentityProvider.objects.exists()
 
 
+def test_adopt_command_dry_run_reports_what_the_real_run_would_skip(
+    adopt_command, connection, capsys
+):
+    """An IdP with no source is reported as a skip, not as one it would record."""
+
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [
+        IdentityProviderRepresentation(
+            alias="xml-saml", provider_id=IDP_PROTOCOL_SAML, config={}
+        )
+    ]
+
+    adopt_command("--dry-run")
+
+    output = capsys.readouterr()
+    assert "Would skip xml-saml (saml) for EXAMPLEU" in output.err
+    assert "Would record" not in output.out
+
+
+def test_adopt_command_warns_about_a_source_alias_that_matched_nothing(
+    adopt_command, connection, capsys
+):
+    """A mistyped --source alias is reported rather than ignored."""
+
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [_pulumi_saml_idp()]
+
+    adopt_command("--source", "EXAMPLEU=https://idp.example.edu/other")
+
+    assert "--source given for IdPs no organization here links to" in (
+        capsys.readouterr().err
+    )
+    assert (
+        OrganizationIdentityProvider.objects.get(alias="exampleu").metadata_source
+        == "https://idp.example.edu/metadata"
+    )
+
+
 def test_adopt_command_skips_an_idp_with_no_source_without_failing(
     adopt_command, connection, capsys
 ):
@@ -2577,6 +2615,8 @@ def test_adopt_command_continues_past_an_organization_keycloak_rejects(
         adopt_command()
 
     assert OrganizationIdentityProvider.objects.filter(alias="bbb").exists()
+    # AAA's IdPs weren't read, so the unlinked report would wrongly list them.
+    connection.identity_providers.list_all.assert_not_called()
 
 
 def test_adopt_command_reports_realm_idps_no_organization_links(

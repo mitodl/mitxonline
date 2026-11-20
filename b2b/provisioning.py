@@ -1222,6 +1222,41 @@ def _adopted_metadata_source(keycloak_idp):
     return None
 
 
+def adoption_metadata_source(keycloak_idp, metadata_source=None):
+    """
+    Return the metadata source adopt_identity_provider would record.
+
+    Separate so a dry run can tell which IdPs a real run would skip.
+
+    Args:
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    - metadata_source (str): a source supplied by the caller, if any
+    Returns:
+    - str: the supplied source, or one derived from Keycloak's config
+    Raises:
+    - IdentityProviderNotAdoptableError: it isn't SAML or OIDC, or no source
+      was supplied and Keycloak holds no metadata URL or issuer for it
+    """
+
+    if keycloak_idp.provider_id not in (IDP_PROTOCOL_SAML, IDP_PROTOCOL_OIDC):
+        msg = (
+            f"The identity provider '{keycloak_idp.alias}' is a "
+            f"{keycloak_idp.provider_id} provider, not SAML or OIDC."
+        )
+        raise IdentityProviderNotAdoptableError(msg)
+
+    metadata_source = metadata_source or _adopted_metadata_source(keycloak_idp)
+    if metadata_source is None:
+        msg = (
+            f"The identity provider '{keycloak_idp.alias}' "
+            f"({keycloak_idp.provider_id}) has no metadata URL or issuer in "
+            "Keycloak to record as its metadata source. Pass one with --source."
+        )
+        raise IdentityProviderNotAdoptableError(msg)
+
+    return metadata_source
+
+
 def organization_identity_providers(connection, organization):
     """
     Return the IdPs Keycloak links to an organization.
@@ -1276,22 +1311,7 @@ def adopt_identity_provider(
     - AliasCollisionError: the alias is already recorded here
     """
 
-    if keycloak_idp.provider_id not in (IDP_PROTOCOL_SAML, IDP_PROTOCOL_OIDC):
-        msg = (
-            f"The identity provider '{keycloak_idp.alias}' is a "
-            f"{keycloak_idp.provider_id} provider, not SAML or OIDC."
-        )
-        raise IdentityProviderNotAdoptableError(msg)
-
-    metadata_source = metadata_source or _adopted_metadata_source(keycloak_idp)
-    if metadata_source is None:
-        msg = (
-            f"The identity provider '{keycloak_idp.alias}' "
-            f"({keycloak_idp.provider_id}) has no metadata URL or issuer in "
-            "Keycloak to record as its metadata source."
-        )
-        raise IdentityProviderNotAdoptableError(msg)
-
+    metadata_source = adoption_metadata_source(keycloak_idp, metadata_source)
     lifecycle_state = IDP_STATE_ACTIVE if keycloak_idp.enabled else IDP_STATE_DISABLED
 
     with transaction.atomic():
