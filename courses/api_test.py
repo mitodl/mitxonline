@@ -17,7 +17,7 @@ import responses
 import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError, connection
+from django.db import DatabaseError, IntegrityError, connection
 from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
@@ -58,6 +58,7 @@ from courses.api import (
     create_local_enrollment,
     create_program_enrollments,
     create_run_enrollments,
+    create_verifiable_credential,
     deactivate_run_enrollment,
     defer_enrollment,
     downgrade_learner,
@@ -126,6 +127,7 @@ from courses.models import (
     ProgramEnrollmentAudit,
     ProgramRequirement,
     ProgramRequirementNodeType,
+    VerifiableCredential,
 )
 from ecommerce.constants import REDEMPTION_TYPE_INTERNAL
 from ecommerce.factories import (
@@ -5493,6 +5495,110 @@ def test_program_certificate_verifiable_credentials(
     assert (
         certificate.verifiable_credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
     )
+
+
+def _certificate_with_old_credential():
+    """A course run certificate that already has a stored verifiable credential."""
+    certificate = CourseRunCertificateFactory.create()
+    certificate.verifiable_credential = VerifiableCredential.objects.create(
+        uuid=certificate.uuid,
+        credential_data={"id": f"urn:uuid:{certificate.uuid}", "old": True},
+    )
+    certificate.save()
+    return certificate
+
+
+def _mock_certificate_page_and_payload(mocker, *, eligible=True):
+    """Patch the certificate page lookup and payload so only the credential storage logic is exercised."""
+    certificate_page = Mock()
+    certificate_page.verifiable_credential_criteria = (
+        "mock_credential_data" if eligible else ""
+    )
+    certificate_page.should_provision_verifiable_credential = eligible
+    mocker.patch("courses.api.get_certificate_page", return_value=certificate_page)
+    mocker.patch(
+        "courses.api.get_verifiable_credentials_payload",
+        side_effect=lambda certificate, _page: {"id": f"urn:uuid:{certificate.uuid}"},
+    )
+
+
+def test_create_verifiable_credential_replaces_existing(mocker):
+    """With replace_existing the stored credential is swapped for the newly signed one"""
+    certificate = _certificate_with_old_credential()
+    _mock_certificate_page_and_payload(mocker)
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+
+    credential = create_verifiable_credential(
+        certificate, raise_on_error=True, replace_existing=True
+    )
+
+    certificate.refresh_from_db()
+    assert credential.credential_data["proof"] == FAKE_PROOF_PAYLOAD
+    assert certificate.verifiable_credential.credential_data["proof"] == (
+        FAKE_PROOF_PAYLOAD
+    )
+    assert "old" not in certificate.verifiable_credential.credential_data
+    assert VerifiableCredential.objects.count() == 1
+
+
+def test_create_verifiable_credential_keeps_existing_when_page_not_eligible(mocker):
+    """An ineligible certificate page never touches the existing credential"""
+    certificate = _certificate_with_old_credential()
+    _mock_certificate_page_and_payload(mocker, eligible=False)
+    mock_request = mocker.patch("courses.api.request_verifiable_credential")
+
+    assert (
+        create_verifiable_credential(
+            certificate, raise_on_error=True, replace_existing=True
+        )
+        is None
+    )
+
+    mock_request.assert_not_called()
+    certificate.refresh_from_db()
+    assert certificate.verifiable_credential.credential_data["old"] is True
+
+
+def test_create_verifiable_credential_keeps_existing_when_signing_fails(mocker):
+    """If the signer fails, the existing credential is left in place"""
+    certificate = _certificate_with_old_credential()
+    _mock_certificate_page_and_payload(mocker)
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=RuntimeError("signer down"),
+    )
+
+    with pytest.raises(RuntimeError):
+        create_verifiable_credential(
+            certificate, raise_on_error=True, replace_existing=True
+        )
+
+    certificate.refresh_from_db()
+    assert certificate.verifiable_credential.credential_data["old"] is True
+
+
+def test_create_verifiable_credential_rolls_back_delete_when_save_fails(mocker):
+    """The old credential is only deleted in the transaction that saves the new one"""
+    certificate = _certificate_with_old_credential()
+    _mock_certificate_page_and_payload(mocker)
+    mocker.patch(
+        "courses.api.request_verifiable_credential",
+        side_effect=return_signed_credential,
+    )
+    mocker.patch.object(
+        VerifiableCredential.objects, "create", side_effect=DatabaseError("boom")
+    )
+
+    with pytest.raises(DatabaseError):
+        create_verifiable_credential(
+            certificate, raise_on_error=True, replace_existing=True
+        )
+
+    certificate.refresh_from_db()
+    assert certificate.verifiable_credential.credential_data["old"] is True
 
 
 @patch("courses.signals.upsert_custom_properties")

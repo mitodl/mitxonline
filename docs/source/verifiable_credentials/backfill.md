@@ -55,11 +55,15 @@ manage.py backfill_verifiable_credentials --type program --ids program-v1:MITx+D
 # Backfill all certificates for a set of courses by comma-separated course run IDs.
 manage.py backfill_verifiable_credentials --type course --ids course-v1:MITx+14.73x+1T2024,course-v1:MITx+14.73x+3T2024 --execute
 
-# Backfill a single certificate by its UUID, forcing a reissue if it already has a credential. This is useful for correcting the criteria text or after a learner changes their name.
+# Backfill a single certificate by its UUID, forcing a reissue if it already has a credential. This is useful for correcting a credential that was issued with wrong content, such as the criteria text or a learner's name. Earlier copies stay valid (see below).
 manage.py backfill_verifiable_credentials --uuid 3f1c0e2a-0000-0000-0000-000000000000 --execute --force
 ```
 
-Note that `--force` deletes the existing credential non-transactionally *before* requesting a new one.
+With `--force`, the existing credential is replaced only after the new one has been signed, so a failed signer request leaves the old credential in place. A certificate whose page isn't set up to provision credentials is skipped with a warning and keeps its existing credential.
+
+`--force` is used for two things: iterating on payload changes (for example, setting the criteria, issuing a credential to see how it looks in Verifier Plus, editing and reissuing), and giving a learner a credential with their updated name. Once revocation is supported, it would make sense to revoke the old credential instead of deleting it.
+
+A reissue does not revoke earlier copies. The new credential has the same `id` and the same `validFrom` (the certificate's issue date) as the old one, and credentials carry no `credentialStatus`, so a copy that a learner has already shared stays valid and keeps the content it was issued with, including the learner's name. After a name change, the old copy still shows the old name. Open Badges 3.0 (section 10) treats credentials with the same issuer and `id` as the same credential and takes the one with the newer `validFrom` as the replacement. We do not set a newer `validFrom` on a reissue yet.
 
 ## Checking certificate page configuration
 As noted earlier, verifiable credentials are only populated if the corresponding CertificatePages has a value for `verifiable_credential_criteria` and `should_provision_verifiable_credential=True`. If those are not populated, a verifiable credential will not be created for an issued Certificate.
