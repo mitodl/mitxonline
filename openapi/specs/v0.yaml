@@ -5574,13 +5574,19 @@ components:
           default: ''
           maxLength: 255
         metadata_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         metadata_xml:
           type: string
         discovery_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         client_id:
           type: string
         client_secret:
@@ -5612,9 +5618,12 @@ components:
           pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         org_key_prefix:
-          type: string
-          pattern: ^[A-Za-z0-9_.\-]+$
-          maxLength: 30
+          oneOf:
+          - type: string
+            pattern: ^[A-Za-z0-9_.\-]+$
+            maxLength: 30
+          - type: string
+            maxLength: 0
         domains:
           type: array
           items:
@@ -7418,6 +7427,7 @@ components:
         logo:
           type: string
           format: uri
+          nullable: true
           readOnly: true
           description: The organization's logo. Will be displayed in the app in various
             places.
@@ -7884,8 +7894,11 @@ components:
         protocol:
           $ref: '#/components/schemas/IdentityProviderProtocolEnum'
         metadata_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         metadata_xml:
           type: string
       required:
@@ -9234,6 +9247,7 @@ components:
         logo:
           type: string
           format: uri
+          nullable: true
           readOnly: true
           description: The organization's logo. Will be displayed in the app in various
             places.
