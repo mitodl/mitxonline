@@ -27,7 +27,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -142,13 +142,18 @@ class BasketItemViewSet(ModelViewSet):
         return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
 
     def perform_create(self, serializer):
-        """Add the item through the basket API, so the basket hooks run."""
+        """
+        Add the item through the basket API, so the basket hooks run.
+
+        The basket comes from the request body, so check it's the caller's.
+        """
+
+        basket = serializer.validated_data["basket"]
+        if basket.user_id != self.request.user.id:
+            raise NotFound
 
         item, _ = add_product_to_basket(
-            self.request,
-            serializer.validated_data["basket"],
-            serializer.validated_data["product"],
-            quantity=serializer.validated_data.get("quantity", 1),
+            self.request, basket, serializer.validated_data["product"]
         )
         serializer.instance = item
 

@@ -692,10 +692,10 @@ class CheckoutApiViewSet(ViewSet):
                 )
             message = "Product already in cart"
             if allow_multiple_items:
-                # Check if product already exists in basket
-                if not basket.basket_items.filter(product=product).exists():
-                    # Add new item to basket
-                    api.add_product_to_basket(self.request, basket, product)
+                # Run the add even if the product is already in the basket, so
+                # the basket hooks see it (it isn't added twice).
+                _, created = api.add_product_to_basket(self.request, basket, product)
+                if created:
                     message = "Product added to cart"
 
                     sync_hubspot_cart_add(

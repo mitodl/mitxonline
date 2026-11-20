@@ -3643,6 +3643,25 @@ def test_add_product_to_basket_existing_item(user, basket_hooks):
     assert item.quantity == 3
     assert basket.basket_items.count() == 1
 
+    # Without a quantity, an existing item's quantity is left alone.
+    item, created = add_product_to_basket(request, basket, existing.product)
+
+    assert created is False
+    assert item.quantity == 3
+
+
+def test_add_product_to_basket_default_quantity(user, basket_hooks):
+    """A new item defaults to a quantity of 1."""
+
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    item, created = add_product_to_basket(request, basket, ProductFactory.create())
+
+    assert created is True
+    assert item.quantity == 1
+
 
 @pytest.mark.parametrize("pass_contract", [True, False])
 def test_add_product_to_basket_contract(user, basket_hooks, pass_contract):

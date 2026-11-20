@@ -2543,3 +2543,39 @@ def test_basket_add_records_location(settings, user, user_client, multiple):
     assert basket.location_source == "geoip"
     assert resp.json()["location_country_code"] == "IN"
     assert resp.json()["location_source"] == "geoip"
+
+
+def test_add_basket_item_to_another_users_basket(user_drf_client, user):
+    """A user can't add an item to someone else's basket."""
+
+    other_basket = BasketFactory.create()
+    BasketFactory.create(user=user)
+
+    resp = user_drf_client.post(
+        reverse("v0:baskets_api-items-list", args=[other_basket.id]),
+        data={"product": ProductFactory.create().id, "basket": other_basket.id},
+        follow=True,
+    )
+
+    assert resp.status_code == 404
+    assert other_basket.basket_items.count() == 0
+    other_basket.refresh_from_db()
+    assert other_basket.location_data == []
+
+
+def test_add_basket_item_keeps_existing_quantity(user_drf_client, user):
+    """Adding a product that's already in the basket doesn't reset its quantity."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket, quantity=3)
+
+    resp = user_drf_client.post(
+        reverse("v0:baskets_api-items-list", args=[basket.id]),
+        data={"product": item.product.id, "basket": basket.id},
+        follow=True,
+    )
+
+    assert resp.status_code == 201
+    item.refresh_from_db()
+    assert item.quantity == 3
+    assert basket.basket_items.count() == 1

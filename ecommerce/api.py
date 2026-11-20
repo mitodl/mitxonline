@@ -653,15 +653,15 @@ def add_product_to_basket(
     basket: Basket,
     product: Product,
     *,
-    quantity: int = 1,
+    quantity: int | None = None,
     b2b_contract=None,
 ) -> tuple[BasketItem, bool]:
     """
     Add a product to a basket, running the basket update hooks around it.
 
     This is the one way to put an item in a basket, so the hooks see every
-    change. If the product is already in the basket, its quantity and contract
-    is updated instead (and its contract, if one is given).
+    addition. If the product is already in the basket, it isn't added again:
+    its quantity is set if one is given, and its contract if one is given.
 
     Callers apply automatic discounts afterwards; the hooks run first, so the
     discounts can rely on what the hooks recorded (such as the location).
@@ -670,7 +670,8 @@ def add_product_to_basket(
     - request (HttpRequest): the current request
     - basket (Basket): the basket to add to
     - product (Product): the product to add
-    - quantity (int): how many to add
+    - quantity (int|None): how many; None means 1 for a new item, and leaves
+      an existing item's quantity alone
     - b2b_contract (ContractPage|None): the contract the item is bought under
 
     Returns:
@@ -683,12 +684,17 @@ def add_product_to_basket(
         BasketUpdate(operation=BASKET_UPDATE_ADD_ITEM, product=product),
     )
 
-    defaults = {"quantity": quantity}
+    defaults = {}
+    if quantity is not None:
+        defaults["quantity"] = quantity
     if b2b_contract is not None:
         defaults["b2b_contract"] = b2b_contract
 
     item, created = BasketItem.objects.update_or_create(
-        basket=basket, product=product, defaults=defaults
+        basket=basket,
+        product=product,
+        defaults=defaults,
+        create_defaults={"quantity": 1, **defaults},
     )
 
     run_basket_post_update_hooks(

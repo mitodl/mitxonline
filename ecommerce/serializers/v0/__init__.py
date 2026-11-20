@@ -21,12 +21,9 @@ from ecommerce.constants import (
 )
 from ecommerce.discount_sources import credited_courseware
 from ecommerce.models import (
-    Basket,
-    BasketItem,
     Order,
     OrderRefundStatus,
     OrderStatus,
-    Product,
     RefundReasonChoices,
     RefundRequest,
     RefundRequestStatus,
@@ -295,13 +292,6 @@ class ProductSerializer(BaseProductSerializer):
 
 class BasketItemSerializer(serializers.ModelSerializer):
     """BasketItem model serializer"""
-
-    def perform_create(self, validated_data):
-        basket = Basket.objects.get(user=validated_data["user"])
-        # Product queryset returns active Products by default
-        product = Product.objects.get(id=validated_data["product"])
-        item, _ = BasketItem.objects.get_or_create(basket=basket, product=product)
-        return item
 
     class Meta:
         model = models.BasketItem

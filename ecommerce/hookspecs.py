@@ -152,10 +152,12 @@ def basket_pre_update(request, basket, update):
     """
     Run before the contents of a basket change.
 
-    Every change to a basket's contents goes through an API in ecommerce.api
-    that brackets the change with this hook and basket_post_update. Work that
-    should happen before the basket changes belongs here: finding out where
-    the user is, and (later) checking that the user may buy the item.
+    The basket APIs in ecommerce.api bracket a change with this hook and
+    basket_post_update. Today that's adding a product (add_product_to_basket)
+    and claiming an anonymous basket; removing items and discounts doesn't go
+    through them yet (hq#14486). Work that should happen before the basket
+    changes belongs here: finding out where the user is, and (later) checking
+    that the user may buy the item.
 
     To stop the change, raise an exception; the caller won't make the change.
     Return values are ignored.
