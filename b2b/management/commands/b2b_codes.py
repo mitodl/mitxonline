@@ -898,6 +898,7 @@ class Command(BaseCommand):
             "--name",
             type=str,
             dest="assigned_name",
+            default="",
             help="The name of the assignee. Valid only with --email.",
         )
         assign_parser.add_argument(

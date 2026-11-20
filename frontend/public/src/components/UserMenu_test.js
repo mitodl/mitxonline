@@ -13,8 +13,15 @@ describe("UserMenu component", () => {
     const userMenu = shallow(
       <UserMenu currentUser={user} useScreenOverlay={false} />
     )
-    assert.lengthOf(userMenu.find("MixedLink"), 4)
-    assert.lengthOf(userMenu.find("a"), 1)
+    assert.lengthOf(userMenu.find("MixedLink"), 3)
+    assert.lengthOf(userMenu.find("a"), 2)
+  })
+
+  it("links to the dashboard with a full page load", () => {
+    const link = shallow(
+      <UserMenu currentUser={user} useScreenOverlay={false} />
+    ).find("a[aria-label='Dashboard']")
+    assert.equal(link.prop("href"), routes.dashboard)
   })
 
   it("has the correct class applied to menu items in the mobile view", () => {
@@ -29,8 +36,7 @@ describe("UserMenu component", () => {
   it("has a link to logout", () => {
     assert.equal(
       shallow(<UserMenu currentUser={user} useScreenOverlay={false} />)
-        .find("a")
-        .at(0)
+        .find("a[aria-label='Sign Out']")
         .prop("href"),
       routes.logout
     )

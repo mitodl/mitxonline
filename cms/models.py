@@ -3,7 +3,6 @@
 import json
 import logging
 import re
-import uuid
 from datetime import datetime
 from json import dumps
 from urllib.parse import quote_plus, urlencode
@@ -11,7 +10,6 @@ from urllib.parse import quote_plus, urlencode
 import pycountry
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.cache import caches
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -23,7 +21,6 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from django.utils.safestring import mark_safe
 from django.utils.text import slugify
-from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from modelcluster.fields import ParentalKey, ParentalManyToManyField
 from wagtail.admin.panels import (
@@ -52,7 +49,6 @@ from wagtail.snippets.models import register_snippet
 from wagtailmetadata.models import MetadataPageMixin
 
 from cms import credential_metadata
-from cms import utils as cms_utils
 from cms.blocks import (
     CourseRunCertificateOverrides,
     PriceBlock,
@@ -73,7 +69,6 @@ from cms.wagtail_api.serializers import ImageSerializer, ProductChildPageSeriali
 from courses.api import get_relevant_course_run_qset
 from courses.models import (
     Course,
-    CourseRun,
     CourseRunCertificate,
     Program,
     ProgramCertificate,
@@ -94,7 +89,7 @@ from flexiblepricing.models import (
 )
 from main import features
 from main.serializers import RichTextSerializer
-from main.utils import get_learn_product_url
+from main.utils import get_learn_base_url, get_learn_product_url, learn_redirect
 from main.views import get_base_context
 
 log = logging.getLogger()
@@ -396,6 +391,16 @@ class CertificatePage(CourseProgramChildPage):
 
     template = "certificate_page.html"
     parent_page_types = ["CoursePage", "ProgramPage"]
+
+    def get_certificate_revision(self):
+        """
+        Return the revision new certificates should be pinned to: the published
+        one, so a later "Save draft" doesn't leak unpublished content onto
+        certificates. Falls back to the latest revision for a live page with no
+        recorded live revision (e.g. one saved live without going through
+        Wagtail's publish flow).
+        """
+        return self.live_revision or self.get_latest_revision()
 
     product_name = models.CharField(
         max_length=250,
@@ -899,68 +904,11 @@ class ProductPageTestimonial(Orderable):
         return self.name
 
 
-class HomePage(VideoPlayerConfigMixin):
+class HomePage(Page):
     """
-    Site home page
+    Root of the site's page tree. Every other page sits under it, so the record
+    has to stay even though the page itself redirects to MIT Learn.
     """
-
-    template = "home_page.html"
-
-    hero = models.ForeignKey(
-        Image,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        help_text="Main image displayed at the top of the home page. (The recommended dimensions for hero image are "
-        "1920x400)",
-    )
-    hero_title = models.CharField(  # noqa: DJ001
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The title text to display in the hero section of the home page.",
-    )
-    hero_subtitle = models.CharField(  # noqa: DJ001
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The subtitle text to display in the hero section of the home page.",
-    )
-
-    product_section_title = models.CharField(  # noqa: DJ001
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The title text to display in the product cards section of the home page.",
-    )
-    video_component_title = models.CharField(  # noqa: DJ001
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The title text to display in the video section of the home page.",
-    )
-    video_component_description = RichTextField(
-        null=True,
-        blank=True,
-        help_text="The text supporting the video in the video component on the homepage.",
-    )
-    video_url = models.URLField(  # noqa: DJ001
-        null=True,
-        blank=True,
-        help_text="URL to the video to be displayed for the homepage video component. It can be an HLS or Youtube video URL.",
-    )
-
-    content_panels = Page.content_panels + [  # noqa: RUF005
-        FieldPanel("hero"),
-        FieldPanel("hero_title"),
-        FieldPanel("hero_subtitle"),
-        FieldPanel("product_section_title"),
-        InlinePanel("featured_products", label="Featured Products"),
-        FieldPanel("video_component_title"),
-        FieldPanel("video_component_description"),
-        FieldPanel("video_url"),
-    ]
 
     parent_page_types = [Page]
     subpage_types = [
@@ -973,190 +921,11 @@ class HomePage(VideoPlayerConfigMixin):
         "InstructorIndexPage",
         "ProgramPage",
     ]
+    preview_modes = []
 
-    @property
-    def get_cached_featured_products(self):
-        """
-        Retrieves teh featured products that were generated using cms/api/create_featured_items either from the
-        management command or the daily cron job. This is used to display the featured products on the home page.
-        """
-        now = now_in_utc()
-        redis_cache = caches["redis"]
-        cached_featured_course_ids = redis_cache.get(
-            cms_utils.get_featured_items_cache_key()
-        )
-        if cached_featured_course_ids and len(cached_featured_course_ids) > 0:
-            # Load fresh course data from database using cached IDs
-            relevant_run_course_ids = (
-                CourseRun.objects.filter(live=True)
-                .filter(
-                    models.Q(course__id__in=cached_featured_course_ids)
-                    & models.Q(enrollment_start__lte=now)
-                    & (
-                        models.Q(enrollment_end__gte=now)
-                        | models.Q(enrollment_end__isnull=True)
-                    )
-                )
-                .values_list("course__id", flat=True)
-            )
-
-            # Create ordering to maintain the sequence from the cache
-            ordering = models.Case(
-                *[
-                    models.When(id=cid, then=pos)
-                    for pos, cid in enumerate(cached_featured_course_ids)
-                ],
-                output_field=models.IntegerField(),
-            )
-
-            valid_course_ids = set(cached_featured_course_ids) & set(
-                relevant_run_course_ids
-            )
-
-            featured_courses = (
-                Course.objects.filter(id__in=valid_course_ids, page__live=True)
-                .select_related("page")
-                .order_by(ordering)
-            )
-
-            featured_products = []
-            for course in featured_courses:
-                course_page = course.course_page
-                if course_page is not None:
-                    featured_products.append(course_page)
-            featured_product_pages = []
-            for page in featured_products:
-                run = page.product.first_unexpired_run
-                run_data = {
-                    "title": page.title,
-                    "description": page.description,
-                    "feature_image": page.feature_image,
-                    "start_date": run.start_date if run is not None else None,
-                    "url_path": get_learn_product_url(
-                        "programs" if page.is_program_page else "courses",
-                        page.product.readable_id,
-                    ),
-                    "is_program": page.is_program_page,
-                    "is_self_paced": run.is_self_paced if run is not None else None,
-                    "program_type": (
-                        page.product.program_type if page.is_program_page else None
-                    ),
-                }
-                featured_product_pages.append(run_data)
-            return featured_product_pages
-        return []
-
-    @property
-    def products(self):
-        """
-        This property returns products from the CMS (self.featured_products) formatted appropriately
-        for the featured products area of the home page
-        """
-        future_data = []
-        past_data = []
-        for page in self.featured_products.filter(course_product_page__live=True):
-            if page.course_product_page:
-                product_page = page.course_product_page.specific
-                run = product_page.product.first_unexpired_run
-                run_data = {
-                    "title": product_page.title,
-                    "description": product_page.description,
-                    "feature_image": product_page.feature_image,
-                    "start_date": run.start_date if run is not None else None,
-                    "url_path": get_learn_product_url(
-                        "programs" if product_page.is_program_page else "courses",
-                        product_page.product.readable_id,
-                    ),
-                    "is_program": product_page.is_program_page,
-                    "is_self_paced": run.is_self_paced if run is not None else None,
-                    "program_type": (
-                        product_page.product.program_type
-                        if product_page.is_program_page
-                        else None
-                    ),
-                }
-
-                if run and run.start_date and run.start_date < now_in_utc():
-                    past_data.append(run_data)
-                else:
-                    future_data.append(run_data)
-
-        # sort future course run in ascending order
-        page_data = sorted(
-            future_data,
-            key=lambda item: (item["start_date"] is None, item["start_date"]),
-        )
-        # sort past course run in descending order
-        page_data.extend(
-            sorted(
-                past_data,
-                key=lambda item: (item["start_date"] is None, item["start_date"]),
-                reverse=True,
-            )
-        )
-        return page_data
-
-    def get_context(self, request, *args, **kwargs):  # noqa: ARG002
-        hubspot_portal_id = settings.HUBSPOT_PORTAL_ID
-        hubspot_home_page_form_guid = settings.HUBSPOT_HOME_PAGE_FORM_GUID
-
-        if request.user.is_authenticated and request.user.global_id:
-            user = request.user.global_id
-        else:
-            if "anonymous_session_id" not in request.session:
-                request.session["anonymous_session_id"] = str(uuid.uuid4())
-            user = request.session["anonymous_session_id"]
-
-        show_auto_daily_featured_items = is_enabled(
-            features.ENABLE_AUTO_DAILY_FEATURED_ITEMS,
-            False,  # noqa: FBT003
-            user,
-        )
-
-        # If the feature flag is enabled, we will show the auto-generated, cached daily featured items
-        if show_auto_daily_featured_items:
-            products = self.get_cached_featured_products
-        # Otherwise, we will show the manually selected featured items that are stored in the CMS
-        else:
-            products = self.products
-
-        return {
-            **super().get_context(request),
-            **get_base_context(request),
-            "product_cards_section_title": self.product_section_title,
-            "products": products,
-            "hubspot_portal_id": hubspot_portal_id,
-            "hubspot_home_page_form_guid": hubspot_home_page_form_guid,
-            "show_auto_daily_featured_items": show_auto_daily_featured_items,
-        }
-
-
-class HomeProductLink(models.Model):  # noqa: DJ008
-    """
-    Home and ProductPage Link
-    """
-
-    page = ParentalKey(
-        HomePage, on_delete=models.CASCADE, related_name="featured_products"
-    )
-
-    # Previously, this was only a link to a course page. To keep these in the same inline field and for behavior to
-    # stay consistent, programs were added to the PageChooserPanel. This did not require a model change and, rather than
-    # cause potential downstream effects, the field name has stayed course_product_page although this now encompasses a
-    # course or program. Technically the FK points to the Page model, it is the wagtail panel setting that restricts the
-    # page type.
-    course_product_page = models.ForeignKey(
-        "wagtailcore.Page",
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="+",
-        verbose_name="Featured Product Page",
-    )
-
-    panels = [
-        PageChooserPanel("course_product_page", ["cms.CoursePage", "cms.ProgramPage"])
-    ]
+    def serve(self, request, *args, **kwargs):  # noqa: ARG002
+        """Send visitors to MITx on MIT Learn, which replaces this page."""
+        return learn_redirect(request, f"{get_learn_base_url()}/c/unit/mitx")
 
 
 class CourseObjectIndexPage(Page):
@@ -1251,9 +1020,7 @@ class ProductPage(VideoPlayerConfigMixin, MetadataPageMixin):
     class Meta:
         abstract = True
 
-    description = RichTextField(
-        help_text="The description shown on the home page and product page."
-    )
+    description = RichTextField(help_text="The description shown on the product page.")
 
     length = models.CharField(
         max_length=50,
@@ -1818,7 +1585,7 @@ class ProgramPage(ProductPage):
     )
 
     description = RichTextField(
-        help_text="The description shown on the home page and product page.",
+        help_text="The description shown on the product page.",
         blank=True,
         null=True,
     )
@@ -2209,7 +1976,12 @@ class FlexiblePricingRequestForm(AbstractForm):
             if isinstance(product, Course) and product.active_products
             else None
         )
-        context["product_page"] = product_page.url
+        # The learner experience lives on MIT Learn, so every way out of the
+        # form leads there rather than back to an MITxOnline page.
+        context["product_page"] = get_learn_product_url(
+            "programs" if isinstance(product, Program) else "courses",
+            product.readable_id,
+        )
 
         return context
 

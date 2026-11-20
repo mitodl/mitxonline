@@ -184,7 +184,6 @@ class TestMultipleCartItems:
         assert basket.basket_items.first().product == new_product
 
     @override_settings(ENABLE_MULTIPLE_CART_ITEMS=False)
-    @pytest.mark.zeal_allow("ecommerce.Product", "get()")
     def test_create_basket_with_products_single_item_mode_rejects_multiple(
         self,
         user_drf_client,

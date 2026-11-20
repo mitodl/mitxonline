@@ -8,9 +8,9 @@ then an ad hoc SCIM sync script with no field-level visibility) with one
 auditable command.
 
 Stage 1 delegates to `migrate_edx_data --type users` via `call_command()`
-rather than reimplementing its Trino/bulk_create logic here - that command
+rather than reimplementing its warehouse query/bulk_create logic here - that command
 also serves five other unrelated migration types (course_runs, entitlements,
-etc.) and owns the Trino schema, so duplicating its logic would mean two
+etc.) and owns the warehouse schema, so duplicating its logic would mean two
 places to keep in sync as that schema changes. This delegation has real
 limits worth knowing: `migrate_edx_data`'s "users" type doesn't support
 `--dry-run` (only its course_runs/entitlements types do), so this command's
@@ -54,7 +54,7 @@ class Command(BaseCommand):
             "--limit",
             type=int,
             help="Limit the number of users processed (for testing purposes). "
-            "Also passed through to migrate_edx_data's Trino query in Stage 1, "
+            "Also passed through to migrate_edx_data's warehouse query in Stage 1, "
             "so a small test run doesn't backfill the entire edX dataset just "
             "to test-sync a handful of users.",
         )
@@ -279,7 +279,9 @@ class Command(BaseCommand):
         """
         to_sync, blocked = [], []
         for user in candidates:
-            adapter = LearnUserAdapter(user)
+            # Read-only, outside a transaction, and the lock would re-fetch the
+            # user and drop the prefetches from _get_candidates.
+            adapter = LearnUserAdapter(user, lock_user=False)
             given_name, family_name = adapter._resolve_name()  # noqa: SLF001
             legal_address_complete = bool(
                 user.legal_address.first_name and user.legal_address.last_name

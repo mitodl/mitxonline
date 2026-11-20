@@ -87,11 +87,9 @@ def create_program_contract_runs(
         contract_id: The ID of the ContractPage
         program_id: The ID of the Program
     """
-    from django.db.models import Q
-
-    from b2b.api import create_contract_run
+    from b2b.contracts import add_courseware_to_contract
     from b2b.models import ContractPage
-    from courses.models import CourseRun, Program
+    from courses.models import Program
 
     lock_key = f"create_program_contract_runs_lock:{contract_id}:{program_id}"
     lock_acquired = cache.add(lock_key, self.request.id, timeout=3600)
@@ -108,62 +106,17 @@ def create_program_contract_runs(
         contract = ContractPage.objects.get(id=contract_id)
         program = Program.objects.get(id=program_id)
 
-        if hasattr(program, "_courses_with_requirements_data"):
-            delattr(program, "_courses_with_requirements_data")
-
-        created_count = 0
-        skipped_count = 0
-
-        courses = program.courses_qset_recursive
-
-        # Get courses with source runs
-        courses_with_source = courses.filter(
-            Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
-        )
-
-        # Count courses without source runs
-        courses_without_source = courses.exclude(
-            Q(courseruns__is_source_run=True) | Q(courseruns__run_tag="SOURCE")
-        ).count()
-
-        # Create contract runs for each course
-        for course in courses_with_source:
-            # Determine what the new run ID would be
-            clone_course_run = course.courseruns.filter(
-                Q(is_source_run=True) | Q(run_tag="SOURCE")
-            ).first()
-
-            if not clone_course_run:
-                continue
-
-            # Check if run already exists
-            if CourseRun.objects.filter(course=course, b2b_contracts=contract).exists():
-                skipped_count += 1
-                log.debug(
-                    "Contract run already exists for course %s in contract %s",
-                    course.readable_id,
-                    contract.slug,
-                )
-                continue
-
-            # Create the run
-            create_contract_run(contract, course, org_prefix=org_prefix)
-            created_count += 1
-            log.info(
-                "Created contract run for course %s in program %s for contract %s",
-                course.readable_id,
-                program.readable_id,
-                contract.slug,
-            )
+        added = add_courseware_to_contract(contract, program, org_prefix=org_prefix)
 
         log.info(
             "Completed contract run creation for program %s in contract %s: "
-            "%d created, %d skipped, %d courses without source runs",
+            "%d created, %d courses without a usable source run, "
+            "%d courses with no valid contract run key",
             program.readable_id,
             contract.slug,
-            created_count,
-            skipped_count,
-            courses_without_source,
+            added.runs_added,
+            added.courses_without_source_run,
+            added.courses_with_invalid_key,
         )
 
     finally:
@@ -176,15 +129,25 @@ def queue_contract_sheet_update_post_save(
     contract_id: int, *, only_update: bool = False
 ):
     """
-    Take an appropriate action on post-save for the contract.
+    Write the contract's enrollment codes to its Google Sheet.
 
-    If the prior revision to the current has a different tab or sheet URL
-    specified, then run write_codes, which will set up the (presumably blank)
-    sheet. Otherwise, use update_sheet, which is non-destructive.
+    write_codes sets up a (presumably blank) sheet and overwrites its rows, so
+    it runs only while none of the contract's codes has a sheet location: the
+    contract has never been written to a sheet, or the contract API cleared
+    the locations because the sheet or tab changed. It sets the locations, so
+    it runs once per sheet, and a failed write is retried by the next run.
+    Otherwise update_sheet, which is non-destructive, keeps each code in its
+    row.
+
+    only_update (the scheduled sweep) never runs write_codes, and skips a
+    contract whose sheet hasn't been written yet: update_sheet there would
+    write the codes without a header and save their locations, and then
+    write_codes would never run.
     """
 
     from b2b.models import ContractPage
     from b2b.sheets import ContractEnrollmentCodesSheetHandler
+    from ecommerce.models import Discount
 
     contract = ContractPage.objects.get(pk=contract_id)
 
@@ -199,24 +162,24 @@ def queue_contract_sheet_update_post_save(
             log.info("Contract %s is managed (no enrollment codes), skipping", contract)
         return
 
-    if not only_update:
-        has_revs = contract.revisions.count() > 1
+    # Every code of the contract, not discounts_qs: that leaves out codes whose
+    # run's product is inactive, and losing those would look like "never
+    # written" on a sheet that has them.
+    never_written = (
+        not Discount.objects.filter(b2b_contract=contract)
+        .exclude(b2b_sheet_location__isnull=True)
+        .exclude(b2b_sheet_location="")
+        .exists()
+    )
 
-        if has_revs:
-            # We have page revisions so check to see if the sheet or the tab changed
-            # in between. If they did, then we start over.
-            # Explicitly set this sort even though the Wagtail model seems to do this anyway.
-            revs = contract.revisions.order_by("-created_at").all()[:2]
-            if (
-                revs[0].as_object().google_sheet_target
-                != revs[1].as_object().google_sheet_target
-            ) or (
-                revs[0].as_object().google_sheet_target_tab
-                != revs[1].as_object().google_sheet_target_tab
-            ):
-                has_revs = False
-
-    if not only_update and not has_revs:
+    if never_written and only_update:
+        log.info(
+            "Google Sheet for %s hasn't been written yet; leaving it for the "
+            "next enrollment code check",
+            contract,
+        )
+        return
+    if never_written:
         log.info("Setting up Google Sheet for %s", contract)
 
         codes_written = handler.write_codes()

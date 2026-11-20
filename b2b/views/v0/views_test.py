@@ -658,7 +658,7 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
         mocked_create_user_request.assert_called()
         mocked_create_from_id.assert_not_called()
 
-    del user.openedx_user
+    user.clear_openedx_user_cache()
     assert user.edx_username
     assert CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
 

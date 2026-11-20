@@ -10,7 +10,7 @@ import reversion
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.test import Client, RequestFactory
-from django.urls import reverse
+from django.urls import resolve, reverse
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
 from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
@@ -72,6 +72,7 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
+from ecommerce.views.legacy import CheckoutCallbackView
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main import features
@@ -80,8 +81,8 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED,
-    USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
@@ -522,7 +523,6 @@ def test_redeem_time_limited_discount(  # noqa: PLR0913
         assert "not found" in resp_json
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_start_checkout_with_invalid_discounts(user, user_client, products, discounts):
     """
     Applies a discount, invalidates all the discounts, then hits the start
@@ -650,7 +650,7 @@ def test_start_checkout_with_stripe(mocker, user, user_client, fake):
         ("DECLINE", reverse("cart"), OrderStatus.DECLINED, True),
         ("ERROR", reverse("cart"), OrderStatus.ERRORED, True),
         ("REVIEW", reverse("cart"), OrderStatus.CANCELED, True),
-        ("ACCEPT", reverse("user-dashboard"), OrderStatus.FULFILLED, False),
+        ("ACCEPT", None, OrderStatus.FULFILLED, False),
     ],
 )
 @pytest.mark.dont_mock_enrollments
@@ -693,6 +693,8 @@ def test_checkout_result(  # noqa: PLR0913
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
+    if decision == "ACCEPT":
+        expected_redirect_url = f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
     assert resp.url == expected_redirect_url
 
     resp = api_client.post(reverse("checkout_result_api"), payload)
@@ -732,142 +734,13 @@ def test_checkout_result(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 @pytest.mark.dont_mock_enrollments
-def test_checkout_result_redirects_uai_b2c_courserun_to_learn_dashboard(
-    settings,
-    user,
-    user_client,
-    mocker,
-):
-    """Accepted UAI+B2C course run purchases should redirect to the MIT Learn dashboard."""
-    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
-
-    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
-    mocker.patch(
-        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
-        return_value=True,
-    )
-
-    run = CourseRunFactory.create(courseware_id="course-v1:UAI_B2C+TEST+2026")
-    with reversion.create_revision():
-        product = ProductFactory.create(purchasable_object=run)
-
-    create_basket_with_product(user, product)
-
-    checkout_payload = create_pending_order(user)
-
-    payload = checkout_payload["payload"]
-    payload = {
-        **{f"req_{key}": value for key, value in payload.items()},
-        "decision": "ACCEPT",
-        "message": "payment processor message",
-        "transaction_id": "12345",
-    }
-
-    resp = user_client.post(reverse("checkout-result-callback"), payload)
-    assert resp.status_code == 302
-    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
-    assert (
-        resp.url
-        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
-    )
-
-
-@pytest.mark.skip_nplusone_check
-@pytest.mark.dont_mock_enrollments
-def test_checkout_result_redirects_uai_b2c_program_to_learn_dashboard(
-    settings,
-    user,
-    user_client,
-    mocker,
-):
-    """Accepted UAI+B2C program purchases should redirect to the MIT Learn dashboard."""
-    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
-
-    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
-    mocker.patch(
-        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
-        return_value=True,
-    )
-    mocker.patch("courses.api.create_program_enrollments")
-
-    program = ProgramFactory.create(readable_id="program-v1:UAI+B2C.3+2026")
-    with reversion.create_revision():
-        product = ProductFactory.create(purchasable_object=program)
-
-    create_basket_with_product(user, product)
-
-    checkout_payload = create_pending_order(user)
-
-    payload = checkout_payload["payload"]
-    payload = {
-        **{f"req_{key}": value for key, value in payload.items()},
-        "decision": "ACCEPT",
-        "message": "payment processor message",
-        "transaction_id": "12345",
-    }
-
-    resp = user_client.post(reverse("checkout-result-callback"), payload)
-    assert resp.status_code == 302
-    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
-    assert (
-        resp.url
-        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
-    )
-
-
-@pytest.mark.skip_nplusone_check
-@pytest.mark.dont_mock_enrollments
-def test_checkout_result_redirects_to_learn_when_flag_enabled(
-    settings,
-    user,
-    user_client,
-    products,
-    mocker,
-):
-    """Fulfilled purchases redirect to Learn dashboard when feature flag is enabled."""
-    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-
-    mocker.patch("hubspot_sync.tasks.sync_deal_with_hubspot.apply_async")
-    mocker.patch(
-        "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
-        return_value=True,
-    )
-    mocker.patch(
-        "ecommerce.views.legacy.is_posthog_enabled",
-        return_value=True,
-    )
-
-    create_basket(user, products)
-
-    checkout_payload = create_pending_order(user)
-
-    payload = checkout_payload["payload"]
-    payload = {
-        **{f"req_{key}": value for key, value in payload.items()},
-        "decision": "ACCEPT",
-        "message": "payment processor message",
-        "transaction_id": "12345",
-    }
-
-    resp = user_client.post(reverse("checkout-result-callback"), payload)
-    assert resp.status_code == 302
-    order = Order.objects.get(purchaser=user, state=OrderStatus.FULFILLED)
-    assert (
-        resp.url
-        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
-    )
-
-
-@pytest.mark.skip_nplusone_check
-@pytest.mark.dont_mock_enrollments
-def test_checkout_result_no_learn_redirect_without_global_id(
+def test_checkout_result_redirects_to_learn_without_global_id(
     settings,
     user_client,
     products,
     mocker,
 ):
-    """Fulfilled purchases fall back to legacy dashboard when user has no global_id."""
+    """Fulfilled purchases redirect to the Learn dashboard even without a global_id."""
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
 
     user_no_global_id = UserFactory.create(global_id=None)
@@ -878,10 +751,6 @@ def test_checkout_result_no_learn_redirect_without_global_id(
         "mitol.payment_gateway.api.PaymentGateway.validate_processor_response",
         return_value=True,
     )
-    mock_is_enabled = mocker.patch(
-        "ecommerce.views.legacy.is_posthog_enabled",
-    )
-
     create_basket(user_no_global_id, products)
 
     checkout_payload = create_pending_order(user_no_global_id)
@@ -896,8 +765,51 @@ def test_checkout_result_no_learn_redirect_without_global_id(
 
     resp = user_client.post(reverse("checkout-result-callback"), payload)
     assert resp.status_code == 302
+    order = Order.objects.get(purchaser=user_no_global_id, state=OrderStatus.FULFILLED)
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+    )
+
+
+@pytest.mark.parametrize(
+    ("order_state", "to_learn_with_order"),
+    [
+        (OrderStatus.FULFILLED, True),
+        (OrderStatus.PENDING, False),
+        (OrderStatus.CANCELED, False),
+    ],
+)
+def test_checkout_result_get_reports_only_fulfilled_orders(
+    settings, user, user_client, order_state, to_learn_with_order
+):
+    """
+    Stripe returns the learner here after both successful and canceled
+    checkouts, so only a fulfilled order sends them to Learn with order info.
+    """
+    order = OrderFactory.create(purchaser=user, state=order_state)
+    session = user_client.session
+    session["order_reference_number"] = order.reference_number
+    session.save()
+    # Sessions are signed cookies, so the saved session is a new cookie value.
+    user_client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+    resp = user_client.get(reverse("checkout-result-callback"))
+
+    assert resp.status_code == 302
+    if to_learn_with_order:
+        assert (
+            resp.url
+            == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        )
+    else:
+        assert resp.url == reverse("user-dashboard")
+
+    # The reference is used once, so coming back later doesn't report the
+    # old order again.
+    assert "order_reference_number" not in user_client.session
+    resp = user_client.get(reverse("checkout-result-callback"))
     assert resp.url == reverse("user-dashboard")
-    mock_is_enabled.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -976,7 +888,6 @@ def test_checkout_product_with_no_active_product_uses_cart(user, user_client):
 
 
 @pytest.mark.dont_mock_enrollments
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 @pytest.mark.parametrize("by_product_id", [True, False])
 def test_checkout_product_with_verified_program_enrollment(
     user, user_client, by_product_id
@@ -1052,7 +963,6 @@ def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
 
 
 @pytest.mark.dont_mock_enrollments
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_product_verified_program_shortcut_with_unusable_profile(
     mocked_export_compliance, user, user_client
 ):
@@ -2003,13 +1913,11 @@ def test_checkout_api_result_program_accept(
     assert resp.status_code == 302
 
     order = Order.objects.get(state=OrderStatus.FULFILLED, purchaser=user)
-    assert USER_MSG_COOKIE_NAME in resp.cookies
-    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {
-            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED,
-            "run": order.lines.first().courseware,
-        }
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
     )
+    assert USER_MSG_COOKIE_NAME not in resp.cookies
     assert not Basket.objects.filter(id=basket.id).exists()
 
 
@@ -2051,43 +1959,9 @@ def test_non_upgradable_courserun_checkout(  # noqa: PLR0913
 @pytest.mark.skip_nplusone_check
 def test_start_checkout_with_zero_value(settings, user, user_client, products):
     """
-    Check that the checkout redirects the user to dashboard when basket price is zero
+    Check that a zero-value checkout redirects the user to the Learn dashboard
     """
     settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-    discount = DiscountFactory.create(
-        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
-    )
-    test_redeem_discount(user, user_client, products, [discount], False, False)  # noqa: FBT003
-
-    resp = user_client.get(reverse("checkout_interstitial_page"))
-
-    assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
-    assert USER_MSG_COOKIE_NAME in resp.cookies
-    order = Order.objects.filter(purchaser=user).get()
-    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {
-            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-            "run": order.lines.first().purchased_object.course.title,
-        }
-    )
-
-
-@pytest.mark.skip_nplusone_check
-def test_start_checkout_with_zero_value_redirects_to_learn(
-    settings, user, user_client, products, mocker
-):
-    """
-    Check that a zero-value checkout redirects to Learn dashboard when flag is enabled.
-    """
-    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
-    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
-
-    mocker.patch(
-        "ecommerce.views.legacy.is_posthog_enabled",
-        return_value=True,
-    )
-
     discount = DiscountFactory.create(
         discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=100
     )
@@ -2125,14 +1999,10 @@ def test_start_checkout_and_ensure_edx_username_created(mocker, settings, produc
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
-    assert USER_MSG_COOKIE_NAME in resp.cookies
     order = Order.objects.filter(purchaser=user).get()
-    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {
-            "type": USER_MSG_TYPE_PAYMENT_ACCEPTED_NOVALUE,
-            "run": order.lines.first().purchased_object.course.title,
-        }
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
     )
     mocked_create_user.assert_called()
 
@@ -2176,7 +2046,6 @@ def test_bulk_discount_create(admin_drf_client, use_redemption_type_flags):
     assert discounts[0].is_bulk
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_google_analytics_object(
     mocker, settings, user, user_client, products
 ):
@@ -2207,7 +2076,6 @@ def test_checkout_interstitial_google_analytics_object(
         assert isinstance(item["quantity"], int)
 
 
-@pytest.mark.zeal_allow("ecommerce.Basket", "get()")
 def test_checkout_interstitial_no_ga_flag_without_global_id(
     mocker, settings, user_client, products
 ):
@@ -2338,3 +2206,101 @@ def test_backoffice_callback_good_order(mocker, client, settings):
 
     assert response.status_code == 200
     mocked_processor.assert_called()
+
+
+@pytest.mark.parametrize("route", ["checkout-result-success", "checkout-result-cancel"])
+def test_checkout_result_routes_resolve_to_new_views(route):
+    """The success/cancel routes aren't swallowed by the checkout/result/ callback."""
+
+    match = resolve(reverse(route, kwargs={"reference_number": "mitxonline-test-1"}))
+
+    assert match.url_name == route
+    assert match.func.view_class is not CheckoutCallbackView
+
+
+def test_checkout_result_success_redirects_to_dashboard(user, client):
+    """Hitting the success endpoint redirects to the dashboard if unauthenticated."""
+
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING
+    assert not order.transactions.exists()
+
+
+def test_checkout_result_success_redirects_to_learn(settings, user, user_client):
+    """Orders that go to the Learn dashboard are sent there as pending, not fulfilled."""
+
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=pending&order_id={order.id}"
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.parametrize("is_anonymous", [True, False])
+def test_checkout_result_success_ignores_other_users_orders(
+    user, user_client, is_anonymous
+):
+    """Another user's reference number (or no login) gets the plain dashboard redirect."""
+
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    client = Client() if is_anonymous else user_client
+
+    resp = client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+    )
+
+
+def test_checkout_result_cancel_redirects_to_cart(user, user_client):
+    """The cancel handler redirects to the cart with the cancelled message."""
+
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_client.get(
+        reverse(
+            "checkout-result-cancel",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING

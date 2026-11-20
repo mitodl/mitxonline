@@ -81,7 +81,7 @@ yarn fmt:check         # Check formatting
 **Build:**
 ```bash
 # From project root
-yarn workspaces foreach run build
+yarn workspaces foreach --all run build
 
 # From frontend/public directory
 yarn build             # Production build
@@ -361,5 +361,3 @@ For frontend changes with hot module replacement:
 cd frontend/public
 yarn dev-server
 ```
-
-The Django dev server uses `webpack-dev-middleware` to proxy webpack assets.

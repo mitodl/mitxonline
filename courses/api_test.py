@@ -17,7 +17,7 @@ import responses
 import reversion
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import RequestFactory, override_settings
 from django.test.utils import CaptureQueriesContext
 from edx_api.course_detail import CourseDetail, CourseMode, CourseModes
@@ -38,7 +38,7 @@ from cms.factories import (
     CourseIndexPageFactory,
     CoursePageFactory,
 )
-from cms.models import CoursePage, ProgramPage
+from cms.models import CertificatePage, CoursePage, ProgramPage
 from compliance.api import ExportComplianceResult, verify_user_with_exports
 from compliance.exceptions import (
     ExportComplianceCheckError,
@@ -120,6 +120,7 @@ from courses.models import (
     CourseRunEnrollmentAudit,
     EnrollmentMode,
     PaidCourseRun,
+    PaidProgram,
     ProgramCertificate,
     ProgramEnrollment,
     ProgramEnrollmentAudit,
@@ -1093,6 +1094,231 @@ class TestDowngradeProgramEnrollmentAndVerifiedRuns:
         assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
         assert run_enrollment.active is True
 
+    def test_unenrolls_run_without_audit_track(self, mocker, program_setup):
+        """A verified run with no audit mode is unenrolled, not downgraded."""
+        program_setup.run.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).delete()
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=program_setup.run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.unenroll_edx_course_run")
+        mocker.patch("courses.api.mail_api.send_course_run_unenrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.active is False
+        assert run_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+
+    def test_downgrades_run_in_nested_program(self, mocker, program_setup):
+        """Runs in programs nested in the purchased program are downgraded too."""
+        nested_program = ProgramFactory.create()
+        nested_run = CourseRunFactory.create()
+        nested_program.add_requirement(nested_run.course)
+        program_setup.program.add_program_requirement(nested_program)
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=program_setup.user,
+            run=nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        assert downgraded_runs == [run_enrollment]
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+
+    @pytest.fixture
+    def nested_setup(self, program_setup):
+        """Add a nested program, with one run, under the purchased program."""
+        nested_program = ProgramFactory.create()
+        nested_run = CourseRunFactory.create()
+        nested_program.add_requirement(nested_run.course)
+        program_setup.program.add_program_requirement(nested_program)
+        program_setup.nested_program = nested_program
+        program_setup.nested_run = nested_run
+        return program_setup
+
+    def test_downgrades_nested_program_enrollment(self, mocker, nested_setup):
+        """A verified nested ProgramEnrollment is downgraded to audit."""
+        nested_enrollment = ProgramEnrollmentFactory.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        nested_enrollment.refresh_from_db()
+        assert nested_enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert nested_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+        assert nested_enrollment.active is True
+
+    def test_deactivates_nested_program_enrollment_without_audit_track(
+        self, mocker, nested_setup
+    ):
+        """A verified nested ProgramEnrollment with no audit mode is deactivated."""
+        nested_setup.nested_program.enrollment_modes.filter(
+            mode_slug=EDX_ENROLLMENT_AUDIT_MODE
+        ).delete()
+        nested_enrollment = ProgramEnrollmentFactory.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        nested_enrollment.refresh_from_db()
+        assert nested_enrollment.active is False
+        assert nested_enrollment.change_status == ENROLL_CHANGE_STATUS_REFUNDED
+
+    def test_preserves_independently_purchased_nested_program(
+        self, mocker, nested_setup
+    ):
+        """A nested program bought separately stays verified."""
+        nested_enrollment = ProgramEnrollmentFactory.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        )
+        PaidProgram.objects.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            order=OrderFactory.create(
+                purchaser=nested_setup.user, state=OrderStatus.FULFILLED
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        nested_enrollment.refresh_from_db()
+        assert nested_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_preserves_run_in_independently_purchased_nested_program(
+        self, mocker, nested_setup
+    ):
+        """
+        Refunding the parent leaves runs of a separately bought nested
+        program verified, even when their only order is a $0 program-linked one.
+        """
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=nested_setup.user,
+            run=nested_setup.nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            nested_setup.user,
+            nested_setup.nested_run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{nested_setup.nested_program.readable_id}-{uuid4()}",
+        )
+        PaidProgram.objects.create(
+            user=nested_setup.user,
+            program=nested_setup.nested_program,
+            order=OrderFactory.create(
+                purchaser=nested_setup.user, state=OrderStatus.FULFILLED
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert run_enrollment.active is True
+
+    def test_preserves_run_covered_by_paid_parent_program(self, mocker, nested_setup):
+        """Refunding a nested program leaves its runs verified while a paid parent covers them."""
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=nested_setup.user,
+            run=nested_setup.nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        PaidProgram.objects.create(
+            user=nested_setup.user,
+            program=nested_setup.program,
+            order=OrderFactory.create(
+                purchaser=nested_setup.user, state=OrderStatus.FULFILLED
+            ),
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.nested_program
+        )
+
+        assert downgraded_runs == []
+        run_enrollment.refresh_from_db()
+        assert run_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+    def test_downgrades_nested_program_zero_value_run(self, mocker, nested_setup):
+        """A $0 order redeeming the nested program's discount is program-linked."""
+        run_enrollment = CourseRunEnrollmentFactory.create(
+            user=nested_setup.user,
+            run=nested_setup.nested_run,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            active=True,
+        )
+        self._paid_course_run(
+            nested_setup.user,
+            nested_setup.nested_run,
+            total_price_paid=Decimal("0.00"),
+            discount_code=f"{nested_setup.nested_program.readable_id}-{uuid4()}",
+        )
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+
+        _, downgraded_runs = downgrade_program_enrollment_and_verified_runs(
+            nested_setup.user, nested_setup.program
+        )
+
+        assert downgraded_runs == [run_enrollment]
+
+    def test_downgrade_skips_export_compliance_check(self, mocker, program_setup):
+        """A declined export check doesn't block downgrading the enrollment."""
+        mocker.patch("courses.api.enroll_in_edx_course_runs")
+        verify = mocker.patch(
+            "courses.api._verify_exports_compliance_for_enrollment",
+            side_effect=ExportComplianceError(program_setup.user, "DENY", "100"),
+        )
+
+        downgrade_program_enrollment_and_verified_runs(
+            program_setup.user, program_setup.program
+        )
+
+        verify.assert_not_called()
+        program_setup.program_enrollment.refresh_from_db()
+        assert program_setup.program_enrollment.enrollment_mode == (
+            EDX_ENROLLMENT_AUDIT_MODE
+        )
+
     def test_downgrades_zero_value_verified_run_enrollment(self, mocker, program_setup):
         """
         A course-run enrollment backed by a PaidCourseRun whose order was
@@ -1559,7 +1785,11 @@ def test_create_run_enrollments_skips_country_check_when_requested(
 
 
 def test_downgrade_learner_skips_country_block(mocker, user):
-    """Refund downgrades must still work for a learner whose country is blocked."""
+    """
+    Downgrades must still work for a learner whose country is blocked
+    or who can't be export-compliance screened, and never send an enrollment
+    email.
+    """
     run = CourseRunFactory.create()
     BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
     enrollment = CourseRunEnrollmentFactory.create(
@@ -1572,6 +1802,8 @@ def test_downgrade_learner_skips_country_block(mocker, user):
     downgrade_learner(enrollment)
 
     assert patched_create.call_args.kwargs["skip_country_block_check"] is True
+    assert patched_create.call_args.kwargs["skip_compliance_check"] is True
+    assert patched_create.call_args.kwargs["skip_enrollment_emails"] is True
 
 
 def test_country_blocked_error_message(user):
@@ -2932,6 +3164,63 @@ def test_course_run_certificate_unpublished_certificate_page(
     assert not CourseRunCertificate.objects.exists()
 
 
+def test_course_run_certificate_uses_current_revision_despite_stale_cache(
+    passed_grade_with_enrollment, mocker
+):
+    """
+    A certificate gets the certificate page's current latest revision even if
+    the Course object (reused across a batch) has a stale cached
+    certificate_page from before a newer revision was saved.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    course = passed_grade_with_enrollment.course_run.course
+    stale_certificate_page = course.certificate_page
+    new_revision = CertificatePage.objects.get(
+        pk=stale_certificate_page.pk
+    ).save_revision()
+    assert stale_certificate_page.get_latest_revision() != new_revision
+
+    certificate, created, _ = process_course_run_grade_certificate(
+        passed_grade_with_enrollment
+    )
+
+    assert created is True
+    assert certificate.certificate_page_revision == new_revision
+
+
+@pytest.mark.parametrize("existing_hidden_certificate", [True, False])
+def test_course_run_certificate_integrity_error(
+    passed_grade_with_enrollment, mocker, existing_hidden_certificate
+):
+    """
+    An IntegrityError from a revoked (hidden) existing certificate is logged
+    as a warning; any other IntegrityError is logged as an error. Neither is
+    raised.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    if existing_hidden_certificate:
+        CourseRunCertificateFactory.create(
+            user=passed_grade_with_enrollment.user,
+            course_run=passed_grade_with_enrollment.course_run,
+            is_revoked=True,
+        )
+    else:
+        mocker.patch.object(
+            CourseRunCertificate.objects, "get_or_create", side_effect=IntegrityError
+        )
+    patched_log = mocker.patch("courses.api.log")
+
+    result = process_course_run_grade_certificate(passed_grade_with_enrollment)
+
+    assert result == (None, False, False)
+    if existing_hidden_certificate:
+        patched_log.warning.assert_called_once()
+        patched_log.exception.assert_not_called()
+    else:
+        patched_log.exception.assert_called_once()
+        patched_log.warning.assert_not_called()
+
+
 @pytest.mark.parametrize("should_force_create", [True, False])
 def test_course_run_certificate_certificates_disabled(
     passed_grade_with_enrollment, should_force_create
@@ -3940,6 +4229,54 @@ def test_generate_program_certificate_unpublished_certificate_page(
     )
     assert result == (None, False)
     assert not ProgramCertificate.all_objects.exists()
+
+
+def test_generate_program_certificate_uses_current_revision_despite_stale_cache(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    mocker,
+):
+    """
+    A program certificate gets the certificate page's current latest revision
+    even if the Program object has a stale cached certificate_page.
+    """
+    mocker.patch("hubspot_sync.api.upsert_custom_properties")
+    program = program_with_empty_requirements
+    stale_certificate_page = program.certificate_page
+    new_revision = CertificatePage.objects.get(
+        pk=stale_certificate_page.pk
+    ).save_revision()
+    assert stale_certificate_page.get_latest_revision() != new_revision
+
+    certificate, created = generate_program_certificate(
+        user=user, program=program, force_create=True
+    )
+
+    assert created is True
+    assert certificate.certificate_page_revision == new_revision
+
+
+def test_generate_program_certificate_integrity_error(
+    user,
+    program_with_empty_requirements,  # noqa: F811
+    mocker,
+):
+    """
+    An IntegrityError creating the certificate is logged and reported as
+    "not created" rather than raised, since this also runs from an on_commit
+    callback.
+    """
+    mocker.patch.object(
+        ProgramCertificate.all_objects, "get_or_create", side_effect=IntegrityError
+    )
+    patched_log = mocker.patch("courses.api.log")
+
+    result = generate_program_certificate(
+        user=user, program=program_with_empty_requirements, force_create=True
+    )
+
+    assert result == (None, False)
+    patched_log.exception.assert_called_once()
 
 
 @pytest.mark.parametrize("force_create", [True, False])

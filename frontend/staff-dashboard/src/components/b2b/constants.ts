@@ -85,17 +85,36 @@ export const CLONE_STATUSES: Record<CourseRunCloneStatus, { label: string; color
     failed: { label: "Failed", color: "red" },
 };
 
-// The contract routes answer a refused request with {detail} or with DRF's
-// per-field errors. Without this the notification only carries axios's
-// "Request failed with status code 400".
-export const apiErrorNotification = (message: string) => (error?: HttpError) => {
-    const data = error?.response?.data;
-    const detail = data?.detail;
+const errorMessages = (value: unknown) => (Array.isArray(value) ? value.join(" ") : JSON.stringify(value));
 
-    return {
-        type: "error" as const,
-        message,
-        // A 500 or 502 can carry an HTML page, which has no place in a notification.
-        description: typeof detail === "string" ? detail : data && typeof data === "object" ? JSON.stringify(data) : undefined,
-    };
+// The provisioning routes answer a refused request with {detail}, or with
+// {errors} (main/exceptions.py wraps a 400's DRF errors), by field or as a
+// list. Without this the notification only carries axios's "Request failed
+// with status code 400". A 500 or 502 can carry an HTML page, which has no
+// place in a notification, so a body that isn't an object is ignored.
+const apiErrorDescription = (error?: HttpError): string | undefined => {
+    const data = error?.response?.data;
+    if (!data || typeof data !== "object") {
+        return undefined;
+    }
+    if (typeof data.detail === "string") {
+        return data.detail;
+    }
+    if (Array.isArray(data.errors)) {
+        return errorMessages(data.errors);
+    }
+    if (data.errors && typeof data.errors === "object") {
+        return Object.entries(data.errors as Record<string, unknown>)
+            .map(([field, value]) =>
+                field === "non_field_errors" ? errorMessages(value) : `${field}: ${errorMessages(value)}`,
+            )
+            .join(" ");
+    }
+    return JSON.stringify(data);
 };
+
+export const apiErrorNotification = (message: string) => (error?: HttpError) => ({
+    type: "error" as const,
+    message,
+    description: apiErrorDescription(error),
+});

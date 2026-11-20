@@ -969,7 +969,7 @@ components:
           maxLength: 255
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
         length:
           type: string
           description: A short description indicating how long it takes to complete
@@ -1022,13 +1022,16 @@ components:
           nullable: true
           description: A short description indicating prerequisites of this course/program.
         faq_url:
-          type: string
-          format: uri
           nullable: true
           description: External link to a separate FAQ page (opens in a new tab on
             the legacy site). For on-page FAQs shown on MIT Learn, use the FAQs section
             below instead.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         hubspot_form_id:
           type: string
           description: HubSpot form ID for this page's 'Stay Updated' sign-up form.
@@ -1045,12 +1048,15 @@ components:
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
-          type: string
-          format: uri
           nullable: true
           description: URL to the video to be displayed for this course/program. It
             can be an HLS or Youtube video URL.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         faculty_section_title:
           type: string
           nullable: true
@@ -2219,7 +2225,7 @@ components:
           readOnly: true
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
           readOnly: true
         live:
           type: boolean
@@ -2272,7 +2278,7 @@ components:
           maxLength: 255
         description:
           type: string
-          description: The description shown on the home page and product page.
+          description: The description shown on the product page.
           readOnly: true
         length:
           type: string
@@ -2326,13 +2332,16 @@ components:
           nullable: true
           description: A short description indicating prerequisites of this course/program.
         faq_url:
-          type: string
-          format: uri
           nullable: true
           description: External link to a separate FAQ page (opens in a new tab on
             the legacy site). For on-page FAQs shown on MIT Learn, use the FAQs section
             below instead.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         hubspot_form_id:
           type: string
           description: HubSpot form ID for this page's 'Stay Updated' sign-up form.
@@ -2349,12 +2358,15 @@ components:
         feature_image:
           $ref: '#/components/schemas/FeatureImage'
         video_url:
-          type: string
-          format: uri
           nullable: true
           description: URL to the video to be displayed for this course/program. It
             can be an HLS or Youtube video URL.
-          maxLength: 200
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 200
+          - type: string
+            maxLength: 0
         faculty_section_title:
           type: string
           nullable: true
@@ -2796,7 +2808,6 @@ components:
         certificate_page_revision:
           type: integer
           readOnly: true
-          nullable: true
       required:
       - certificate_page
       - certificate_page_revision
@@ -3433,7 +3444,6 @@ components:
         certificate_page_revision:
           type: integer
           readOnly: true
-          nullable: true
       required:
       - certificate_page
       - certificate_page_revision

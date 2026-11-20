@@ -12,6 +12,7 @@ from uuid import uuid4
 
 import requests
 import reversion
+from authlib.integrations.base_client.errors import OAuthError
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import caches
@@ -38,8 +39,16 @@ from b2b.constants import (
     RETIREMENT_ORG_KEY,
     RETIREMENT_ORG_NAME,
 )
-from b2b.exceptions import SourceCourseIncompleteError
-from b2b.keycloak_admin_api import KCAM_ORGANIZATIONS, get_keycloak_model
+from b2b.exceptions import (
+    KeycloakAdminImproperlyConfiguredError,
+    SourceCourseIncompleteError,
+)
+from b2b.keycloak_admin_api import (
+    KCAM_ORGANIZATIONS,
+    MEMBERSHIP_CREDENTIALS,
+    bootstrap_client,
+    get_keycloak_model,
+)
 from b2b.keycloak_admin_dataclasses import OrganizationRepresentation
 from b2b.mail import ENROLLMENT_CODE_ASSINGMENT_TAG
 from b2b.models import (
@@ -397,6 +406,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
     skip_edx: bool = False,
     require_designated_source_run: bool = False,
     org_prefix: str | None = None,
+    filter_variants: list | None = None,
 ):
     """
     Create a contract run for the given course, importing it from edX if necessary.
@@ -447,10 +457,18 @@ def import_and_create_contract_run(  # noqa: PLR0913
         ingest_content_files_for_ai (bool): Set the "ingest_content_files_for_ai" flag on the new page.
         skip_edx (bool): Don't try to create a course run in edX.
         require_designated_source_run (bool): Require a flagged source run.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list raises SourceCourseIncompleteError before anything is
+            imported; None means every variant the course supports.
     Returns:
         CourseRun: The created CourseRun object.
         Product: The created Product object.
     """
+
+    # create_contract_run rejects this too, but only after the import.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course_run_id} for."
+        raise SourceCourseIncompleteError(msg)
 
     run_qs = CourseRun.all_objects.filter(courseware_id=course_run_id)
 
@@ -486,6 +504,7 @@ def import_and_create_contract_run(  # noqa: PLR0913
         skip_edx=skip_edx,
         require_designated_source_run=require_designated_source_run,
         org_prefix=org_prefix,
+        filter_variants=filter_variants,
     )
 
 
@@ -515,6 +534,9 @@ def _get_source_runs_for_course(  # noqa: PLR0913
         only_lang: If set, only add the specified additional language (plus the
             default)
         filter_variants: If provided, a list of SupportedVariant objects to filter by.
+            An empty list matches no variants; None means no filter. The
+            legacy and ignore_langs paths don't apply it, so create_contract_run
+            rejects an empty list before calling this.
         no_variants: If True, only return runs that match the default variant set.
     Returns:
         List of distinct source CourseRun objects, one per language (or one
@@ -545,12 +567,14 @@ def _get_source_runs_for_course(  # noqa: PLR0913
             variant_industry=course.default_variant_options.variant_industry,
         )
     else:
+        # Filtered in Python so a prefetched possible_variant_sets is used.
         course_variants = [
             (sv.language, sv.variant_length, sv.variant_industry)
-            for sv in course.possible_variant_sets.filter(active=True).all()
+            for sv in course.possible_variant_sets.all()
+            if sv.active
         ]
 
-        if filter_variants:
+        if filter_variants is not None:
             fvs = [
                 (fv.language, fv.variant_length, fv.variant_industry)
                 for fv in filter_variants
@@ -648,11 +672,19 @@ def create_contract_run(  # noqa: PLR0913
         queue_codes (bool): Queue enrollment code generation after saving.
         ignore_langs (bool): Only create a run for the primary language.
         only_lang (str|None): Only create a run for the primary language and the specified one.
+        filter_variants (list|None): Only create runs for these variant sets. An
+            empty list matches none; None means every variant the course supports.
     Returns:
         list[tuple[CourseRun, Product]]: One (CourseRun, Product) pair per
         source language run. Legacy single-language courses produce a one-element
         list.
     """
+    # _get_source_runs_for_course doesn't apply filter_variants to a course with
+    # no default variant set, with ignore_langs, or in its fallback.
+    if filter_variants == []:
+        msg = f"No variant sets to create runs of {course} for."
+        raise SourceCourseIncompleteError(msg)
+
     source_runs = _get_source_runs_for_course(
         course,
         require_designated=require_designated_source_run,
@@ -660,6 +692,11 @@ def create_contract_run(  # noqa: PLR0913
         only_lang=only_lang,
         filter_variants=filter_variants,
     )
+
+    # Raises InvalidKeyError before the loop creates anything, so a course with
+    # one bad source run ID doesn't end up with runs for only some variants.
+    for source_run in source_runs:
+        CourseKey.from_string(source_run.readable_id)
 
     content_type = ContentType.objects.filter(
         app_label="courses", model="courserun"
@@ -845,33 +882,29 @@ def is_product_program(product) -> bool:
     return isinstance(product.purchasable_object, Program)
 
 
-def is_discount_supplied_for_b2b_purchase(request, active_contracts=None) -> bool:
+def is_discount_supplied_for_b2b_purchase(
+    basket: Basket, active_contracts=None
+) -> bool:
     """
     Check if a discount is supplied for B2B purchase.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
         active_contracts: List of active contracts to check against.
 
     Returns:
         bool: True if discount is supplied or not needed, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
     if not active_contracts:
         # No contracts = nothing to validate
         return True
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
 
     free_contracts, nonfree_contracts = get_free_and_nonfree_contracts(active_contracts)
 
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -911,7 +944,7 @@ def get_active_contracts_from_basket_items(basket: Basket):
     return []
 
 
-def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
+def validate_basket_for_b2b_purchase(basket: Basket, active_contracts=None) -> bool:
     """
     Validate the basket for a B2B purchase.
 
@@ -925,16 +958,11 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     linked to contracts the user's also associated with.
 
     Args:
-        request: The HTTP request object containing the basket data.
+        basket: The basket being purchased, owned by the purchasing user.
+        active_contracts: List of active contracts to check against.
 
     Returns: bool, True if the basket is valid for B2B purchase, False otherwise.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
-
-    basket = establish_basket(request)
-    if not basket:
-        return False
-
     if not active_contracts:
         active_contracts = []
 
@@ -943,7 +971,7 @@ def validate_basket_for_b2b_purchase(request, active_contracts=None) -> bool:
     # Find free contracts the user is NOT associated with
     remaining_free_contract_qset = ContractPage.objects.filter(
         Q(pk__in=[c.pk for c in free_contracts])
-        & ~Q(pk__in=request.user.b2b_contracts.values_list("pk", flat=True))
+        & ~Q(pk__in=basket.user.b2b_contracts.values_list("pk", flat=True))
     )
 
     if not remaining_free_contract_qset.exists() and not nonfree_contracts:
@@ -1933,7 +1961,9 @@ def create_b2b_enrollment(
 
     if basket_price == 0:
         # This call should go ahead and fulfill the order.
-        response = generate_checkout_payload(request, raise_compliance_data_errors=True)
+        response = generate_checkout_payload(
+            request, basket=basket, raise_compliance_data_errors=True
+        )
 
         if "no_checkout" in response:
             # Course run enrollment succeeded - now handle program enrollment
@@ -2491,7 +2521,12 @@ def add_user_org_membership(org, user):
     if not org.sso_organization_id:
         return False
 
-    org_model = get_keycloak_model(OrganizationRepresentation, "organizations")
+    # This runs on enrollment requests, so it authenticates as the membership
+    # service account rather than the one that can provision identity providers.
+    org_model = get_keycloak_model(
+        *KCAM_ORGANIZATIONS,
+        client=bootstrap_client(verify_realm=True, credentials=MEMBERSHIP_CREDENTIALS),
+    )
 
     kc_org = org_model.get(org.sso_organization_id)
 
@@ -2546,17 +2581,28 @@ def process_add_org_membership(user, organization, *, keep_until_seen=False):
     if created:
         obj.keep_until_seen = keep_until_seen
         obj.save()
+        # get_or_create has already committed the row, so a retry after an
+        # error below sees created=False. Contracts go first so that no
+        # Keycloak failure can leave the member without them; the
+        # unconfirmed-member push retries Keycloak for added_to_keycloak_at=None.
+        organization.add_user_contracts(user)
         try:
             if organization.attach_user(user):
                 obj.added_to_keycloak_at = now_in_utc()
                 obj.save(update_fields=["added_to_keycloak_at"])
         # requests' ConnectionError and Timeout are not the builtin
         # ConnectionError, so Keycloak being unreachable needs the second one.
-        except (ConnectionError, requests.exceptions.RequestException):
+        # A rejected client secret (OAuthError) or missing credentials
+        # (KeycloakAdminImproperlyConfiguredError) fail before any request.
+        except (
+            ConnectionError,
+            requests.exceptions.RequestException,
+            OAuthError,
+            KeycloakAdminImproperlyConfiguredError,
+        ):
             log.exception(
                 "Could not attach %s to Keycloak org for %s", user, organization
             )
-        organization.add_user_contracts(user)
 
     return obj
 

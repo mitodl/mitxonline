@@ -1,11 +1,18 @@
+import json
+import ssl
+from datetime import UTC
+
+import pymysql
+import trino.dbapi
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.functions import Lower
+from mitol.common.utils.datetime import now_in_utc
 from reversion.models import Version
 from trino.auth import BasicAuthentication
-from trino.dbapi import connect
 
 from cms.api import create_default_courseware_page
 from cms.models import CertificatePage, SignatoryPage
@@ -15,6 +22,7 @@ from courses.models import (
     CourseRunCertificate,
     CourseRunEnrollment,
     CourseRunGrade,
+    CourseRunGradeAudit,
     Department,
     Program,
     ProgramCertificate,
@@ -27,26 +35,125 @@ from openedx.api import repair_faulty_edx_user
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
+# StarRocks fails a query whose result is still being read query_timeout seconds
+# after it started (default 300), and the results below are streamed while each
+# batch is written to the database, so a large type would outlive the default.
+STARROCKS_QUERY_TIMEOUT_SECONDS = 24 * 60 * 60
+WAREHOUSE_TRINO = "trino"
+WAREHOUSE_STARROCKS = "starrocks"
+WAREHOUSE_REQUIRED_SETTINGS = {
+    WAREHOUSE_TRINO: ("TRINO_HOST", "TRINO_USER", "TRINO_CATALOG"),
+    WAREHOUSE_STARROCKS: ("STARROCKS_HOST", "STARROCKS_USER"),
+}
+
+MIGRATION_SCHEMA = "ol_warehouse_production_migration"
+# The data platform builds these tables in the production lake only. StarRocks
+# exposes it under this catalog; Trino's catalog name comes from TRINO_CATALOG.
+STARROCKS_CATALOG = "ol_data_lake_production"
+
+
+def _uses_trino():
+    return settings.EDX_MIGRATION_WAREHOUSE == WAREHOUSE_TRINO
+
+
+def _warehouse_table(table_name):
+    catalog = settings.TRINO_CATALOG if _uses_trino() else STARROCKS_CATALOG
+    return f"{catalog}.{MIGRATION_SCHEMA}.{table_name}"
+
+
+def _warehouse_placeholders(count):
+    """Query placeholders in the warehouse driver's paramstyle"""
+    placeholder = "?" if _uses_trino() else "%s"
+    return ", ".join([placeholder] * count)
+
+
+def _warehouse_list(value):
+    """Read an array column. Trino sends a list, StarRocks sends JSON text."""
+    if value is None:
+        return []
+    if isinstance(value, str | bytes):
+        return json.loads(value)
+    return list(value)
+
+
+def _warehouse_datetime(value):
+    """Read a timestamp column. StarRocks sends it naive, in the session's time zone,
+    which _connect_to_starrocks sets to UTC.
+    """
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=UTC)
+
+
+def _connect_to_trino():
+    return trino.dbapi.connect(
+        host=settings.TRINO_HOST,
+        port=settings.TRINO_PORT,
+        user=settings.TRINO_USER,
+        auth=BasicAuthentication(settings.TRINO_USER, settings.TRINO_PASSWORD),
+        catalog=settings.TRINO_CATALOG,
+        schema=MIGRATION_SCHEMA,
+    )
+
+
+def _connect_to_starrocks():
+    return pymysql.connect(
+        host=settings.STARROCKS_HOST,
+        port=settings.STARROCKS_PORT,
+        user=settings.STARROCKS_USER,
+        password=settings.STARROCKS_PASSWORD,
+        # Verifies the chain against the system CAs and the hostname.
+        # pymysql skips the hostname check when ssl_ca is unset, even
+        # with ssl_verify_identity=True, so a context is passed instead.
+        ssl=ssl.create_default_context(),
+        # Stream rows as fetchmany asks for them, as the Trino client does;
+        # the default cursor reads the whole result into memory at execute.
+        cursorclass=pymysql.cursors.SSCursor,
+        # StarRocks renders a timestamp with time zone in the session's
+        # time zone, and sends it without one.
+        init_command=(
+            "SET time_zone = '+00:00', "
+            f"query_timeout = {STARROCKS_QUERY_TIMEOUT_SECONDS}"
+        ),
+    )
+
 
 class Command(BaseCommand):
     help = (
-        "Migrate the edX data via Trino from the data platform to the corresponding models in MITx Online "
+        "Migrate the edX data via the data platform's warehouse (Trino or StarRocks, "
+        "per EDX_MIGRATION_WAREHOUSE) to the corresponding models in MITx Online "
         "e.g Course, CourseRun, CoursePage CertificatePage, etc."
     )
 
-    def _connect_to_trino(self):
-        try:
-            conn = connect(
-                host=settings.TRINO_HOST,
-                port=settings.TRINO_PORT,
-                user=settings.TRINO_USER,
-                auth=BasicAuthentication(settings.TRINO_USER, settings.TRINO_PASSWORD),
-                catalog=settings.TRINO_CATALOG,
-                schema="ol_warehouse_production_migration",
+    def _connect_to_warehouse(self):
+        warehouse = settings.EDX_MIGRATION_WAREHOUSE
+        if warehouse not in WAREHOUSE_REQUIRED_SETTINGS:
+            msg = (
+                f"EDX_MIGRATION_WAREHOUSE must be one of "
+                f"{', '.join(WAREHOUSE_REQUIRED_SETTINGS)}, not {warehouse!r}"
             )
-            self.stdout.write(self.style.SUCCESS("Successfully connected to Trino"))
+            raise CommandError(msg)
+        missing = [
+            name
+            for name in WAREHOUSE_REQUIRED_SETTINGS[warehouse]
+            if not getattr(settings, name)
+        ]
+        if missing:
+            msg = f"{', '.join(missing)} must be set to read the edX migration tables from {warehouse}"
+            raise CommandError(msg)
+        try:
+            conn = (
+                _connect_to_trino()
+                if warehouse == WAREHOUSE_TRINO
+                else _connect_to_starrocks()
+            )
+            self.stdout.write(
+                self.style.SUCCESS(f"Successfully connected to {warehouse}")
+            )
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Failed to connect to Trino: {e}"))
+            self.stdout.write(
+                self.style.ERROR(f"Failed to connect to {warehouse}: {e}")
+            )
             raise
         else:
             return conn
@@ -56,7 +163,7 @@ class Command(BaseCommand):
         Create a new Course instance or get an existing one using data from the row.
 
         Args:
-            row (dict): Dictionary containing course data from Trino
+            row (dict): Dictionary containing course data from the warehouse
 
         Returns:
             tuple: Tuple containing (Course instance, boolean indicating if created)
@@ -124,7 +231,7 @@ class Command(BaseCommand):
 
         Args:
             course (Course): Course model instance to create the run for
-            row (dict): Dictionary containing course run data from Trino
+            row (dict): Dictionary containing course run data from the warehouse
 
         Returns:
             tuple: Tuple containing (CourseRun instance, boolean indicating if created)
@@ -134,10 +241,10 @@ class Command(BaseCommand):
             defaults={
                 "course": course,
                 "run_tag": row.get("run_tag"),
-                "start_date": row.get("start_date"),
-                "end_date": row.get("end_date"),
-                "enrollment_start": row.get("enrollment_start"),
-                "enrollment_end": row.get("enrollment_end"),
+                "start_date": _warehouse_datetime(row.get("start_date")),
+                "end_date": _warehouse_datetime(row.get("end_date")),
+                "enrollment_start": _warehouse_datetime(row.get("enrollment_start")),
+                "enrollment_end": _warehouse_datetime(row.get("enrollment_end")),
                 "title": row.get("courserun_title"),
                 "live": True,
                 "is_self_paced": row.get("is_self_paced"),
@@ -150,7 +257,7 @@ class Command(BaseCommand):
         Get SignatoryPage based on the provided list of names or use the default signatory.
 
         Args:
-            signatory_list (list): List of signatory names
+            signatory_list (str | None): The signatory_names array column, as StarRocks sends it
             use_default_signatory: Boolean indicating whether to use the default signatory
 
         Returns:
@@ -169,7 +276,7 @@ class Command(BaseCommand):
 
         signatory_names = [
             name.strip()
-            for name in signatory_list
+            for name in _warehouse_list(signatory_list)
             if isinstance(name, str) and name.strip()
         ]
         return list(SignatoryPage.objects.filter(name__in=signatory_names))
@@ -184,7 +291,7 @@ class Command(BaseCommand):
 
         cur = conn.cursor()
 
-        query = "SELECT * FROM edxorg_to_mitxonline_course_runs"
+        query = f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_course_runs')}"  # noqa: S608
         if limit is not None:
             query += f" LIMIT {int(limit)}"
         cur.execute(query)
@@ -211,7 +318,7 @@ class Command(BaseCommand):
                     continue
 
                 signatories = self._get_signatories(
-                    row.get("signatory_names") or [], use_default_signatory
+                    row.get("signatory_names"), use_default_signatory
                 )
 
                 if not signatories and row.get("mitxonline_course_id") is None:
@@ -375,10 +482,11 @@ class Command(BaseCommand):
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
 
         cur = conn.cursor()
 
-        query = "SELECT * FROM edxorg_to_mitxonline_users"
+        query = f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_users')}"  # noqa: S608
         if limit is not None:
             query += f" LIMIT {int(limit)}"
         cur.execute(query)
@@ -388,6 +496,8 @@ class Command(BaseCommand):
         GENDER_MAP = {label: code for code, label in GENDER_CHOICES}
 
         user_creation_count = 0
+        # dry-run only: lowercased emails already counted, across batches
+        dry_run_counted = set()
         while True:
             results = cur.fetchmany(batch_size)
             if not results:
@@ -400,11 +510,34 @@ class Command(BaseCommand):
             }
             emails = list(row_lookup.keys())
 
-            existing_emails = set(
-                User.objects.filter(
+            # usernames too: migrated users get username=email, so an email
+            # matching an existing username would conflict on create
+            existing_emails = {
+                value
+                for pair in User.objects.filter(
                     Q(username__in=emails) | Q(email__in=emails)
-                ).values_list("email", flat=True)
-            )
+                ).values_list("username", "email")
+                for value in pair
+            }
+
+            if dry_run:
+                # email uniqueness is case-insensitive (user_email_unique), so
+                # count the way a real run's inserts would succeed or conflict
+                existing_lower = set(
+                    User.objects.annotate(email_lower=Lower("email"))
+                    .filter(email_lower__in=[email.lower() for email in emails])
+                    .values_list("email_lower", flat=True)
+                )
+                for email in emails:
+                    key = email.lower()
+                    if (
+                        email not in existing_emails
+                        and key not in existing_lower
+                        and key not in dry_run_counted
+                    ):
+                        dry_run_counted.add(key)
+                        user_creation_count += 1
+                continue
 
             created_users = self._bulk_create_users(rows, existing_emails, batch_size)
             user_creation_count += len(created_users)
@@ -419,6 +552,14 @@ class Command(BaseCommand):
                 created_users, id_row_lookup, batch_size, GENDER_MAP
             )
 
+        if dry_run:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"[DRY RUN] Would create {user_creation_count} users"
+                )
+            )
+            return
+
         self.stdout.write(self.style.SUCCESS(f"{user_creation_count} users created"))
 
     def _repair_migrated_user_profiles(self, conn, options):
@@ -430,7 +571,7 @@ class Command(BaseCommand):
         User.objects.filter(id__in=[None, ...]), which always matches zero
         rows - LegalAddress/UserProfile silently never got created for any
         user who went through this command, regardless of the row data
-        Trino actually had for them.
+        the warehouse actually had for them.
 
         This re-scans the same edX table used by _migrate_users, but only
         acts on users already missing one of these rows - real, already-saved
@@ -457,7 +598,7 @@ class Command(BaseCommand):
         )
 
         cur = conn.cursor()
-        cur.execute("SELECT * FROM edxorg_to_mitxonline_users")
+        cur.execute(f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_users')}")  # noqa: S608
         columns = [desc[0] for desc in cur.description]
 
         # e.g. {"Male": "m", "Female": "f"}
@@ -550,6 +691,7 @@ class Command(BaseCommand):
                 course_run_id=row["courserun_id"],
                 grade=row["courserungrade_grade"],
                 passed=row["courserungrade_is_passing"],
+                letter_grade=row.get("courserungrade_letter_grade"),
             )
             for row in rows
         ]
@@ -568,7 +710,7 @@ class Command(BaseCommand):
             CourseRunCertificate(
                 user_id=row["user_mitxonline_id"],
                 course_run_id=row["courserun_id"],
-                issue_date=row["courseruncertificate_created_on"],
+                issue_date=_warehouse_datetime(row["courseruncertificate_created_on"]),
                 certificate_page_revision_id=row["certificate_page_revision_id"],
             )
             for row in rows
@@ -581,6 +723,18 @@ class Command(BaseCommand):
         )
         return len(new_certificate_objects)
 
+    @staticmethod
+    def _courserun_filter(options):
+        readable_ids = [
+            readable_id.strip()
+            for readable_id in (options.get("courserun_readable_ids") or "").split(",")
+            if readable_id.strip()
+        ]
+        if not readable_ids:
+            return None, []
+        placeholders = _warehouse_placeholders(len(readable_ids))
+        return f"courserun_readable_id IN ({placeholders})", readable_ids
+
     def _migrate_course_certificates(self, conn, options):
         """
         Migrate certificates from edX to MITx Online. Create CourseRunEnrollment, CourseRunGrade,
@@ -589,29 +743,21 @@ class Command(BaseCommand):
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
         dry_run = options.get("dry_run")
-        courserun_readable_ids = [
-            readable_id.strip()
-            for readable_id in (options.get("courserun_readable_ids") or "").split(",")
-            if readable_id
-        ] or None
-
         cur = conn.cursor()
 
         query = (
-            "SELECT * FROM edxorg_to_mitxonline_enrollments "
+            f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_enrollments')} "  # noqa: S608
             "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
             "AND courseruncertificate_created_on IS NOT NULL"
         )
-        if courserun_readable_ids:
-            placeholders = [
-                f"'{readable_id}'" for readable_id in courserun_readable_ids
-            ]
-            query += f" AND courserun_readable_id IN ({','.join(placeholders)})"
+        courserun_filter, params = self._courserun_filter(options)
+        if courserun_filter:
+            query += f" AND {courserun_filter}"
 
         if limit is not None:
             query += f" LIMIT {int(limit)}"
 
-        cur.execute(query)
+        cur.execute(query, params)
         columns = [desc[0] for desc in cur.description]
 
         total_enrollments = 0
@@ -651,6 +797,104 @@ class Command(BaseCommand):
                         f"{total_certificates} certificates created"
                     )
                 )
+
+    @staticmethod
+    def _update_letter_grades(rows, *, dry_run):
+        """
+        Set letter_grade on the CourseRunGrade rows that match the given rows. Grades
+        that already have a letter grade are not changed.
+
+        Returns:
+            int: The number of grades updated, or that would be updated on a dry run
+        """
+        letter_by_key = {
+            (row["user_mitxonline_id"], row["courserun_id"]): row[
+                "courserungrade_letter_grade"
+            ]
+            for row in rows
+            if row["courserungrade_letter_grade"]
+        }
+        if not letter_by_key:
+            return 0
+
+        user_ids = {user_id for user_id, _ in letter_by_key}
+        run_ids = {run_id for _, run_id in letter_by_key}
+        with transaction.atomic():
+            candidates = (
+                CourseRunGrade.objects.select_for_update()
+                .filter(user_id__in=user_ids, course_run_id__in=run_ids)
+                .filter(Q(letter_grade__isnull=True) | Q(letter_grade=""))
+            )
+            grades = [
+                grade
+                for grade in candidates
+                if (grade.user_id, grade.course_run_id) in letter_by_key
+            ]
+            if dry_run or not grades:
+                return len(grades)
+
+            # bulk_update skips save_and_log, so the audit rows are written here
+            now = now_in_utc()
+            audits = []
+            for grade in grades:
+                data_before = grade.to_dict()
+                grade.letter_grade = letter_by_key[(grade.user_id, grade.course_run_id)]
+                grade.updated_on = now
+                audits.append(
+                    CourseRunGradeAudit(
+                        course_run_grade=grade,
+                        acting_user=None,
+                        call_stack="migrate_edx_data --type letter_grades",
+                        data_before=data_before,
+                        data_after=grade.to_dict(),
+                    )
+                )
+            CourseRunGrade.objects.bulk_update(grades, ["letter_grade", "updated_on"])
+            CourseRunGradeAudit.objects.bulk_create(audits)
+        return len(grades)
+
+    def _backfill_letter_grades(self, conn, options):
+        """
+        Backfill letter grades from edX.org for CourseRunGrade rows that have none,
+        such as the grades that the course_certificates migration created.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+        cur = conn.cursor()
+
+        query = (
+            "SELECT user_mitxonline_id, courserun_id, courserungrade_letter_grade "  # noqa: S608
+            f"FROM {_warehouse_table('edxorg_to_mitxonline_letter_grades')}"
+        )
+        courserun_filter, params = self._courserun_filter(options)
+        if courserun_filter:
+            query += f" WHERE {courserun_filter}"
+
+        if limit is not None:
+            query += f" LIMIT {int(limit)}"
+
+        cur.execute(query, params)
+        columns = [desc[0] for desc in cur.description]
+
+        total_rows = 0
+        total_updated = 0
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+            total_rows += len(rows)
+            total_updated += self._update_letter_grades(rows, dry_run=dry_run)
+
+        prefix = "[DRY RUN] Would update" if dry_run else "Updated"
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"{prefix} {total_updated} letter grades "
+                f"from {total_rows} edX.org letter grade rows"
+            )
+        )
 
     @staticmethod
     def _bulk_create_program_enrollments(rows, batch_size):
@@ -695,7 +939,7 @@ class Command(BaseCommand):
             ProgramCertificate(
                 user_id=row["user_mitxonline_id"],
                 program_id=row["program_id"],
-                issue_date=row["program_certificate_issued_on"],
+                issue_date=_warehouse_datetime(row["program_certificate_issued_on"]),
                 certificate_page_revision_id=row["certificate_page_revision_id"],
             )
             for row in rows
@@ -722,7 +966,7 @@ class Command(BaseCommand):
         cur = conn.cursor()
 
         query = (
-            "SELECT * FROM edxorg_to_mitxonline_program_certificates "
+            f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_program_certificates')} "  # noqa: S608
             "WHERE user_mitxonline_id IS NOT NULL AND program_id IS NOT NULL "
             "AND certificate_page_revision_id IS NOT NULL "
         )
@@ -773,7 +1017,7 @@ class Command(BaseCommand):
         product_content_type_id = ContentType.objects.get_for_model(Product).id
 
         query = (
-            "SELECT * FROM edxorg_to_mitxonline_program_entitlements "
+            f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_program_entitlements')} "  # noqa: S608
             "WHERE order_id IS NULL"
         )
 
@@ -954,7 +1198,7 @@ class Command(BaseCommand):
         cur = conn.cursor()
 
         query = (
-            "SELECT * FROM edxorg_to_mitxonline_enrollments "
+            f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_enrollments')} "  # noqa: S608
             "WHERE user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
             "AND courseruncertificate_created_on IS NULL"
         )
@@ -1145,13 +1389,13 @@ class Command(BaseCommand):
         parser.add_argument(
             "--limit",
             type=int,
-            help="Limit the number of rows processed from Trino (for testing purposes)",
+            help="Limit the number of rows processed from the warehouse (for testing purposes)",
         )
         parser.add_argument(
             "--batch-size",
             type=int,
             default=1000,
-            help="Number of rows to fetch per batch from Trino (default: 1000)",
+            help="Number of warehouse rows to process per batch (default: 1000). The whole result is read into memory first.",
         )
         parser.add_argument(
             "--type",
@@ -1163,9 +1407,10 @@ class Command(BaseCommand):
                 "entitlements",
                 "future_enrollments",
                 "repair_migrated_profiles",
+                "letter_grades",
             ],
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles (default: course_runs)",
+            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles, letter_grades (default: course_runs)",
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -1175,7 +1420,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):  # pylint: disable=unused-argument # noqa: ARG002
-        conn = self._connect_to_trino()
+        conn = self._connect_to_warehouse()
 
         migrate_type = options.get("type")
 
@@ -1215,3 +1460,7 @@ class Command(BaseCommand):
         if migrate_type == "future_enrollments":
             self.stdout.write("Migrating the edX future enrollments  ...")
             self._migrate_enrollments(conn, options)
+
+        if migrate_type == "letter_grades":
+            self.stdout.write("Backfilling edX.org letter grades ...")
+            self._backfill_letter_grades(conn, options)

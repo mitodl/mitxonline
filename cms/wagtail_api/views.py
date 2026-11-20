@@ -3,8 +3,9 @@ Views for Wagtail API
 """
 
 from enum import Enum
+from functools import cached_property
 
-from django.db.models import F
+from django.db.models import F, Q
 from drf_spectacular.utils import (
     OpenApiParameter,
     PolymorphicProxySerializer,
@@ -12,7 +13,9 @@ from drf_spectacular.utils import (
 )
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_api_key.permissions import HasAPIKey
 from wagtail.api.v2.views import PagesAPIViewSet
+from wagtail.models import Page
 
 from cms.models import CertificatePage
 from cms.wagtail_api.filters import ReadableIDFilter
@@ -86,6 +89,34 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
             return PageSerializer
         return super().get_serializer_class()
 
+    @cached_property
+    def _is_keyed_course_request(self):
+        """
+        True for a course page request carrying a valid API key (MIT Learn's
+        ETL key). HasAPIKey doesn't authenticate a user, so request.user is
+        still anonymous here.
+        """
+        return self.request.GET.get(
+            "type", ""
+        ).lower() == PageType.COURSE.value and HasAPIKey().has_permission(
+            self.request, self
+        )
+
+    def get_base_queryset(self):
+        """
+        Wagtail only exposes live pages. For keyed course requests, also expose
+        unpublished pages in Learn "test mode" (ingest_content_files_for_ai on).
+        """
+        queryset = super().get_base_queryset()
+        if self._is_keyed_course_request:
+            # Deliberately not limited to live pages: Learn needs the pages of
+            # unpublished test-mode courses. Live pages are already in `queryset`.
+            return Page.objects.filter(
+                Q(pk__in=queryset.values("pk"))
+                | Q(coursepage__ingest_content_files_for_ai=True)
+            )
+        return queryset
+
     def get_queryset(self):
         """
         Returns the queryset for the API viewset, with additional annotations
@@ -121,7 +152,11 @@ class WagtailPagesAPIViewSet(PagesAPIViewSet):
                     include_in_learn_catalog=True,
                 )
             elif model_type == PageType.COURSE.value:
-                queryset = queryset.filter(include_in_learn_catalog=True)
+                catalog = Q(include_in_learn_catalog=True)
+                if self._is_keyed_course_request:
+                    # test-mode courses are returned even if hidden from the catalog
+                    catalog |= Q(ingest_content_files_for_ai=True)
+                queryset = queryset.filter(catalog)
 
         return queryset
 

@@ -8,7 +8,7 @@ import { contractPath, contractsUrl, membershipType, organizationPath } from "co
 import { ContractCodes } from "components/b2b/contract_codes";
 import { ContractCourseware } from "components/b2b/contract_courseware";
 import { IContractSetupStatus, IProvisionedContract } from "interfaces";
-import { formatIncome, mitxOnlineUrl } from "utils";
+import { formatIncome } from "utils";
 
 const SETUP_POLL_INTERVAL_MS = 5000;
 // How long to wait for enrollment codes after the page loads or changes
@@ -80,12 +80,6 @@ export const ContractShow: React.FC = () => {
                     <Button icon={<ReloadOutlined />} onClick={refresh}>
                         Refresh
                     </Button>
-                    {/* The welcome page's extra content, the Google Sheet target and program order are not in the contract API yet. */}
-                    {contract && (
-                        <Button icon={<ExportOutlined />} href={mitxOnlineUrl(`/cms/pages/${contract.id}/edit/`)} target="_blank">
-                            Open in Wagtail
-                        </Button>
-                    )}
                     {contract && (
                         <Button type="primary" icon={<EditOutlined />} onClick={() => go({ to: `${contractPath(orgKey, contractId)}/edit` })}>
                             Edit
@@ -124,6 +118,21 @@ export const ContractShow: React.FC = () => {
                                 <Descriptions.Item label="Slug">
                                     <Typography.Text code>{contract.slug}</Typography.Text>
                                 </Descriptions.Item>
+                                <Descriptions.Item label="Google Sheet">
+                                    {/* Only link an https URL: sheets set before the API validated them could hold anything. */}
+                                    {contract.google_sheet_target?.startsWith("https://") ? (
+                                        <Typography.Link href={contract.google_sheet_target} target="_blank" rel="noopener noreferrer">
+                                            {contract.google_sheet_target_tab || "Open"} <ExportOutlined />
+                                        </Typography.Link>
+                                    ) : (
+                                        "none"
+                                    )}
+                                </Descriptions.Item>
+                                {contract.welcome_message_extra && (
+                                    <Descriptions.Item label="Extra welcome content" span={2}>
+                                        <span style={{ whiteSpace: "pre-wrap" }}>{richTextToPlain(contract.welcome_message_extra)}</span>
+                                    </Descriptions.Item>
+                                )}
                                 {contract.description && (
                                     <Descriptions.Item label="Description" span={2}>
                                         <span style={{ whiteSpace: "pre-wrap" }}>{richTextToPlain(contract.description)}</span>

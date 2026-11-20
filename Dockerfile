@@ -43,21 +43,35 @@ WORKDIR /src
 RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
     uv sync --frozen --no-install-project --no-dev
 
+ENV XDG_CACHE_HOME=/tmp/.cache
+
+# The dev dependencies, installed before any source so a source edit reuses them.
+FROM deps AS deps-dev
+
+RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
+    uv sync --frozen --no-install-project
+
 FROM deps AS code
 
 COPY . /src
 WORKDIR /src
 
-ENV XDG_CACHE_HOME=/tmp/.cache
-
 # ─── Node / frontend asset build ─────────────────────────────────────────────
-FROM node:17.9 AS node
+FROM node:20.18 AS node
 
-COPY --from=code /src /src
 WORKDIR /src
+# Only the build inputs, so a backend-only change reuses this stage. The
+# webpack and craco configs read nothing outside frontend/ except the root
+# node_modules, and write their manifests to webpack-stats/.
+COPY package.json yarn.lock .yarnrc.yml /src/
+COPY .yarn/releases /src/.yarn/releases
+COPY frontend /src/frontend
 
 ENV NODE_ENV=production
-RUN yarn workspace mitx-online-public install --immutable && \
+# The cache mount keeps yarn's package zips across builds; node_modules is
+# extracted from them, so nothing the build outputs lives in the cache.
+RUN --mount=type=cache,target=/src/.yarn/cache \
+    yarn workspace mitx-online-public install --immutable && \
     yarn workspace mitx-online-public run build && \
     yarn workspace mitx-online-staff-dashboard install --immutable && \
     yarn workspace mitx-online-staff-dashboard run build
@@ -73,23 +87,21 @@ FROM django-server AS production
 
 # Only the compiled frontend: these are the node stage's outputs that
 # STATICFILES_DIRS and WEBPACK_LOADER in main/settings.py read. The rest of
-# its /src is the source `code` already has, plus node_modules and yarn's
-# cache, which nothing reads at runtime.
+# its /src is frontend source, which `code` already has, plus node_modules,
+# which nothing reads at runtime.
 COPY --from=node /src/frontend/public/build /src/frontend/public/build
 COPY --from=node /src/frontend/staff-dashboard/build /src/frontend/staff-dashboard/build
 COPY --from=node /src/webpack-stats /src/webpack-stats
 
 # ─── Local-dev target (ol-infrastructure local-dev k8s/Tilt stack) ───────────
-# Runtime user owns /src (live-synced source), plus dev deps (pytest, ipdb, …)
-# and watchfiles for granian --reload.
-FROM production AS local-dev
+# Dev deps (pytest, ipdb, …) and watchfiles for granian --reload, plus
+# production's /src: the source and the compiled frontend. FROM deps-dev, not
+# production: production holds the source, so every source edit would reinstall
+# the dev deps on top of it. The command and PORT come from the k8s manifest.
+FROM deps-dev AS local-dev
 
-USER root
-RUN chown -R mitodl:mitodl /src
-USER mitodl
-
-RUN --mount=type=cache,target=/opt/uv-cache,uid=1000,gid=1000 \
-    uv sync --frozen --no-install-project
+# Owned by mitodl because Tilt's live update writes synced files as mitodl.
+COPY --from=production --chown=mitodl:mitodl /src /src
 
 FROM code AS jupyter-notebook
 

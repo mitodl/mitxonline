@@ -4,6 +4,95 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.18.2] - 2026-11-18
+
+### Changes
+
+- **Keep contracts when the Keycloak membership call fails** (#4298) by tmacey@mit.edu
+- **Update @xmldom/xmldom, minimatch, brace-expansion and fast-uri for security fixes** (#4273) by 1447295+shaidar@users.noreply.github.com
+- **Read the edX migration tables from StarRocks or Trino, chosen by a setting** (#4270) by tmacey@mit.edu
+- **feat: show the site banner when ecom-service is set** (#4299) by christopher.chudzicki@gmail.com
+- **Move Sentry from send_default_pii to data_collection** (#4239) by jkachel@mit.edu
+- **Add tests for the OIDC provider, telemetry setup and email CSS inlining** (#4271) by 1447295+shaidar@users.noreply.github.com
+- **fix: brand the financial aid form pages as MIT Learn** (#4265) by 88967643+Anas12091101@users.noreply.github.com
+- **feat: always send /dashboard/ to MIT Learn and remove the legacy dashboard** (#4278) by 88967643+Anas12091101@users.noreply.github.com
+- **Assert uv.lock stays on revision 5** (#4288) by rhysyngsun@users.noreply.github.com
+- **Take run order from the database in reconcile_upgrade_deadlines tests** (#4295) by christopher.chudzicki@gmail.com
+
+## [2026.11.16.1] - 2026-11-16
+
+### Changes
+
+- **feat: show the site banner on the cart page** (#4285) by christopher.chudzicki@gmail.com
+- **Automatically process eligible refund requests** (#4224) by collinp@mit.edu
+- **Update ol-django common and add ol-django geoip** (#4283) by jkachel@mit.edu
+- **Drop the uv required-version upper bound** (#4286) by rhysyngsun@users.noreply.github.com
+- **fix: let a hand-off from Learn discard a stale gateway session** (#4276) by tmacey@mit.edu
+- **Update dependency astral-sh/uv to v0.13.7** (#4293) by 29139614+renovate[bot]@users.noreply.github.com
+- **Send Sentry a keyed hash of the user instead of their identity** (#4272) by tmacey@mit.edu
+- **Serve a login link with kc_idp_hint for each B2B identity provider** (#4119) by tmacey@mit.edu
+- **Keep a path in KEYCLOAK_BASE_URL when building Keycloak URLs** (#4104) by tmacey@mit.edu
+- **Add has_live_product_page to the v3 enrollment APIs** (#4280) by gumaerc@mit.edu
+- **Skip a program's courses with no valid contract run key, and give a contract with no variant sets no runs** (#4105) by tmacey@mit.edu
+- **Run the checkout pre-flight checks through Pluggy hooks** (#4139) by jkachel@mit.edu
+- **Move the last Wagtail-edited contract fields into the contract API and staff dashboard** (#4267) by tmacey@mit.edu
+- **Default b2b_codes assign --name to blank** (#4268) by tmacey@mit.edu
+- **feat: add backfill functionality for edX.org letter grades in migrate_edx_data** (#4274) by rlougee@mit.edu
+- **Build the frontend from its own inputs so backend edits reuse the cached bundles** (#4277) by christopher.chudzicki@gmail.com
+- **Skip a program's courses with no usable source run, and create its runs for the contract's variant sets** (#4095) by tmacey@mit.edu
+- **Bound uv required-version so Renovate stops silently changing the lockfile format** (#4275) by rhysyngsun@users.noreply.github.com
+- **fix: point financial aid emails at MIT Learn instead of MITx Online** (#4264) by 88967643+Anas12091101@users.noreply.github.com
+- **Update dependency sqlparse to v0.6.0 [SECURITY]** (#4260) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency soupsieve to v2.9 [SECURITY]** (#4259) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pymongo to v4.18.3 [SECURITY]** (#4258) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pygments to v2.20.0 [SECURITY]** (#4257) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pillow-heif to v1.3.0 [SECURITY]** (#4256) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency opentelemetry-api to v1.45.1 [SECURITY]** (#4255) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency lxml to v6.1.0 [SECURITY]** (#4254) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency idna to v3.15 [SECURITY]** (#4253) by 29139614+renovate[bot]@users.noreply.github.com
+- **Fix redirect to referer if enrollment fails** (#4242) by jkachel@mit.edu
+- **feat(courses): add --dry-run support to migrate_edx_data's users type** (#3842) by 1447295+shaidar@users.noreply.github.com
+- **Add tests for the Google Sheets auth and video.js setup paths** (#4269) by 1447295+shaidar@users.noreply.github.com
+- **Update dependency httplib2 to v0.32.0 [SECURITY]** (#4252) by 29139614+renovate[bot]@users.noreply.github.com
+- **Add tests that exercise real image processing** (#4240) by 1447295+shaidar@users.noreply.github.com
+- **Remove the new-issues workflow** (#4235) by 1447295+shaidar@users.noreply.github.com
+- **Update dependency pyasn1 to v0.6.5 [SECURITY]** (#4247) by 29139614+renovate[bot]@users.noreply.github.com
+
+## [2026.11.10.1] - 2026-11-10
+
+### Changes
+
+- **Update dependency dnspython to v2.9.0 [SECURITY]** (#4251) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency black to v26.10.1 [SECURITY]** (#4250) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency python-dotenv to v1.2.2 [SECURITY]** (#4249) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pytest to v9.0.3 [SECURITY]** (#4248) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency jwcrypto to v1.5.7 [SECURITY]** (#4246) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency oauthlib to v4 [SECURITY]** (#4262) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency pyjwt to v2.15.1** (#4218) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency astral-sh/uv to v0.13.6** (#4245) by 29139614+renovate[bot]@users.noreply.github.com
+- **Fix certificate revision for certificates** (#3920) by annagav@users.noreply.github.com
+- **chore(frontend): remove more unused dependencies** (#4241) by christopher.chudzicki@gmail.com
+- **Set username to the lowercased email where it is something else** (#4206) by tmacey@mit.edu
+- **Update dependency authlib to v1.9.1 [SECURITY]** (#4197) by 29139614+renovate[bot]@users.noreply.github.com
+- **Test pull requests as their merge ref** (#4228) by christopher.chudzicki@gmail.com
+- **chore(frontend): split dev dependencies and drop unused packages** (#4237) by 1447295+shaidar@users.noreply.github.com
+- **Return test-mode course pages to MIT Learn from /api/v2/pages/** (#4230) by ahiguera@mit.edu
+- **Add an identity provider edit form to the staff dashboard** (#4111) by tmacey@mit.edu
+- **Fix some basket N+1 's, reduce zeal suppressions** (#4168) by christopher.chudzicki@gmail.com
+
+## [2026.11.5.1] - 2026-11-05
+
+### Changes
+
+- **fix: point $0 program course order refunds at the paid program order** (#4234) by 88967643+Anas12091101@users.noreply.github.com
+- **chore(deps): upgrade Pillow to 13.0.0** (#4236) by 1447295+shaidar@users.noreply.github.com
+- **Refactor exception handling** (#2988) by 1447295+shaidar@users.noreply.github.com
+- **Remove unused YouTube data-src iframe script from base template** (#4231) by 1447295+shaidar@users.noreply.github.com
+- **Checkout product with program product ID uses cart flow** (#4207) by annagav@users.noreply.github.com
+- **Fix the test_create_edx_user flake and log edX lookup failures** (#4029) by tmacey@mit.edu
+- **ci: limit the CI workflow's GITHUB_TOKEN to read-only** (#4232) by 1447295+shaidar@users.noreply.github.com
+- **Do not return a parent program's certificate type for courses (e.g., courses do not have Micromaster Credentials)** (#4213) by christopher.chudzicki@gmail.com
+
 ## [2026.11.4.1] - 2026-11-04
 
 ### Changes

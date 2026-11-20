@@ -1,7 +1,7 @@
 import React from "react";
 import { useApiUrl, useCustomMutation, useGo } from "@refinedev/core";
 import { Button, Card, Descriptions, Dropdown, Modal, Space, Table, Tag, Typography } from "antd";
-import { DeleteOutlined, DownOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, DownOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import { IDP_ALLOWED_TRANSITIONS, PROVISIONING_RESOURCE, idpState } from "./constants";
@@ -15,8 +15,8 @@ const TRANSITION_WARNINGS: Partial<Record<IdpLifecycleState, string>> = {
     draft: "The identity provider will be disabled in Keycloak.",
 };
 
-const Copyable: React.FC<{ value: string | null }> = ({ value }) =>
-    value ? <Typography.Text copyable code>{value}</Typography.Text> : <Typography.Text type="secondary">n/a</Typography.Text>;
+const Copyable: React.FC<{ value: string | null; empty?: string }> = ({ value, empty = "n/a" }) =>
+    value ? <Typography.Text copyable code>{value}</Typography.Text> : <Typography.Text type="secondary">{empty}</Typography.Text>;
 
 // What an operator hands the partner's IT team to configure their side.
 const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> = ({ idp }) => (
@@ -38,6 +38,17 @@ const ServiceProviderDetails: React.FC<{ idp: IOrganizationIdentityProvider }> =
                 <Copyable value={idp.service_provider.redirect_uri} />
             </Descriptions.Item>
         )}
+        <Descriptions.Item label="Login link">
+            <Copyable value={idp.login_url} empty="Login client not configured" />
+            {idp.login_url ? (
+                <div>
+                    <Typography.Text type="secondary">
+                        Signs a user in through this identity provider once it is in Testing or Active. Open it in a
+                        private window to test.
+                    </Typography.Text>
+                </div>
+            ) : null}
+        </Descriptions.Item>
         <Descriptions.Item label="Metadata source">
             <Typography.Text style={{ wordBreak: "break-all" }}>
                 {idp.metadata_source.trimStart().startsWith("<") ? "Pasted XML document" : idp.metadata_source}
@@ -98,7 +109,7 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
     const remove = (idp: IOrganizationIdentityProvider) =>
         confirmAndRun(
             `Delete ${idp.alias}?`,
-            "This deletes the identity provider from Keycloak. Users who sign in through it will no longer be able to, and the configuration cannot be recovered.",
+            "This deletes the identity provider from Keycloak, and with it every user's link to it. Nobody can sign in through it afterwards, and if it is created again, everyone who signed in through it before has to link their account again on their next login. The configuration cannot be recovered. To rotate a secret, point at new metadata or fix a mapping, edit it instead.",
             () =>
                 mutate(
                     {
@@ -163,6 +174,16 @@ export const IdentityProviders: React.FC<{ organization: IProvisionedOrganizatio
                             </Dropdown>
                             <Button size="small" icon={<ReloadOutlined />} disabled={isLoading} onClick={() => refreshMetadata(idp)}>
                                 Refresh metadata
+                            </Button>
+                            <Button
+                                size="small"
+                                icon={<EditOutlined />}
+                                disabled={isLoading}
+                                onClick={() =>
+                                    go({ to: `/b2b_organizations/show/${organization.org_key}/identity-providers/${idp.alias}/edit` })
+                                }
+                            >
+                                Edit
                             </Button>
                             <Button
                                 size="small"

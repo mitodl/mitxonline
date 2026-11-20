@@ -1,21 +1,14 @@
 import React, { useState } from "react";
 import { Create } from "@refinedev/antd";
 import { useApiUrl, useCustomMutation, useGo, useParsed } from "@refinedev/core";
-import { Alert, Button, Card, Descriptions, Form, Input, Radio, Select, Space, Typography } from "antd";
-import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Descriptions, Form, Input, Radio, Space, Typography } from "antd";
 
+import { AttributeMapping, IAttributeRow, toMap } from "components/b2b/attribute_mapping";
 import { B2B_ORGANIZATIONS, IDP_PROTOCOLS, PROVISIONING_RESOURCE } from "components/b2b/constants";
 import { useRefreshOrganization } from "components/b2b/use_refresh_organization";
 import { IdpProtocol } from "interfaces";
 
 type MetadataSource = "url" | "xml";
-
-interface IAttributeRow {
-    user_attribute: string;
-    source: string;
-    // SAML only: match the assertion attribute by FriendlyName or by Name.
-    match?: "friendly" | "name";
-}
 
 interface IIdentityProviderForm {
     protocol: IdpProtocol;
@@ -37,13 +30,6 @@ const DEFAULT_SAML_ATTRIBUTES: IAttributeRow[] = [
     { user_attribute: "firstName", source: "firstName", match: "friendly" },
     { user_attribute: "lastName", source: "lastName", match: "friendly" },
 ];
-
-const toMap = (rows: IAttributeRow[] | undefined, match: "friendly" | "name") =>
-    Object.fromEntries(
-        (rows ?? [])
-            .filter((row) => row?.user_attribute && row?.source && (row.match ?? "friendly") === match)
-            .map((row) => [row.user_attribute, row.source]),
-    );
 
 export const IdentityProviderCreate: React.FC = () => {
     const { params } = useParsed<{ orgKey: string }>();
@@ -220,43 +206,7 @@ export const IdentityProviderCreate: React.FC = () => {
                     </Space>
                 </Card>
 
-                <Typography.Title level={5}>Attribute mapping</Typography.Title>
-                <Typography.Paragraph type="secondary">
-                    {protocol === "oidc"
-                        ? "Optional for OIDC: map a user attribute to a claim in the partner's token."
-                        : "Required for SAML: without it, users arrive with no email or name. Match each SAML attribute by its FriendlyName, or by its Name when the partner's assertions only carry URI names."}
-                </Typography.Paragraph>
-                <Form.List name="attributes">
-                    {(fields, { add, remove }) => (
-                        <>
-                            {fields.map(({ key, name }) => (
-                                <Space key={key} align="baseline" style={{ display: "flex" }}>
-                                    <Form.Item name={[name, "user_attribute"]} rules={[{ required: true }]}>
-                                        <Input placeholder="User attribute, e.g. email" />
-                                    </Form.Item>
-                                    {protocol !== "oidc" && (
-                                        <Form.Item name={[name, "match"]} initialValue="friendly">
-                                            <Select
-                                                style={{ width: 150 }}
-                                                options={[
-                                                    { value: "friendly", label: "FriendlyName" },
-                                                    { value: "name", label: "Name" },
-                                                ]}
-                                            />
-                                        </Form.Item>
-                                    )}
-                                    <Form.Item name={[name, "source"]} rules={[{ required: true }]}>
-                                        <Input placeholder={protocol === "oidc" ? "Claim" : "SAML attribute"} />
-                                    </Form.Item>
-                                    <Button type="text" icon={<MinusCircleOutlined />} aria-label="Remove mapping" onClick={() => remove(name)} />
-                                </Space>
-                            ))}
-                            <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />}>
-                                Add mapping
-                            </Button>
-                        </>
-                    )}
-                </Form.List>
+                <AttributeMapping protocol={protocol} />
             </Form>
         </Create>
     );

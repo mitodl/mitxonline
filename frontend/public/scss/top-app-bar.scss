@@ -269,3 +269,26 @@ header.site-header {
     }
   }
 }
+
+// The financial aid form's MIT Learn header has no mobile overlay menu, so
+// keep its user menu, which the styles above hide on small screens, visible.
+header.learn-header {
+  .full-screen-top-menu,
+  .top-user-menu.dropdown,
+  .user-menu-button {
+    display: flex;
+  }
+
+  // No Catalog link sits to its left here, so drop the divider, and keep the
+  // height that link gives the site header so the bar and the dropdown's
+  // position match it.
+  .top-user-menu {
+    border-left: 0;
+  }
+
+  @include media-breakpoint-up(md) {
+    .full-screen-top-menu {
+      min-height: 47px;
+    }
+  }
+}
