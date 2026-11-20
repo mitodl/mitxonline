@@ -250,7 +250,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             Refund downgrade callers and support-initiated deferrals only —
             never bypass for new enrollments.
         skip_enrollment_emails (bool): If True, don't send the learner the
-            enrollment confirmation email. Operator-run management commands only.
+            enrollment confirmation email. For operator-run management commands
+            and downgrades only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
@@ -679,14 +680,18 @@ def downgrade_learner(enrollment):
     Downgrades given enrollment from verified to audit.
     """
 
-    # Forcing the enrollment here - if the refund comes after the end date
+    # Forcing the enrollment here - if the downgrade comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
+    # Downgrading only reduces access, so neither the country block nor the
+    # export compliance screening applies, and no enrollment email is sent.
     return create_run_enrollments(
         user=enrollment.user,
         runs=[enrollment.run],
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_compliance_check=True,
         skip_country_block_check=True,
+        skip_enrollment_emails=True,
     )
 
 

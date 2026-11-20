@@ -1785,7 +1785,11 @@ def test_create_run_enrollments_skips_country_check_when_requested(
 
 
 def test_downgrade_learner_skips_country_block(mocker, user):
-    """Refund downgrades must still work for a learner whose country is blocked."""
+    """
+    Downgrades must still work for a learner whose country is blocked
+    or who can't be export-compliance screened, and never send an enrollment
+    email.
+    """
     run = CourseRunFactory.create()
     BlockedCountryFactory.create(course=run.course, country=user.legal_address.country)
     enrollment = CourseRunEnrollmentFactory.create(
@@ -1798,6 +1802,8 @@ def test_downgrade_learner_skips_country_block(mocker, user):
     downgrade_learner(enrollment)
 
     assert patched_create.call_args.kwargs["skip_country_block_check"] is True
+    assert patched_create.call_args.kwargs["skip_compliance_check"] is True
+    assert patched_create.call_args.kwargs["skip_enrollment_emails"] is True
 
 
 def test_country_blocked_error_message(user):
