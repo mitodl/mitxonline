@@ -117,7 +117,7 @@ class StaffDashboardOrganizationPanel(HelpPanel):
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
             self.content = format_html(
-                'Edit this organization, its SSO setup and its contracts in the <a href="{}">staff '
+                'Edit this organization, its logo, its SSO setup and its contracts in the <a href="{}">staff '
                 "dashboard</a>.",
                 f"/staff-dashboard/b2b_organizations/show/{self.instance.org_key}",
             )
@@ -196,18 +196,17 @@ class OrganizationPage(Page):
         "org_key",
         "org_key_prefix",
         "description",
+        "logo",
         "sso_organization_id",
     )
 
-    # The staff dashboard has no logo upload, so the logo is the one field
-    # still edited here.
     content_panels = [
         StaffDashboardOrganizationPanel(),
         FieldPanel("name", read_only=True),
         FieldPanel("description", read_only=True),
         FieldPanel("org_key", read_only=True),
         FieldPanel("sso_organization_id", read_only=True),
-        FieldPanel("logo"),
+        FieldPanel("logo", read_only=True),
     ]
 
     # Use default promote_panels from Page to allow manual slug editing
