@@ -2595,6 +2595,35 @@ def test_adopt_command_records_a_source_file(adopt_command, connection, tmp_path
     )
 
 
+def test_adopt_command_refuses_an_unreadable_source_file(
+    adopt_command, connection, tmp_path
+):
+    """A mistyped --source path is a CommandError naming it, before any read."""
+
+    missing = tmp_path / "missing.xml"
+
+    with pytest.raises(CommandError, match=f"xml-saml: could not read {missing}"):
+        adopt_command("--source", f"xml-saml={missing}")
+
+    connection.client.list.assert_not_called()
+
+
+@pytest.mark.parametrize("org_keys", [[], ["AAA"]])
+def test_adopt_command_skips_an_idp_linked_to_two_organizations(
+    adopt_command, connection, capsys, org_keys
+):
+    """A shared IdP gets no record, even when the run is limited to one org."""
+
+    OrganizationPageFactory.create(org_key="AAA")
+    OrganizationPageFactory.create(org_key="BBB")
+    connection.client.list.return_value = [_pulumi_saml_idp("shared")]
+
+    adopt_command(*org_keys)
+
+    assert not OrganizationIdentityProvider.objects.exists()
+    assert "Skipped shared: Keycloak links it to AAA, BBB" in capsys.readouterr().err
+
+
 def test_adopt_command_continues_past_an_organization_keycloak_rejects(
     adopt_command, connection
 ):

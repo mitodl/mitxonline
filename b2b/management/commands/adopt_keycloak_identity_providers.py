@@ -5,7 +5,8 @@ The staff dashboard lists an organization's IdPs from OrganizationIdentityProvid
 rows, and only the provisioning API wrote those, so every IdP Pulumi declared
 was invisible there. This records each IdP Keycloak links to an organization
 here, without changing anything in Keycloak. Safe to re-run: recorded IdPs are
-skipped.
+skipped. So is an IdP Keycloak links to more than one organization, because a
+delete through one organization's record would remove it for all of them.
 
 Recorded IdPs are pulumi_managed: the dashboard lists them, and the provisioning
 API refuses to change them until release_pulumi_identity_providers runs for
@@ -13,6 +14,7 @@ each one after it leaves Pulumi state.
 """
 
 import logging
+from collections import defaultdict
 from pathlib import Path
 
 from django.core.management import BaseCommand, CommandError
@@ -39,7 +41,11 @@ def _parse_source(value):
     if not source.startswith(("http://", "https://")):
         # A saved SAML metadata document, e.g. one of the
         # files/olapps/*_metadata.xml copies in ol-infrastructure.
-        source = Path(source).read_text()
+        try:
+            source = Path(source).read_text()
+        except OSError as exc:
+            msg = f"--source {alias}: could not read {source}: {exc.strerror}"
+            raise CommandError(msg) from exc
     return alias, source
 
 
@@ -67,20 +73,61 @@ class Command(BaseCommand):
         parser.add_argument(
             "org_keys",
             nargs="*",
-            help="Limit the run to these org keys. Defaults to every linked org.",
+            help=(
+                "Record only these orgs' IdPs. Every linked org is still read, "
+                "to find IdPs shared with another org. Defaults to every linked org."
+            ),
         )
 
     def handle(self, *args, **options):  # noqa: ARG002
         sources = dict(_parse_source(value) for value in options["source"])
         connection = KeycloakConnection()
+        targets = self._target_org_keys(options["org_keys"])
         recorded = set(
             OrganizationIdentityProvider.objects.values_list("alias", flat=True)
         )
-        linked_aliases = set()
-        failed = []
+        links, failed = self._links(connection)
         skipped = []
 
-        for organization in self._organizations(options["org_keys"]):
+        for alias, linked in links.items():
+            org_keys = [organization.org_key for organization, _ in linked]
+            if alias in recorded or not targets.intersection(org_keys):
+                continue
+            if len(linked) > 1:
+                self.stderr.write(
+                    f"Skipped {alias}: Keycloak links it to {', '.join(org_keys)}, "
+                    "and deleting it through one of them would remove it for all."
+                )
+                skipped.append(alias)
+                continue
+            organization, keycloak_idp = linked[0]
+            outcome = self._adopt(
+                organization, keycloak_idp, sources, dry_run=options["dry_run"]
+            )
+            if outcome == "skipped":
+                skipped.append(alias)
+            elif outcome == "failed":
+                failed.append(alias)
+
+        # An organization whose listing failed would make its IdPs look unlinked.
+        if not options["org_keys"] and not failed:
+            self._report_unlinked(connection, recorded | set(links))
+        self._report_outcome(sources, set(links), skipped, failed)
+
+    def _links(self, connection):
+        """
+        Map each alias to the (organization, IdP) pairs Keycloak links it to.
+
+        Returns:
+        - dict[str, list[tuple]]: the links, in org_key order
+        - list[str]: the org keys whose IdPs could not be listed
+        """
+
+        links = defaultdict(list)
+        failed = []
+        for organization in OrganizationPage.objects.filter(
+            sso_organization_id__isnull=False
+        ).order_by("org_key"):
             try:
                 linked = organization_identity_providers(connection, organization)
             except Exception as exc:
@@ -89,23 +136,9 @@ class Command(BaseCommand):
                 failed.append(organization.org_key)
                 self.stderr.write(f"Failed to list {organization.org_key}: {exc}")
                 continue
-
-            linked_aliases.update(keycloak_idp.alias for keycloak_idp in linked)
             for keycloak_idp in linked:
-                if keycloak_idp.alias in recorded:
-                    continue
-                outcome = self._adopt(
-                    organization, keycloak_idp, sources, dry_run=options["dry_run"]
-                )
-                if outcome == "skipped":
-                    skipped.append(keycloak_idp.alias)
-                elif outcome == "failed":
-                    failed.append(keycloak_idp.alias)
-
-        # An organization whose listing failed would make its IdPs look unlinked.
-        if not options["org_keys"] and not failed:
-            self._report_unlinked(connection, recorded | linked_aliases)
-        self._report_outcome(sources, linked_aliases, skipped, failed)
+                links[keycloak_idp.alias].append((organization, keycloak_idp))
+        return links, failed
 
     def _report_outcome(self, sources, linked_aliases, skipped, failed):
         """Report unused --source aliases and skipped IdPs, then fail on errors."""
@@ -126,23 +159,24 @@ class Command(BaseCommand):
             msg = f"{len(failed)} failure(s): {', '.join(failed)}"
             raise CommandError(msg)
 
-    def _organizations(self, org_keys):
-        """Return the linked organizations to check, reporting unknown keys."""
+    def _target_org_keys(self, org_keys):
+        """Return the linked org keys to record IdPs for, reporting unknown keys."""
 
-        organizations = OrganizationPage.objects.filter(
-            sso_organization_id__isnull=False
-        ).order_by("org_key")
+        linked = set(
+            OrganizationPage.objects.filter(
+                sso_organization_id__isnull=False
+            ).values_list("org_key", flat=True)
+        )
         if not org_keys:
-            return organizations
+            return linked
 
-        organizations = organizations.filter(org_key__in=org_keys)
-        unmatched = set(org_keys) - set(organizations.values_list("org_key", flat=True))
+        unmatched = set(org_keys) - linked
         if unmatched:
             self.stderr.write(
                 "No organization linked to Keycloak for: "
                 + ", ".join(sorted(unmatched))
             )
-        return organizations
+        return linked.intersection(org_keys)
 
     def _adopt(self, organization, keycloak_idp, sources, *, dry_run):
         label = (

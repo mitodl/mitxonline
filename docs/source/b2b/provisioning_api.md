@@ -60,7 +60,12 @@ Keycloak, it's audited as "Identity provider adopted", and recorded IdPs are
 skipped, so it is safe to re-run. A Keycloak error listing one organization's
 IdPs is reported and the run carries on with the rest. A run without org keys
 also lists the realm IdPs that no organization here links to; those aren't
-recorded.
+recorded. Org keys limit which organizations' IdPs are recorded, but every
+linked organization is still read, so an IdP Keycloak links to more than one
+organization is found and skipped: a row belongs to one organization, and
+deleting the IdP through it would remove it for the others. Pulumi links each
+IdP to one organization, so only a link added in the Keycloak console can
+cause this.
 
 An adopted IdP is recorded as follows:
 
