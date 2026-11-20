@@ -58,24 +58,38 @@ class Command(BaseCommand):
 
     def generate_credential_for_certificate(self, certificate, *, force=False):
         """
-        Generate a verifiable credential for a given certificate
-        We may want to wrap this in a transaction in the future if force=True gets a lot of use
+        Generate a verifiable credential for a given certificate.
+
+        With force=True an existing credential is replaced, but only once the new one has been signed.
+        A certificate whose page isn't set up to provision credentials is skipped and keeps what it has.
         """
-        if not certificate.verifiable_credential or force:
-            if certificate.verifiable_credential:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Deleting and regenerating verifiable credential for certificate {certificate}"
-                    )
-                )
-                certificate.verifiable_credential.delete()
-            create_verifiable_credential(certificate, raise_on_error=True)
-        else:
+        has_credential = bool(certificate.verifiable_credential)
+        if has_credential and not force:
             self.stdout.write(
                 self.style.WARNING(
                     f"Certificate {certificate} already has a verifiable credential; skipping."
                 )
             )
+            return
+
+        if has_credential:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Replacing verifiable credential for certificate {certificate}"
+                )
+            )
+        credential = create_verifiable_credential(
+            certificate, raise_on_error=True, replace_existing=force
+        )
+        if not credential:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Certificate {certificate} skipped: its certificate page isn't set up to provision "
+                    "verifiable credentials. Any existing credential was left in place."
+                )
+            )
+            return
+        self.stdout.write(self.style.SUCCESS(f"Backfilled certificate {certificate}"))
 
     def handle(self, *args, **options):  # noqa: ARG002
         # These are either the readable IDs of a program or the IDs of course runs to process
@@ -127,9 +141,6 @@ class Command(BaseCommand):
             try:
                 if execute:
                     self.generate_credential_for_certificate(cert, force=force)
-                    self.stdout.write(
-                        self.style.SUCCESS(f"Backfilled certificate for program {cert}")
-                    )
                 else:
                     self.stdout.write(
                         self.style.SUCCESS(
