@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from hubspot_sync.task_helpers import sync_hubspot_user
 from openedx.api import create_user
+from users.models import LegalAddress, UserProfile
 from users.serializers import (
     LegalAddressSerializer,
     UserProfileSerializer,
@@ -44,16 +45,20 @@ class RegisterDetailsSerializer(serializers.Serializer):
             user.name = name
             user.save()
 
+            # some existing users lack these rows; create_user -> _build_user_data reads both
+            legal_address_obj, _ = LegalAddress.objects.get_or_create(user=user)
+            user_profile_obj, _ = UserProfile.objects.get_or_create(user=user)
+
             if legal_address_data:
                 legal_address = LegalAddressSerializer(
-                    user.legal_address, data=legal_address_data
+                    legal_address_obj, data=legal_address_data
                 )
                 if legal_address.is_valid():
                     legal_address.save()
 
             if user_profile_data:
                 user_profile = UserProfileSerializer(
-                    user.user_profile, data=user_profile_data
+                    user_profile_obj, data=user_profile_data
                 )
                 if user_profile.is_valid():
                     user_profile.save()
