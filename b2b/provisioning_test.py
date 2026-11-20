@@ -63,6 +63,7 @@ from b2b.provisioning import (
     push_unconfirmed_members_to_keycloak,
     refresh_identity_provider_metadata,
     set_onboarding_state,
+    set_organization_logo,
     transition_identity_provider,
     update_identity_provider,
     update_organization,
@@ -1426,6 +1427,64 @@ def test_update_organization_that_changes_nothing_is_not_audited(connection):
     )
 
     update_organization(organization, connection=connection, name=organization.name)
+
+    assert _audits(organization) == []
+
+
+def test_set_organization_logo_stores_and_audits_it(staff_user, logo_upload):
+    """Replacing a logo records both file names."""
+
+    organization = OrganizationPageFactory.create()
+    set_organization_logo(organization, logo_upload("first.png"), actor=staff_user)
+    first = OrganizationPage.objects.get(pk=organization.pk).logo.name
+
+    set_organization_logo(organization, logo_upload("second.png"), actor=staff_user)
+
+    organization.refresh_from_db()
+    assert organization.logo.name.startswith("organization_logos/second")
+    assert organization.logo.storage.exists(organization.logo.name)
+    initial, replaced = _audits(organization)
+    assert initial.data_before == {"logo": None}
+    assert initial.data_after == {"logo": first}
+    assert replaced.action == PROVISIONING_ACTION_ORG_UPDATED
+    assert replaced.acting_user == staff_user
+    assert replaced.data_before == {"logo": first}
+    assert replaced.data_after == {"logo": organization.logo.name}
+
+
+def test_set_organization_logo_does_not_need_keycloak(logo_upload):
+    """The logo lives only here, so an org with no Keycloak record can have one."""
+
+    organization = OrganizationPageFactory.create(sso_organization_id=None)
+
+    set_organization_logo(organization, logo_upload())
+
+    organization.refresh_from_db()
+    assert organization.logo.name.startswith("organization_logos/")
+
+
+def test_clearing_an_organization_logo(staff_user, logo_upload):
+    """Clearing stores a blank logo and is audited."""
+
+    organization = OrganizationPageFactory.create()
+    set_organization_logo(organization, logo_upload())
+    before = OrganizationPage.objects.get(pk=organization.pk).logo.name
+
+    set_organization_logo(organization, None, actor=staff_user)
+
+    organization.refresh_from_db()
+    assert not organization.logo
+    assert OrganizationPage.objects.filter(pk=organization.pk, logo="").exists()
+    assert _audits(organization)[-1].data_before == {"logo": before}
+    assert _audits(organization)[-1].data_after == {"logo": None}
+
+
+def test_clearing_a_missing_logo_is_not_audited():
+    """Removing a logo the organization doesn't have is not a change."""
+
+    organization = OrganizationPageFactory.create()
+
+    set_organization_logo(organization, None)
 
     assert _audits(organization) == []
 
