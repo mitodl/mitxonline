@@ -6,6 +6,7 @@ import random
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
+from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -15,6 +16,7 @@ from CyberSource.rest import ApiException
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext
@@ -68,6 +70,8 @@ from ecommerce.api import (
     generate_checkout_payload,
     get_anonymous_basket_id,
     get_auto_apply_discounts_for_basket,
+    get_checkout_cancel_url,
+    get_checkout_success_url,
     log_stripe_event,
     process_cybersource_payment_response,
     process_stripe_checkout_completed,
@@ -3490,3 +3494,87 @@ def test_generate_checkout_payload_compliance_data_error(
             "missing_fields": ["last_name"],
         }
     assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.parametrize("get_url", [get_checkout_success_url, get_checkout_cancel_url])
+def test_get_checkout_return_url_cybersource(settings, get_url):
+    """CyberSource keeps returning to the callback route with no reference number."""
+
+    settings.SITE_BASE_URL = "https://mitxonline.example.com"
+
+    assert get_url(MITOL_PAYMENT_GATEWAY_CYBERSOURCE, "mitxonline-test-1") == urljoin(
+        settings.SITE_BASE_URL, reverse("checkout-result-callback")
+    )
+
+
+@pytest.mark.parametrize(
+    ("get_url", "route", "path_part"),
+    [
+        (get_checkout_success_url, "checkout-result-success", "success"),
+        (get_checkout_cancel_url, "checkout-result-cancel", "cancel"),
+    ],
+)
+def test_get_checkout_return_url_stripe(settings, get_url, route, path_part):
+    """Stripe return URLs have the order reference number built in."""
+
+    settings.SITE_BASE_URL = "https://mitxonline.example.com"
+    reference_number = "mitxonline-test-1"
+
+    url = get_url(MITOL_PAYMENT_GATEWAY_STRIPE, reference_number)
+
+    assert url == urljoin(
+        settings.SITE_BASE_URL,
+        reverse(route, kwargs={"reference_number": reference_number}),
+    )
+    assert url.endswith(f"/checkout/result/{path_part}/{reference_number}/")
+
+
+@pytest.mark.parametrize("get_url", [get_checkout_success_url, get_checkout_cancel_url])
+def test_get_checkout_return_url_stripe_requires_reference(get_url):
+    """Stripe return URLs can't be built without a reference number."""
+
+    with pytest.raises(ValidationError):
+        get_url(MITOL_PAYMENT_GATEWAY_STRIPE)
+
+
+@pytest.mark.parametrize("get_url", [get_checkout_success_url, get_checkout_cancel_url])
+def test_get_checkout_return_url_unknown_gateway(get_url):
+    """An unmapped gateway raises a ValidationError."""
+
+    with pytest.raises(ValidationError):
+        get_url("not-a-gateway", "mitxonline-test-1")
+
+
+@pytest.mark.parametrize(
+    ("gateway_type", "expect_reference"),
+    [
+        (MITOL_PAYMENT_GATEWAY_STRIPE, True),
+        (MITOL_PAYMENT_GATEWAY_CYBERSOURCE, False),
+    ],
+)
+def test_generate_checkout_payload_return_urls(
+    mocker, user, products, gateway_type, expect_reference
+):
+    """Stripe gets return URLs with the order's reference number; CyberSource doesn't."""
+
+    create_basket(user, products)
+    mock_start_payment = mocker.patch(
+        "ecommerce.api.PaymentGateway.start_payment",
+        return_value={"payload": mocker.MagicMock()},
+    )
+    # Stripe logs the CheckoutSession as a transaction; that's not under test.
+    mocker.patch("ecommerce.models.Order.get_object_flow")
+
+    generate_checkout_payload(authed_request(user), gateway_type=gateway_type)
+
+    order = PendingOrder.objects.get(purchaser=user)
+    success_url, cancel_url = mock_start_payment.call_args.args[2:4]
+
+    if expect_reference:
+        assert success_url.endswith(
+            f"/checkout/result/success/{order.reference_number}/"
+        )
+        assert cancel_url.endswith(f"/checkout/result/cancel/{order.reference_number}/")
+    else:
+        assert success_url.endswith(reverse("checkout-result-callback"))
+        assert cancel_url.endswith(reverse("checkout-result-callback"))

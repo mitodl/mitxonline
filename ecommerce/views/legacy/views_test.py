@@ -10,7 +10,7 @@ import reversion
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.test import Client, RequestFactory
-from django.urls import reverse
+from django.urls import resolve, reverse
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
 from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
@@ -72,6 +72,7 @@ from ecommerce.serializers import (
     DiscountSerializer,
     ProductSerializer,
 )
+from ecommerce.views.legacy import CheckoutCallbackView
 from flexiblepricing.constants import FlexiblePriceStatus
 from flexiblepricing.factories import FlexiblePriceFactory, FlexiblePriceTierFactory
 from main import features
@@ -80,6 +81,8 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
+    USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
@@ -2203,3 +2206,101 @@ def test_backoffice_callback_good_order(mocker, client, settings):
 
     assert response.status_code == 200
     mocked_processor.assert_called()
+
+
+@pytest.mark.parametrize("route", ["checkout-result-success", "checkout-result-cancel"])
+def test_checkout_result_routes_resolve_to_new_views(route):
+    """The success/cancel routes aren't swallowed by the checkout/result/ callback."""
+
+    match = resolve(reverse(route, kwargs={"reference_number": "mitxonline-test-1"}))
+
+    assert match.url_name == route
+    assert match.func.view_class is not CheckoutCallbackView
+
+
+def test_checkout_result_success_redirects_to_dashboard(user, client):
+    """Hitting the success endpoint redirects to the dashboard if unauthenticated."""
+
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING
+    assert not order.transactions.exists()
+
+
+def test_checkout_result_success_redirects_to_learn(settings, user, user_client):
+    """Orders that go to the Learn dashboard are sent there as pending, not fulfilled."""
+
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=pending&order_id={order.id}"
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.parametrize("is_anonymous", [True, False])
+def test_checkout_result_success_ignores_other_users_orders(
+    user, user_client, is_anonymous
+):
+    """Another user's reference number (or no login) gets the plain dashboard redirect."""
+
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+    client = Client() if is_anonymous else user_client
+
+    resp = client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+    )
+
+
+def test_checkout_result_cancel_redirects_to_cart(user, user_client):
+    """The cancel handler redirects to the cart with the cancelled message."""
+
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    resp = user_client.get(
+        reverse(
+            "checkout-result-cancel",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
+    )
+    order.refresh_from_db()
+    assert order.state == OrderStatus.PENDING

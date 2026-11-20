@@ -1,6 +1,10 @@
 from django.urls import include, path, re_path
 
 from ecommerce.admin import AdminRefundOrderView
+from ecommerce.constants import (
+    CHECKOUT_RESULT_CANCEL_ROUTE,
+    CHECKOUT_RESULT_SUCCESS_ROUTE,
+)
 from ecommerce.views.legacy import (
     AllProductViewSet,
     AnonymousCheckoutView,
@@ -12,6 +16,8 @@ from ecommerce.views.legacy import (
     CheckoutCallbackView,
     CheckoutInterstitialView,
     CheckoutProductView,
+    CheckoutResultCancelView,
+    CheckoutResultSuccessView,
     DiscountViewSet,
     NestedDiscountProductViewSet,
     NestedDiscountRedemptionViewSet,
@@ -109,6 +115,18 @@ urlpatterns = [
         r"^api/checkout/result/",
         BackofficeCallbackView.as_view(),
         name="checkout_result_api",
+    ),
+    # These must come before the checkout/result/ pattern, which isn't
+    # anchored at the end and would otherwise match them.
+    path(
+        "checkout/result/success/<str:reference_number>/",
+        CheckoutResultSuccessView.as_view(),
+        name=CHECKOUT_RESULT_SUCCESS_ROUTE,
+    ),
+    path(
+        "checkout/result/cancel/<str:reference_number>/",
+        CheckoutResultCancelView.as_view(),
+        name=CHECKOUT_RESULT_CANCEL_ROUTE,
     ),
     re_path(
         r"^checkout/result/",
