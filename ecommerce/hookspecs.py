@@ -105,6 +105,8 @@ def checkout_validate_basket(request, basket, options):
     Raises:
     - ExportComplianceDataError: if the user's profile can't be checked for
       export compliance and raise_compliance_data_errors is set to True
+    - ExportComplianceError: if the user failed the export compliance check
+      and raise_compliance_declines is set to True
     """
 
 

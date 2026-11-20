@@ -7,6 +7,7 @@ import {
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
   USER_MSG_TYPE_ENROLL_BLOCKED,
+  USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
   USER_MSG_TYPE_ENROLL_DUPLICATED,
   USER_MSG_TYPE_ENROLL_FAILED,
   USER_MSG_TYPE_ENROLLED,
@@ -59,6 +60,14 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_DANGER
     msgText =
         "We're sorry, your country is currently blocked from enrolling in this course."
+    break
+  case USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED:
+    alertType = ALERT_TYPE_DANGER
+    msgText = `Unable to complete enrollment. Please contact support at ${
+      SETTINGS.support_email
+    }${
+      userMsgJson.code ? ` and mention error code ${userMsgJson.code}` : ""
+    }.`
     break
   case USER_MSG_TYPE_PROFILE_INCOMPLETE:
     alertType = ALERT_TYPE_DANGER

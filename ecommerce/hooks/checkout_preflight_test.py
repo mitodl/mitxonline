@@ -5,6 +5,7 @@ import pytest
 from django.test import RequestFactory
 from mitol.common.utils import now_in_utc
 
+from compliance.exceptions import ExportComplianceError
 from ecommerce import hookspecs
 from ecommerce.api import _run_checkout_preflight
 from ecommerce.factories import (
@@ -25,6 +26,7 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
 )
 from main.plugin_manager import get_plugin_manager
@@ -79,6 +81,34 @@ def test_check_basket_purchasable(mocker, basket_request, failing, expected):
         mocker.patch.object(basket, check, return_value=check == failing)
 
     assert _check_basket_purchasable(basket, options={}) == expected
+
+
+@pytest.mark.parametrize("raise_compliance_declines", [False, True])
+def test_check_basket_purchasable_compliance_declined(
+    mocker, basket_request, raise_compliance_declines
+):
+    """
+    An export compliance decline is reported as such with its CS_700 code, or
+    raised, never as a country block (mitodl/hq#14499).
+    """
+
+    _, basket = basket_request
+    mocker.patch.object(
+        basket,
+        "has_user_blocked_products",
+        side_effect=ExportComplianceError(basket.user, "DECLINED", 700),
+    )
+    options = {"raise_compliance_declines": raise_compliance_declines}
+
+    if raise_compliance_declines:
+        with pytest.raises(ExportComplianceError):
+            _check_basket_purchasable(basket, options=options)
+    else:
+        assert _check_basket_purchasable(basket, options=options) == {
+            "compliance_declined": True,
+            "error": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
+            "reason_code": "CS_700",
+        }
 
 
 @pytest.mark.parametrize("discounts_valid", [True, False])
