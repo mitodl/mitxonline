@@ -163,7 +163,8 @@ class TaxRateAdmin(VersionAdmin):
         A queryset delete is a bulk update, which records no versions.
         """
 
-        for tax_rate in queryset:
+        # Already-deleted rates are skipped, so their deletion time is kept.
+        for tax_rate in queryset.filter(is_active=True):
             tax_rate.delete()
 
 

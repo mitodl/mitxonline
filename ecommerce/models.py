@@ -218,6 +218,9 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
 
         Tax records will point at the version of the rate they used, so every
         change has to produce one - not just the ones made in the admin.
+
+        Bulk queryset .update() and .delete() skip save(), so they record no
+        version; change rates one at a time instead.
         """
 
         if reversion.is_active():
@@ -229,7 +232,12 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
 
     @property
     def current_version(self) -> Version | None:
-        """Return the newest version of this rate, which matches the saved row."""
+        """
+        Return the newest version of this rate.
+
+        This matches the row as last saved, which is not necessarily this
+        instance if the rate changed after it was loaded.
+        """
 
         return Version.objects.get_for_object(self).first()
 

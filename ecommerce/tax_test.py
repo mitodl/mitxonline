@@ -204,6 +204,24 @@ def test_tax_rate_admin_bulk_delete_is_versioned():
         assert rate.current_version.field_dict["is_active"] is False
 
 
+def test_tax_rate_admin_bulk_delete_skips_deleted():
+    """The admin's bulk delete leaves already-deleted rates alone."""
+
+    rate = TaxRateFactory.create(country_code="IN")
+    rate.delete()
+    rate.refresh_from_db()
+    deleted_on = rate.deleted_on
+    version_count = Version.objects.get_for_object(rate).count()
+
+    TaxRateAdmin(TaxRate, AdminSite()).delete_queryset(
+        None, TaxRate.all_objects.filter(pk=rate.pk)
+    )
+
+    rate.refresh_from_db()
+    assert rate.deleted_on == deleted_on
+    assert Version.objects.get_for_object(rate).count() == version_count
+
+
 @pytest.mark.parametrize("taxed", [True, False])
 @pytest.mark.parametrize("price", [None, Decimal("50.00")])
 def test_product_calculate_tax_for_locale(taxed, price):
