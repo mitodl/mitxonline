@@ -38,6 +38,7 @@ from ecommerce.models import (
     RefundedOrder,
     RefundRequest,
     StripeEventLog,
+    TaxRate,
     Transaction,
     UserDiscount,
 )
@@ -131,6 +132,27 @@ class ProductAdmin(VersionAdmin):
                 item.save()
 
             reversion.set_user(request.user)
+
+
+@admin.register(TaxRate)
+class TaxRateAdmin(VersionAdmin):
+    """Admin for TaxRate"""
+
+    model = TaxRate
+    list_display = (
+        "id",
+        "is_active",
+        "country_code",
+        "tax_rate",
+        "tax_rate_name",
+    )
+    list_filter = ("is_active", "country_code")
+    search_fields = ("country_code", "tax_rate_name")
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager, so we can see deleted rates."""
+
+        return self.model.all_objects.get_queryset()
 
 
 @admin.register(Basket)

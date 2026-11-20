@@ -14,9 +14,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils.functional import cached_property
+from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
@@ -51,13 +53,16 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
+from location.models import SoftDeleteTimestampedModel
 from main import features
+from main.models import ValidateOnSaveMixin
 from main.plugin_manager import get_plugin_manager
 from users.models import User
 
 if TYPE_CHECKING:
     from b2b.models import ContractPage
     from ecommerce.discount_sources import SourceResolution
+    from ecommerce.tax import CalculatedTax
 
 User = get_user_model()  # noqa: F811
 
@@ -126,6 +131,86 @@ class Product(TimestampedModel):
 
     def __str__(self):
         return f"#{self.id} {self.description} {self.price}"
+
+    def calculate_tax_for_locale(
+        self, country_code: str | None, *, price: Decimal | None = None
+    ) -> CalculatedTax:
+        """
+        Calculate the tax owed on this product for the given locale.
+
+        Args:
+        - country_code (str|None): the ISO 3166-1 alpha-2 country code
+        - price (Decimal|None): the amount to tax; defaults to the product's
+          price. Pass the discounted price to tax that instead.
+
+        Returns:
+        - CalculatedTax: the rate applied (if any), the tax, and the total
+        """
+        from ecommerce.tax import (  # noqa: PLC0415
+            calculate_tax,
+            get_tax_rate_for_locale,
+        )
+
+        return calculate_tax(
+            self.price if price is None else price,
+            get_tax_rate_for_locale(country_code),
+        )
+
+
+@reversion.register(exclude=("created_on", "updated_on"))
+class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
+    """
+    The tax we charge for a locale.
+
+    The locale is a country for now. The subdivision fields are there so a rate
+    can be narrowed to a region later; nothing reads them yet.
+
+    The rate is versioned with django-reversion so an order can point at the
+    rate that was in force when it was placed, even after the rate changes.
+    """
+
+    country_code = CountryField()
+    subdivision_1_code = models.CharField(
+        help_text="ISO-3166-2 code for the first-level subdivision of the country, without the alpha-2 prefix. Not used yet.",
+        max_length=3,
+        blank=True,
+        default="",
+    )
+    subdivision_2_code = models.CharField(
+        help_text="ISO-3166-2 code for the second-level subdivision of the country, without the alpha-2 prefix. Not used yet.",
+        max_length=3,
+        blank=True,
+        default="",
+    )
+    tax_rate = models.DecimalField(
+        help_text="The tax rate, as a percentage (e.g. 18 for 18%).",
+        max_digits=6,
+        decimal_places=4,
+        validators=[MinValueValidator(Decimal(0)), MaxValueValidator(Decimal(100))],
+    )
+    tax_rate_name = models.CharField(
+        help_text="The name of the tax, shown to learners (e.g. VAT, GST).",
+        max_length=100,
+        default="VAT",
+    )
+
+    class Meta:
+        """Only allow one active rate per locale."""
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=(
+                    "country_code",
+                    "subdivision_1_code",
+                    "subdivision_2_code",
+                ),
+                condition=models.Q(is_active=True),
+                name="tax_rate_unique_active_locale",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tax_rate}% {self.tax_rate_name} for {self.country_code}"
 
 
 class Basket(TimestampedModel):

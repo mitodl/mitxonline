@@ -28,6 +28,15 @@ from users.factories import UserFactory
 FAKE = faker.Factory.create()
 
 
+class TaxRateFactory(DjangoModelFactory):
+    country_code = fuzzy.FuzzyChoice(["IN", "GB", "DE", "FR", "AU", "JP"])
+    tax_rate = fuzzy.FuzzyDecimal(1, 25, precision=4)
+    tax_rate_name = fuzzy.FuzzyChoice(["VAT", "GST"])
+
+    class Meta:
+        model = models.TaxRate
+
+
 class ProductFactory(DjangoModelFactory):
     purchasable_object = SubFactory(CourseRunFactory)
     price = fuzzy.FuzzyDecimal(2, 2000, precision=2)
