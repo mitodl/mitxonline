@@ -245,20 +245,21 @@ class LearnUserAdapter(UserAdapter):
         """
         return value.strip() if isinstance(value, str) else ""
 
-    def _handle_resplace_nested_path(self, nested_path, nested_value):
+    def _handle_replace_nested_path(self, nested_path, nested_value):
         """
         Skip a PATCH replace of fullName that carries no value.
 
-        The parent resolves the path through ATTR_MAP with a plain setattr, so
-        this is the only place a null can be stopped before it reaches
-        User.name. Returning True marks the path handled.
+        The parent's set_mapped_attr() skips a null, but User.name allows
+        blank, so it writes "" or whitespace through and clears the name.
+        Applying _clean_full_name here keeps PATCH on the same rule as
+        from_dict. Returning True marks the path handled.
         """
         if nested_path.first_path == self.FULL_NAME_PATH:
             full_name = self._clean_full_name(nested_value)
             if not full_name:
                 return True
             nested_value = full_name
-        return super()._handle_resplace_nested_path(nested_path, nested_value)
+        return super()._handle_replace_nested_path(nested_path, nested_value)
 
     def _set_external_id(self, external_id: str | None):
         """
