@@ -7,6 +7,11 @@ from location.dataclasses import LocationFlagRule
 GEOLOCATION_TYPE_PROFILE = "profile"
 GEOLOCATION_TYPE_GEOIP = "geoip"
 GEOLOCATION_TYPE_NONE = "none"
+GEOLOCATION_TYPE_CHOICES = [
+    (GEOLOCATION_TYPE_PROFILE, "Profile"),
+    (GEOLOCATION_TYPE_GEOIP, "GeoIP"),
+    (GEOLOCATION_TYPE_NONE, "None"),
+]
 
 # Flag determination rules
 # These are the different ways the flag may be set for a given user. Each maps

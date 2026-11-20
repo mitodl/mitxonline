@@ -29,8 +29,20 @@ from ecommerce.models import (
     validate_discount_shape,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
+from location.constants import GEOLOCATION_TYPE_CHOICES
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
+
+
+# The user's location, for baskets and orders. Declared as plain strings rather
+# than left to the model's CountryField, so a record with no location ("") is
+# valid in the API schema. (A comment, not a docstring: drf-spectacular would
+# use a docstring as the description of serializers that lack their own.)
+class UserLocationFieldsMixin(serializers.Serializer):
+    location_country_code = serializers.CharField(read_only=True)
+    location_source = serializers.ChoiceField(
+        choices=GEOLOCATION_TYPE_CHOICES, read_only=True
+    )
 
 
 class ProgramRunProductPurchasableObjectSerializer(serializers.ModelSerializer):
@@ -281,7 +293,7 @@ class BasketItemSerializer(serializers.ModelSerializer):
         ]
 
 
-class BasketSerializer(serializers.ModelSerializer):
+class BasketSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     """Basket model serializer"""
 
     basket_items = serializers.SerializerMethodField()
@@ -299,6 +311,8 @@ class BasketSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "basket_items",
+            "location_country_code",
+            "location_source",
         ]
         model = models.Basket
 
@@ -325,7 +339,21 @@ class RedeemedDiscountSerializer(serializers.ModelSerializer):
         depth = 1
 
 
+class NestedBasketSerializer(serializers.ModelSerializer):
+    """
+    A basket nested in a basket item.
+
+    Lists its fields, rather than nesting with depth, so fields added to Basket
+    (such as the user's location and IP) aren't exposed here by accident.
+    """
+
+    class Meta:
+        model = models.Basket
+        fields = ["id", "created_on", "updated_on", "anonymous_id", "user"]
+
+
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
+    basket = NestedBasketSerializer(read_only=True)
     product = serializers.SerializerMethodField()
 
     def get_product(self, instance):
@@ -337,7 +365,7 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
         depth = 1
 
 
-class BasketWithProductSerializer(serializers.ModelSerializer):
+class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     """Serializer for Basket model with product details"""
 
     basket_items = serializers.SerializerMethodField()
@@ -428,6 +456,8 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             "total_price",
             "discounted_price",
             "discounts",
+            "location_country_code",
+            "location_source",
         ]
 
 
@@ -452,7 +482,7 @@ class LineSerializer(serializers.ModelSerializer):
         model = models.Line
 
 
-class OrderSerializer(serializers.ModelSerializer):
+class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     lines = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
@@ -616,6 +646,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "transactions",
             "street_address",
             "refund_eligible",
+            "location_country_code",
+            "location_source",
         ]
         model = models.Order
 
@@ -685,7 +717,31 @@ class ProductFlexibilePriceSerializer(BaseProductSerializer):
         model = models.Product
 
 
+class NestedRedeemedOrderSerializer(serializers.ModelSerializer):
+    """
+    An order nested in a discount redemption.
+
+    Lists its fields, rather than nesting with depth, so fields added to Order
+    (such as the user's location and IP) aren't exposed here by accident.
+    """
+
+    class Meta:
+        model = models.Order
+        fields = [
+            "id",
+            "created_on",
+            "updated_on",
+            "state",
+            "purchaser",
+            "total_price_paid",
+            "reference_number",
+            "gateway_type",
+        ]
+
+
 class DiscountRedemptionSerializer(serializers.ModelSerializer):
+    redeemed_order = NestedRedeemedOrderSerializer(read_only=True)
+
     class Meta:
         model = models.DiscountRedemption
         fields = [

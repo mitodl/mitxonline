@@ -51,6 +51,7 @@ from courses.models import (
 )
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.api import (
+    add_product_to_basket,
     apply_discount_to_basket,
     establish_basket,
     establish_basket_for_request,
@@ -139,6 +140,17 @@ class BasketItemViewSet(ModelViewSet):
         # BasketItem has no Meta.ordering, so without this the row order is
         # whatever Postgres hands back - it varies between requests.
         return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
+
+    def perform_create(self, serializer):
+        """Add the item through the basket API, so the basket hooks run."""
+
+        item, _ = add_product_to_basket(
+            self.request,
+            serializer.validated_data["basket"],
+            serializer.validated_data["product"],
+            quantity=serializer.validated_data.get("quantity", 1),
+        )
+        serializer.instance = item
 
 
 @extend_schema_view(
@@ -263,10 +275,8 @@ def _create_basket_from_product(
             # Don't clear discounts here — the read→delete→reapply logic below
             # already preserves and re-checks them correctly.
 
-        # FUTURE: This is where the basket_add hook was called.
-
-        (_, created) = BasketItem.objects.update_or_create(
-            basket=basket, product=product, defaults={"quantity": quantity}
+        (_, created) = add_product_to_basket(
+            request, basket, product, quantity=quantity
         )
 
         if request.user.is_authenticated:
@@ -458,10 +468,7 @@ def create_basket_with_products(request):
 
     try:
         for product, quantity in products:
-            # FUTURE: this is where the basket_add hook is called
-            BasketItem.objects.update_or_create(
-                basket=basket, product=product, defaults={"quantity": quantity}
-            )
+            add_product_to_basket(request, basket, product, quantity=quantity)
 
             sync_hubspot_cart_add(
                 request.user,

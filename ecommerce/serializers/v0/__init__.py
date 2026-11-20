@@ -33,6 +33,8 @@ from ecommerce.models import (
 )
 from ecommerce.serializers import (
     DiscountShapeMixin,
+    NestedBasketSerializer,
+    UserLocationFieldsMixin,
     discount_is_price_neutral,
 )
 from flexiblepricing.api import determine_courseware_flexible_price_discount
@@ -310,7 +312,7 @@ class BasketItemSerializer(serializers.ModelSerializer):
         ]
 
 
-class BasketSerializer(serializers.ModelSerializer):
+class BasketSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     """Basket model serializer"""
 
     basket_items = serializers.SerializerMethodField()
@@ -328,6 +330,8 @@ class BasketSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "basket_items",
+            "location_country_code",
+            "location_source",
         ]
         model = models.Basket
 
@@ -355,6 +359,7 @@ class RedeemedDiscountSerializer(serializers.ModelSerializer):
 
 
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
+    basket = NestedBasketSerializer(read_only=True)
     product = serializers.SerializerMethodField()
 
     def get_product(self, instance):
@@ -366,7 +371,7 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
         depth = 1
 
 
-class BasketWithProductSerializer(serializers.ModelSerializer):
+class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     """Serializer for Basket model with product details"""
 
     basket_items = serializers.SerializerMethodField()
@@ -461,6 +466,8 @@ class BasketWithProductSerializer(serializers.ModelSerializer):
             "total_price",
             "discounted_price",
             "discounts",
+            "location_country_code",
+            "location_source",
         ]
 
 
@@ -588,7 +595,7 @@ class LineSerializer(serializers.ModelSerializer):
         model = models.Line
 
 
-class OrderSerializer(serializers.ModelSerializer):
+class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
     lines = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
@@ -777,6 +784,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "refund_status",
             "refund_requested_on",
             "refund_reviewed_on",
+            "location_country_code",
+            "location_source",
         ]
         model = models.Order
 

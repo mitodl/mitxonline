@@ -83,6 +83,12 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from location.constants import (
+    GEOLOCATION_TYPE_GEOIP,
+    GEOLOCATION_TYPE_NONE,
+    GEOLOCATION_TYPE_PROFILE,
+)
+from location.dataclasses import UserCalculatedLocation
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
@@ -2297,3 +2303,38 @@ def test_line_product_resolves_its_own_courseware_when_the_ids_disagree(
 
     with django_assert_num_queries(1):
         assert line.product.purchasable_object == snapshotted
+
+
+@pytest.mark.parametrize("from_basket", [True, False])
+def test_pending_order_copies_location(settings, user, from_basket):
+    """An order made from a basket records the basket's location; one made from a product doesn't."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    basket.set_location(
+        [
+            UserCalculatedLocation("US", GEOLOCATION_TYPE_PROFILE, ""),
+            UserCalculatedLocation("IN", GEOLOCATION_TYPE_GEOIP, "1.2.3.4"),
+        ]
+    )
+    basket.save()
+
+    if from_basket:
+        order = PendingOrder.create_from_basket(basket)
+    else:
+        order = PendingOrder.create_from_product(product, user)
+
+    order.refresh_from_db()
+    if from_basket:
+        assert order.location_country_code == "IN"
+        assert order.location_source == GEOLOCATION_TYPE_GEOIP
+        assert order.user_locations == basket.user_locations
+        assert order.location_determined_on == basket.location_determined_on
+    else:
+        assert order.location_country_code == ""
+        assert order.location_source == GEOLOCATION_TYPE_NONE
+        assert order.user_locations == []
+        assert order.location_determined_on is None

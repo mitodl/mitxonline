@@ -53,7 +53,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
-from location.models import SoftDeleteTimestampedModel
+from location.models import SoftDeleteTimestampedModel, UserLocationModel
 from main import features
 from main.models import ValidateOnSaveMixin
 from main.plugin_manager import get_plugin_manager
@@ -242,8 +242,8 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         return Version.objects.get_for_object(self).first()
 
 
-class Basket(TimestampedModel):
-    """Represents a User's basket."""
+class Basket(TimestampedModel, UserLocationModel):
+    """Represents a User's basket, and where we placed the user when they filled it."""
 
     anonymous_id = models.UUIDField(null=True, blank=True, unique=True, db_index=True)
     user = models.OneToOneField(
@@ -1174,7 +1174,7 @@ class OrderFlow:
             transaction.on_commit(self.order.send_ecommerce_order_receipt)
 
 
-class Order(TimestampedModel):
+class Order(TimestampedModel, UserLocationModel):
     """An order containing information for a purchase."""
 
     state = models.CharField(max_length=150, choices=OrderStatus)
@@ -1436,6 +1436,7 @@ class PendingOrder(Order):
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
+        location_from: UserLocationModel | None = None,
     ):
         """
         Creates a new PendingOrder with the supplied data.
@@ -1451,6 +1452,8 @@ class PendingOrder(Order):
             discounts (List[Discounts]):  A list of Discounts to apply to each
                 Line associated with the order.
             gateway_type (str): The PaymentGateway class for the order.
+            location_from (UserLocationModel|None): a record (usually the
+                basket) to copy the user's location from.
 
         Returns:
             PendingOrder
@@ -1481,12 +1484,14 @@ class PendingOrder(Order):
             product_object_ids.append(product.object_id)
             product_content_types.append(product.content_type_id)
 
-        order = Order.objects.create(
+        order = Order(
             state=OrderStatus.PENDING,
             purchaser=user,
             total_price_paid=0,
             gateway_type=gateway_type,
         )
+        order.copy_location_from(location_from)
+        order.save()
 
         # Apply any discounts to the PendingOrder
         if discounts:
@@ -1549,7 +1554,7 @@ class PendingOrder(Order):
             for basket_discount in basket.discounts.all()
         ]
         order = cls._create_with_data(
-            cls, products, basket.user, discounts, gateway_type
+            cls, products, basket.user, discounts, gateway_type, location_from=basket
         )
         return order  # noqa: RET504
 

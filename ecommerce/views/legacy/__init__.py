@@ -296,6 +296,16 @@ class BasketItemViewSet(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
+    def perform_create(self, serializer):
+        """Add the item through the basket API, so the basket hooks run."""
+
+        item, _ = api.add_product_to_basket(
+            self.request,
+            serializer.validated_data["basket"],
+            serializer.validated_data["product"],
+        )
+        serializer.instance = item
+
 
 @extend_schema(
     parameters=[
@@ -685,7 +695,7 @@ class CheckoutApiViewSet(ViewSet):
                 # Check if product already exists in basket
                 if not basket.basket_items.filter(product=product).exists():
                     # Add new item to basket
-                    BasketItem.objects.create(basket=basket, product=product)
+                    api.add_product_to_basket(self.request, basket, product)
                     message = "Product added to cart"
 
                     sync_hubspot_cart_add(
@@ -706,7 +716,7 @@ class CheckoutApiViewSet(ViewSet):
                     )
             else:
                 # Legacy behavior: add single item
-                BasketItem.objects.create(basket=basket, product=product)
+                api.add_product_to_basket(self.request, basket, product)
                 message = "Product added to cart"
 
                 sync_hubspot_cart_add(
@@ -1052,7 +1062,7 @@ class CheckoutProductView(RedirectView):
                 )
             )
             for product in Product.objects.filter(id__in=all_product_ids):
-                BasketItem.objects.create(basket=basket, product=product)
+                api.add_product_to_basket(self.request, basket, product)
 
         return super().get_redirect_url(*args, **kwargs)
 

@@ -42,6 +42,8 @@ from ecommerce.constants import (
     ALL_DISCOUNT_TYPES,
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
+    BASKET_UPDATE_ADD_ITEM,
+    BASKET_UPDATE_CLAIM,
     CHECKOUT_CANCEL_ROUTE_MAP,
     CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
     CHECKOUT_SUCCESS_ROUTE_MAP,
@@ -74,6 +76,7 @@ from ecommerce.constants import (
     TRANSACTION_TYPE_PAYMENT,
     ZERO_PAYMENT_DATA,
 )
+from ecommerce.dataclasses import BasketUpdate
 from ecommerce.discount_sources import (
     double_spent_source_line_ids,
     fulfilled_paid_amount_off_redemptions,
@@ -629,6 +632,76 @@ def establish_basket(request, *, no_delay=False):
     return basket
 
 
+def run_basket_pre_update_hooks(request, basket, update: BasketUpdate):
+    """Run the basket_pre_update hooks for a basket change."""
+
+    get_plugin_manager().hook.basket_pre_update(
+        request=request, basket=basket, update=update
+    )
+
+
+def run_basket_post_update_hooks(request, basket, update: BasketUpdate):
+    """Run the basket_post_update hooks for a basket change."""
+
+    get_plugin_manager().hook.basket_post_update(
+        request=request, basket=basket, update=update
+    )
+
+
+def add_product_to_basket(
+    request,
+    basket: Basket,
+    product: Product,
+    *,
+    quantity: int = 1,
+    b2b_contract=None,
+) -> tuple[BasketItem, bool]:
+    """
+    Add a product to a basket, running the basket update hooks around it.
+
+    This is the one way to put an item in a basket, so the hooks see every
+    change. If the product is already in the basket, its quantity and contract
+    is updated instead (and its contract, if one is given).
+
+    Callers apply automatic discounts afterwards; the hooks run first, so the
+    discounts can rely on what the hooks recorded (such as the location).
+
+    Args:
+    - request (HttpRequest): the current request
+    - basket (Basket): the basket to add to
+    - product (Product): the product to add
+    - quantity (int): how many to add
+    - b2b_contract (ContractPage|None): the contract the item is bought under
+
+    Returns:
+    - tuple[BasketItem, bool]: the item, and whether it was newly created
+    """
+
+    run_basket_pre_update_hooks(
+        request,
+        basket,
+        BasketUpdate(operation=BASKET_UPDATE_ADD_ITEM, product=product),
+    )
+
+    defaults = {"quantity": quantity}
+    if b2b_contract is not None:
+        defaults["b2b_contract"] = b2b_contract
+
+    item, created = BasketItem.objects.update_or_create(
+        basket=basket, product=product, defaults=defaults
+    )
+
+    run_basket_post_update_hooks(
+        request,
+        basket,
+        BasketUpdate(
+            operation=BASKET_UPDATE_ADD_ITEM, product=product, basket_item=item
+        ),
+    )
+
+    return item, created
+
+
 ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
 
 
@@ -706,6 +779,12 @@ def claim_anonymous_basket(request):
         anon_basket.save(update_fields=["user", "anonymous_id"])
 
     del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+
+    # Now that there's a user, there may be more to learn (their profile).
+    update = BasketUpdate(operation=BASKET_UPDATE_CLAIM)
+    run_basket_pre_update_hooks(request, anon_basket, update)
+    run_basket_post_update_hooks(request, anon_basket, update)
+
     apply_user_discounts(anon_basket)
 
     return anon_basket
@@ -2112,7 +2191,7 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
         basket.basket_items.all().delete()
         basket.discounts.all().delete()
 
-    BasketItem.objects.create(basket=basket, product=product, quantity=1)
+    add_product_to_basket(request, basket, product)
     BasketDiscount.objects.create(
         redemption_date=now_in_utc(),
         redeemed_by=request.user,

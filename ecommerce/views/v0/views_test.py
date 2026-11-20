@@ -2514,3 +2514,32 @@ def test_order_receipt_reports_when_a_request_was_decided(user, user_drf_client)
 
     assert receipt["refund_status"] == "denied"
     assert parse_datetime(receipt["refund_reviewed_on"]) == request.updated_on
+
+
+@pytest.mark.parametrize("multiple", [False, True])
+def test_basket_add_records_location(settings, user, user_client, multiple):
+    """Adding a product to the basket records the user's location, and returns it."""
+
+    settings.LOCATION_FORCE_COUNTRY = "IN"
+    product = ProductFactory.create()
+
+    if multiple:
+        resp = user_client.post(
+            reverse("v0:baskets_api-create_with_products"),
+            data={"product_ids": [{"product_id": product.id, "quantity": 1}]},
+            content_type="application/json",
+        )
+    else:
+        resp = user_client.post(
+            reverse(
+                "v0:baskets_api-create_from_product",
+                kwargs={"product_id": product.id},
+            )
+        )
+
+    assert resp.status_code in (200, 201)
+    basket = Basket.objects.get(user=user)
+    assert basket.location_country_code == "IN"
+    assert basket.location_source == "geoip"
+    assert resp.json()["location_country_code"] == "IN"
+    assert resp.json()["location_source"] == "geoip"
