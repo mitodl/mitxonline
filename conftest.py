@@ -30,6 +30,7 @@ def default_settings(monkeypatch, settings):
     settings.FEATURES[features.ENABLE_PROGRAM_SPECIFIC_PATHWAY_SCHOOLS] = False
     settings.FEATURES[features.STRIPE_ENABLE_FEATURE_FLAG] = False
     settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    settings.FEATURES[features.USE_HASHED_USER_NAME_FOR_VERIFIABLE_CREDENTIALS] = False
 
 
 @pytest.fixture(autouse=True)
