@@ -40,9 +40,12 @@ from b2b.constants import (
     IDP_ALLOWED_TRANSITIONS,
     IDP_PROTOCOL_OIDC,
     IDP_PROTOCOL_SAML,
+    IDP_STATE_ACTIVE,
+    IDP_STATE_DISABLED,
     IDP_STATE_DRAFT,
     IDP_STATE_KEYCLOAK_FLAGS,
     ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_ADOPTED,
     PROVISIONING_ACTION_IDP_CREATED,
     PROVISIONING_ACTION_IDP_DELETED,
     PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
@@ -54,6 +57,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    IdentityProviderNotAdoptableError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -66,7 +70,10 @@ from b2b.keycloak_admin_api import (
     get_keycloak_model,
     import_identity_provider_config,
 )
-from b2b.keycloak_admin_dataclasses import IdentityProviderMapperRepresentation
+from b2b.keycloak_admin_dataclasses import (
+    IdentityProviderMapperRepresentation,
+    IdentityProviderRepresentation,
+)
 from b2b.models import (
     OrganizationIdentityProvider,
     OrganizationIndexPage,
@@ -1153,6 +1160,141 @@ def create_identity_provider(  # noqa: PLR0913
     except Exception:
         connection.identity_providers.delete(alias)
         raise
+
+    return identity_provider
+
+
+def _adopted_metadata_source(keycloak_idp):
+    """
+    Return the metadata URL to record for an IdP created outside this API.
+
+    ol-infrastructure configures a SAML IdP from its metadata URL as
+    metadataDescriptorUrl, and keeps only the issuer from an OIDC IdP's
+    discovery document. The discovery document is at a fixed path under the
+    issuer (OpenID Connect Discovery 1.0, section 4).
+
+    Args:
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    Returns:
+    - str: the URL, or None when Keycloak holds nothing to refresh from
+    """
+
+    config = keycloak_idp.config or {}
+
+    if keycloak_idp.provider_id == IDP_PROTOCOL_SAML:
+        return config.get("metadataDescriptorUrl") or None
+
+    issuer = config.get("issuer")
+    if keycloak_idp.provider_id == IDP_PROTOCOL_OIDC and issuer:
+        return f"{issuer.rstrip('/')}/.well-known/openid-configuration"
+
+    return None
+
+
+def find_unadopted_identity_providers(connection, organizations=None):
+    """
+    Find the IdPs Keycloak links to an organization here that have no record.
+
+    These are the IdPs ol-infrastructure created. Each organization's links
+    are read from organizations/{id}/identity-providers, the association
+    create_identity_provider writes, so this doesn't depend on which link
+    field Keycloak's IdP representation carries.
+
+    Args:
+    - connection (KeycloakConnection): the Keycloak connection to use
+    - organizations (QuerySet): the organizations to check; defaults to
+      every organization linked to Keycloak
+    Returns:
+    - list of (OrganizationPage, IdentityProviderRepresentation)
+    """
+
+    if organizations is None:
+        organizations = OrganizationPage.objects.all()
+    recorded = set(OrganizationIdentityProvider.objects.values_list("alias", flat=True))
+
+    found = []
+    for organization in organizations.filter(
+        sso_organization_id__isnull=False
+    ).order_by("org_key"):
+        linked = connection.client.list(
+            f"organizations/{organization.sso_organization_id}/{ORG_IDP_ASSOCIATION}",
+            IdentityProviderRepresentation,
+        )
+        found.extend(
+            (organization, keycloak_idp)
+            for keycloak_idp in linked
+            if keycloak_idp.alias not in recorded
+        )
+
+    return found
+
+
+def adopt_identity_provider(organization, keycloak_idp, *, actor=None):
+    """
+    Record an IdP that already exists in Keycloak, without changing Keycloak.
+
+    For the IdPs ol-infrastructure created, so the staff dashboard lists and
+    manages them. Until the IdP leaves Pulumi state, the next pulumi up
+    reverts any change made to it here.
+
+    The lifecycle state comes from Keycloak's `enabled`. Testing and active
+    set the same Keycloak flags (IDP_STATE_KEYCLOAK_FLAGS), so an enabled IdP
+    is recorded as active: Pulumi only declares IdPs partners sign in through.
+    No metadata is fetched, so metadata_artifact stays empty until somebody
+    refreshes the IdP. The attribute mappers aren't stored here at all; they
+    are read from Keycloak whenever they're needed.
+
+    Args:
+    - organization (OrganizationPage): the organization Keycloak links it to
+    - keycloak_idp (IdentityProviderRepresentation): the IdP as Keycloak has it
+    - actor (User): who ran the adoption, for the audit trail
+    Returns:
+    - OrganizationIdentityProvider: the new record
+    Raises:
+    - IdentityProviderNotAdoptableError: Keycloak holds no metadata URL or
+      issuer for it, or it isn't SAML or OIDC
+    - AliasCollisionError: the alias is already recorded here
+    """
+
+    metadata_source = _adopted_metadata_source(keycloak_idp)
+    if metadata_source is None:
+        msg = (
+            f"The identity provider '{keycloak_idp.alias}' "
+            f"({keycloak_idp.provider_id}) has no metadata URL or issuer in "
+            "Keycloak to record as its metadata source."
+        )
+        raise IdentityProviderNotAdoptableError(msg)
+
+    lifecycle_state = IDP_STATE_ACTIVE if keycloak_idp.enabled else IDP_STATE_DISABLED
+
+    with transaction.atomic():
+        if OrganizationIdentityProvider.objects.filter(
+            alias=keycloak_idp.alias
+        ).exists():
+            msg = f"An identity provider with alias '{keycloak_idp.alias}' already exists."
+            raise AliasCollisionError(msg)
+
+        identity_provider = OrganizationIdentityProvider.objects.create(
+            organization=organization,
+            alias=keycloak_idp.alias,
+            protocol=keycloak_idp.provider_id,
+            lifecycle_state=lifecycle_state,
+            display_name=keycloak_idp.display_name or "",
+            internal_id=keycloak_idp.internal_id or "",
+            metadata_source=metadata_source,
+        )
+        _audit(
+            organization,
+            PROVISIONING_ACTION_IDP_ADOPTED,
+            actor=actor,
+            identity_provider_alias=keycloak_idp.alias,
+            data_after={
+                "protocol": keycloak_idp.provider_id,
+                "display_name": identity_provider.display_name,
+                "lifecycle_state": lifecycle_state,
+                "metadata_source": metadata_source,
+            },
+        )
 
     return identity_provider
 

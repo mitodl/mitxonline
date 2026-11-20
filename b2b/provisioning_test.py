@@ -21,6 +21,7 @@ from b2b.constants import (
     IDP_STATE_TESTING,
     ONBOARDING_STATE_LIVE,
     ONBOARDING_STATE_ORG_CREATED,
+    PROVISIONING_ACTION_IDP_ADOPTED,
     PROVISIONING_ACTION_IDP_CREATED,
     PROVISIONING_ACTION_IDP_DELETED,
     PROVISIONING_ACTION_IDP_METADATA_REFRESHED,
@@ -32,6 +33,7 @@ from b2b.constants import (
 )
 from b2b.exceptions import (
     AliasCollisionError,
+    IdentityProviderNotAdoptableError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -56,9 +58,11 @@ from b2b.models import (
     UserOrganization,
 )
 from b2b.provisioning import (
+    adopt_identity_provider,
     create_identity_provider,
     create_organization,
     delete_identity_provider,
+    find_unadopted_identity_providers,
     link_organization_to_keycloak,
     push_unconfirmed_members_to_keycloak,
     refresh_identity_provider_metadata,
@@ -2242,3 +2246,191 @@ def test_transition_checks_and_audits_the_stored_state_not_the_callers(
         action=PROVISIONING_ACTION_IDP_TRANSITIONED
     )
     assert audit.data_before == {"lifecycle_state": IDP_STATE_TESTING}
+
+
+def _pulumi_saml_idp(alias="exampleu", *, enabled=True):
+    """An IdP shaped the way ol-infrastructure's onboard_saml_org declares it."""
+
+    return IdentityProviderRepresentation(
+        alias=alias,
+        display_name="Example University",
+        internal_id=str(FAKE.uuid4()),
+        provider_id=IDP_PROTOCOL_SAML,
+        enabled=enabled,
+        hide_on_login=True,
+        config={
+            "metadataDescriptorUrl": "https://idp.example.edu/metadata",
+            "useMetadataDescriptorUrl": "true",
+            "singleSignOnServiceUrl": "https://idp.example.edu/sso",
+        },
+    )
+
+
+def _pulumi_oidc_idp(alias="exampleu-oidc", issuer="https://login.example.edu/v2.0/"):
+    """An IdP shaped the way ol-infrastructure's onboard_oidc_org declares it."""
+
+    return IdentityProviderRepresentation(
+        alias=alias,
+        provider_id=IDP_PROTOCOL_OIDC,
+        enabled=True,
+        config={
+            "issuer": issuer,
+            "clientId": "mit-learn",
+            "clientSecret": "**********",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("enabled", "lifecycle_state"),
+    [(True, IDP_STATE_ACTIVE), (False, IDP_STATE_DISABLED)],
+)
+def test_adopt_identity_provider_records_a_saml_idp(
+    staff_user, enabled, lifecycle_state
+):
+    """A SAML IdP is recorded from Keycloak's descriptor URL."""
+
+    organization = OrganizationPageFactory.create()
+    keycloak_idp = _pulumi_saml_idp(enabled=enabled)
+
+    identity_provider = adopt_identity_provider(
+        organization, keycloak_idp, actor=staff_user
+    )
+
+    assert identity_provider.organization == organization
+    assert identity_provider.alias == "exampleu"
+    assert identity_provider.protocol == IDP_PROTOCOL_SAML
+    assert identity_provider.lifecycle_state == lifecycle_state
+    assert identity_provider.display_name == "Example University"
+    assert identity_provider.internal_id == keycloak_idp.internal_id
+    assert identity_provider.metadata_source == "https://idp.example.edu/metadata"
+    assert identity_provider.metadata_artifact is None
+    assert identity_provider.metadata_fetched_at is None
+    (audit,) = _audits(organization)
+    assert audit.action == PROVISIONING_ACTION_IDP_ADOPTED
+    assert audit.acting_user == staff_user
+    assert audit.identity_provider_alias == "exampleu"
+    assert audit.data_after == {
+        "protocol": IDP_PROTOCOL_SAML,
+        "display_name": "Example University",
+        "lifecycle_state": lifecycle_state,
+        "metadata_source": "https://idp.example.edu/metadata",
+    }
+
+
+def test_adopt_identity_provider_derives_the_oidc_discovery_url():
+    """An OIDC IdP's source is the discovery document under its issuer."""
+
+    organization = OrganizationPageFactory.create()
+
+    identity_provider = adopt_identity_provider(organization, _pulumi_oidc_idp())
+
+    assert identity_provider.protocol == IDP_PROTOCOL_OIDC
+    assert (
+        identity_provider.metadata_source
+        == "https://login.example.edu/v2.0/.well-known/openid-configuration"
+    )
+    assert "clientSecret" not in str(_audits(organization)[0].data_after)
+
+
+@pytest.mark.parametrize(
+    "keycloak_idp",
+    [
+        IdentityProviderRepresentation(
+            alias="xml-saml", provider_id=IDP_PROTOCOL_SAML, config={}
+        ),
+        IdentityProviderRepresentation(
+            alias="no-issuer", provider_id=IDP_PROTOCOL_OIDC, config={}
+        ),
+        IdentityProviderRepresentation(
+            alias="github", provider_id="github", config={"issuer": "https://x"}
+        ),
+    ],
+    ids=["saml-from-xml", "oidc-without-issuer", "other-provider"],
+)
+def test_adopt_identity_provider_refuses_one_with_no_source(keycloak_idp):
+    """With nothing to refresh from, the IdP isn't recorded."""
+
+    organization = OrganizationPageFactory.create()
+
+    with pytest.raises(IdentityProviderNotAdoptableError, match=keycloak_idp.alias):
+        adopt_identity_provider(organization, keycloak_idp)
+
+    assert not OrganizationIdentityProvider.objects.exists()
+    assert _audits(organization) == []
+
+
+def test_adopt_identity_provider_refuses_a_recorded_alias():
+    """An alias that is already recorded is not recorded twice."""
+
+    organization = OrganizationPageFactory.create()
+    _identity_provider(organization)
+
+    with pytest.raises(AliasCollisionError):
+        adopt_identity_provider(organization, _pulumi_saml_idp())
+
+
+def test_find_unadopted_identity_providers(connection):
+    """Each linked organization's IdPs are read, and recorded ones are left out."""
+
+    recorded_org = OrganizationPageFactory.create(org_key="AAA")
+    _identity_provider(recorded_org)
+    pulumi_org = OrganizationPageFactory.create(org_key="BBB")
+    OrganizationPageFactory.create(org_key="CCC", sso_organization_id=None)
+    pulumi_idp = _pulumi_saml_idp("bbb")
+    links = {
+        f"organizations/{recorded_org.sso_organization_id}/identity-providers": [
+            _pulumi_saml_idp("exampleu")
+        ],
+        f"organizations/{pulumi_org.sso_organization_id}/identity-providers": [
+            pulumi_idp
+        ],
+    }
+    connection.client.list.side_effect = lambda endpoint, _: links[endpoint]
+
+    found = find_unadopted_identity_providers(connection)
+
+    assert found == [(pulumi_org, pulumi_idp)]
+    assert connection.client.list.call_count == 2
+
+
+def test_adopt_command_dry_run_writes_nothing(mocker, connection, capsys):
+    """--dry-run lists what it would record and leaves the table alone."""
+
+    mocker.patch(
+        "b2b.management.commands.adopt_keycloak_identity_providers.KeycloakConnection",
+        return_value=connection,
+    )
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [_pulumi_saml_idp()]
+
+    call_command("adopt_keycloak_identity_providers", "--dry-run")
+
+    assert "Would record: exampleu (saml) for EXAMPLEU" in capsys.readouterr().out
+    assert not OrganizationIdentityProvider.objects.exists()
+
+
+def test_adopt_command_records_what_it_can_and_fails_on_the_rest(
+    mocker, connection, capsys
+):
+    """An IdP with no source is reported and fails the run; the others are recorded."""
+
+    mocker.patch(
+        "b2b.management.commands.adopt_keycloak_identity_providers.KeycloakConnection",
+        return_value=connection,
+    )
+    OrganizationPageFactory.create(org_key="EXAMPLEU")
+    connection.client.list.return_value = [
+        _pulumi_saml_idp(),
+        IdentityProviderRepresentation(
+            alias="xml-saml", provider_id=IDP_PROTOCOL_SAML, config={}
+        ),
+    ]
+
+    with pytest.raises(CommandError, match="xml-saml"):
+        call_command("adopt_keycloak_identity_providers")
+
+    assert list(
+        OrganizationIdentityProvider.objects.values_list("alias", flat=True)
+    ) == ["exampleu"]
+    assert "Recorded: exampleu (saml) for EXAMPLEU as active" in capsys.readouterr().out

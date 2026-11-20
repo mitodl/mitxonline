@@ -4286,6 +4286,7 @@ components:
       - organization_updated
       - onboarding_changed
       - identity_provider_created
+      - identity_provider_adopted
       - identity_provider_updated
       - identity_provider_transitioned
       - identity_provider_metadata_refreshed
@@ -4298,6 +4299,7 @@ components:
         * `organization_updated` - Organization updated
         * `onboarding_changed` - Onboarding state changed
         * `identity_provider_created` - Identity provider created
+        * `identity_provider_adopted` - Identity provider adopted
         * `identity_provider_updated` - Identity provider updated
         * `identity_provider_transitioned` - Identity provider state changed
         * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
@@ -4309,6 +4311,7 @@ components:
       - Organization updated
       - Onboarding state changed
       - Identity provider created
+      - Identity provider adopted
       - Identity provider updated
       - Identity provider state changed
       - Identity provider metadata refreshed

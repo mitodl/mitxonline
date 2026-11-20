@@ -29,6 +29,17 @@ class AliasCollisionError(Exception):
     """
 
 
+class IdentityProviderNotAdoptableError(Exception):
+    """
+    Raised when an identity provider in Keycloak can't be recorded here.
+
+    Every OrganizationIdentityProvider needs a metadata source to refresh from.
+    Keycloak keeps one for a SAML IdP only when it was configured from a
+    metadata URL, and for an OIDC IdP only as its issuer, so an IdP built from
+    inline XML, or of another provider type, has nothing to record.
+    """
+
+
 class OrganizationNameCollisionError(Exception):
     """
     Raised when a new organization's name would reuse an existing page slug.

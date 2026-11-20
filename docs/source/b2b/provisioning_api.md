@@ -48,6 +48,31 @@ given) and returns 409 if the alias is taken.
 The organizations Pulumi already declares are still Pulumi's. Don't modify one
 of them through this API; the next `pulumi up` will revert the change.
 
+### Adopting the IdPs Pulumi created
+
+An organization's IdPs show in the staff dashboard only when they have an
+`OrganizationIdentityProvider` row, and only this API wrote those, so the IdPs
+Pulumi created were missing there. `manage.py adopt_keycloak_identity_providers
+[--dry-run] [org_key ...]` records each IdP that Keycloak links to an
+organization here (read from `organizations/{id}/identity-providers`) and has no
+row yet. It doesn't write to Keycloak, it's audited as "Identity provider
+adopted", and recorded IdPs are skipped, so it is safe to re-run.
+
+An adopted IdP is recorded as follows:
+
+- `lifecycle_state` is `active` if Keycloak has it enabled and `disabled`
+  otherwise. Testing and active set the same Keycloak flags, and Pulumi only
+  declares IdPs partners sign in through.
+- `metadata_source` is a SAML IdP's `metadataDescriptorUrl`, or
+  `{issuer}/.well-known/openid-configuration` for an OIDC IdP. An IdP with
+  neither (a SAML IdP configured from inline XML, or another provider type) is
+  reported and not recorded.
+- `metadata_artifact` stays empty until somebody refreshes the IdP.
+
+Adopting an IdP doesn't take it out of Pulumi. Until it leaves Pulumi state, an
+edit, refresh or transition made through the dashboard is reverted by the next
+`pulumi up`.
+
 ## Organizations
 
 ```
@@ -443,6 +468,8 @@ changes an existing `org_key`.
 
 - Pulumi handover. The per-organization resources Pulumi already declares
   need to be moved out of Pulumi state without deleting them from Keycloak.
+  Recording their IdPs here (see "Adopting the IdPs Pulumi created") is the
+  first step.
 - Orphaned organizations. As of April 2026, about 24 `OrganizationPage`
   records from before Keycloak was the source of truth had no
   `sso_organization_id` (mitodl/hq#10552). They need Keycloak organizations created and their
