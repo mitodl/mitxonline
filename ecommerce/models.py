@@ -28,7 +28,6 @@ from reversion.models import Version
 from viewflow import this
 from viewflow.fsm import State
 
-from compliance.exceptions import ExportComplianceError
 from courses.models import CourseRun, PaidCourseRun, Program
 from courses.utils import is_contract_order, is_uai_order, is_xpro_order
 from ecommerce.constants import (
@@ -154,10 +153,13 @@ class Basket(TimestampedModel):
 
     def has_user_blocked_products(self, user):
         """
-        Return true if any of the courses in the basket block user's country,
-        or the user failed the export compliance check.
+        Return true if any of the courses in the basket block user's country.
+
+        The export compliance check runs first, and its failures are raised
+        rather than reported as a country block, so callers can tell them apart.
 
         Raises:
+            ExportComplianceError: if the user failed the export compliance check
             ExportComplianceDataError: if the user's profile can't be checked
         """
         basket_items = self.basket_items.prefetch_related("product")
@@ -174,12 +176,9 @@ class Basket(TimestampedModel):
                 _verify_exports_compliance_for_enrollment,
             )
 
-            try:
-                _verify_exports_compliance_for_enrollment(
-                    user, basket_items[0].product.purchasable_object
-                )
-            except ExportComplianceError:
-                return True
+            _verify_exports_compliance_for_enrollment(
+                user, basket_items[0].product.purchasable_object
+            )
 
         return any(
             [  # noqa: C419

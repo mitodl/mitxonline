@@ -13,12 +13,13 @@ import logging
 
 import pluggy
 
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from main.constants import (
     USER_MSG_TYPE_BASKET_EMPTY,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
@@ -31,9 +32,20 @@ def _check_basket_purchasable(basket, options) -> dict | None:
     """Check that the user is allowed to buy what's in the basket."""
 
     raise_compliance_data_errors = options.get("raise_compliance_data_errors", False)
+    raise_compliance_declines = options.get("raise_compliance_declines", False)
 
     try:
         has_blocked_products = basket.has_user_blocked_products(basket.user)
+    except ExportComplianceError as exc:
+        if raise_compliance_declines:
+            raise
+        # Not a country block: support recognizes the code and does a manual
+        # review. The decision itself is logged where it's detected.
+        return {
+            "compliance_declined": True,
+            "error": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
+            "reason_code": exc.error_code,
+        }
     except ExportComplianceDataError as exc:
         if raise_compliance_data_errors:
             raise

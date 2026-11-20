@@ -4904,6 +4904,7 @@ components:
             Error message for the order, if there is one.
 
             * `enroll-blocked` - enroll-blocked
+            * `enroll-compliance-declined` - enroll-compliance-declined
             * `enroll-duplicated` - enroll-duplicated
             * `course-non-upgradable` - course-non-upgradable
             * `discount-invalid` - discount-invalid
@@ -4917,6 +4918,12 @@ components:
             type: string
           readOnly: true
           description: With a profile-incomplete error, the profile fields to fix.
+        reason_code:
+          type: string
+          readOnly: true
+          nullable: true
+          description: With an enroll-compliance-declined error, the support code
+            (CS_700).
       required:
       - error
       - method
@@ -4924,6 +4931,7 @@ components:
       - no_checkout
       - order_id
       - payload
+      - reason_code
       - url
     CompanySizeEnum:
       enum:
@@ -5867,6 +5875,7 @@ components:
     ErrorEnum:
       enum:
       - enroll-blocked
+      - enroll-compliance-declined
       - enroll-duplicated
       - course-non-upgradable
       - discount-invalid
@@ -5877,6 +5886,7 @@ components:
       type: string
       description: |-
         * `enroll-blocked` - enroll-blocked
+        * `enroll-compliance-declined` - enroll-compliance-declined
         * `enroll-duplicated` - enroll-duplicated
         * `course-non-upgradable` - course-non-upgradable
         * `discount-invalid` - discount-invalid
@@ -5886,6 +5896,7 @@ components:
         * `profile-incomplete` - profile-incomplete
       x-enum-descriptions:
       - enroll-blocked
+      - enroll-compliance-declined
       - enroll-duplicated
       - course-non-upgradable
       - discount-invalid

@@ -43,6 +43,7 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
@@ -1258,6 +1259,7 @@ class CheckoutPayloadSerializer(serializers.Serializer):
         help_text="Error message for the order, if there is one.",
         choices=(
             USER_MSG_TYPE_ENROLL_BLOCKED,
+            USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
             USER_MSG_TYPE_ENROLL_DUPLICATED,
             USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
             USER_MSG_TYPE_DISCOUNT_INVALID,
@@ -1274,6 +1276,13 @@ class CheckoutPayloadSerializer(serializers.Serializer):
         default=list,
         help_text="With a profile-incomplete error, the profile fields to fix.",
     )
+    reason_code = serializers.CharField(
+        read_only=True,
+        required=False,
+        default=None,
+        allow_null=True,
+        help_text="With an enroll-compliance-declined error, the support code (CS_700).",
+    )
 
     class Meta:
         fields = [
@@ -1284,6 +1293,7 @@ class CheckoutPayloadSerializer(serializers.Serializer):
             "order_id",
             "error",
             "missing_fields",
+            "reason_code",
         ]
 
 
