@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 # hadolint global ignore=DL3008
 
-FROM mitodl/ol-python-base:3.11 AS base
+FROM mitodl/ol-python-base:3.11@sha256:6262962459aaf2acdab0a07111aa103c2def2b9a5c7aa21a1d14ef3308f5654a AS base
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
 # App-specific apt extras; common-core packages are in mitodl/ol-python-base:3.11.
@@ -57,7 +57,7 @@ COPY . /src
 WORKDIR /src
 
 # ─── Node / frontend asset build ─────────────────────────────────────────────
-FROM node:20.18 AS node
+FROM node:20.18@sha256:bcf90f85634194bc51e92f8add1221c7fdeeff94b7f1ff360aeaa7498086d641 AS node
 
 WORKDIR /src
 # Only the build inputs, so a backend-only change reuses this stage. The
