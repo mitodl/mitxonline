@@ -1448,8 +1448,8 @@ def _keycloak_org_for(organization):
     )
 
 
-def _add_contract_run(organization):
-    run = CourseRunFactory.create()
+def _add_contract_run(organization, *, is_source_run=False):
+    run = CourseRunFactory.create(is_source_run=is_source_run)
     run.b2b_contracts.add(ContractPageFactory.create(organization=organization))
 
 
@@ -1477,13 +1477,19 @@ def test_update_organization_changes_the_prefix_before_any_contract_run(
     assert audit.data_after == {"org_key_prefix": new_prefix}
 
 
+@pytest.mark.parametrize("is_source_run", [False, True])
 def test_update_organization_refuses_a_prefix_change_after_a_contract_run(
-    connection, staff_user
+    connection, staff_user, is_source_run
 ):
-    """A run's courseware ID already carries the prefix, so it stays."""
+    """
+    A run's courseware ID already carries the prefix, so it stays.
+
+    A source run attached to a contract counts too, though CourseRun.objects
+    hides it.
+    """
 
     organization = OrganizationPageFactory.create(org_key_prefix="OLD_")
-    _add_contract_run(organization)
+    _add_contract_run(organization, is_source_run=is_source_run)
     connection.organizations.get.return_value = _keycloak_org_for(organization)
 
     with pytest.raises(OrganizationKeyInUseError):

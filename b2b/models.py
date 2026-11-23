@@ -314,7 +314,9 @@ class OrganizationPage(Page):
         Until one is, nothing has been built from the courseware ID prefix.
         """
 
-        return CourseRun.objects.filter(b2b_contracts__organization=self).exists()
+        # all_objects: CourseRun.objects hides source runs, which can be
+        # attached to a contract as they are.
+        return CourseRun.all_objects.filter(b2b_contracts__organization=self).exists()
 
     def get_learners(self):
         """Get the learners associated with this organization."""
