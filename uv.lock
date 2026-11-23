@@ -2111,7 +2111,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-payment-gateway"
-version = "2026.11.19"
+version = "2026.11.23"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -2121,9 +2121,9 @@ dependencies = [
     { name = "mitol-django-common" },
     { name = "stripe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b4/1b/b6bf023b0d8ab55b528573c933247b1ece0ba5df9da5cf7b1b5e9c42586e/mitol_django_payment_gateway-2026.11.19.tar.gz", hash = "sha256:7ef2a3df065210bf55b7a7a49e7613cae2f5f9170528a005054ba7202e05aeec", size = 34039, upload-time = "2026-11-19T14:51:24.547Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3e/0f/1ec953545b3ec6f9359e1785c705fff22d1566d7bd7c2cb9d99ef79a031c/mitol_django_payment_gateway-2026.11.23.tar.gz", hash = "sha256:1fdfd14f93d48bc27d8ce13f23a6ab31d27faabd4b783b0bc68df420c6009bcc", size = 34075, upload-time = "2026-11-23T20:47:42.178Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8c/01/ac601c56951e44810779e72720909516e84ff814b39cc671070a529628d9/mitol_django_payment_gateway-2026.11.19-py3-none-any.whl", hash = "sha256:7e60202a3da432e7a26625e2065d85645f3cabf9b2d500e1b70dfc7bab4c80f7", size = 44425, upload-time = "2026-11-19T14:51:22.171Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/05/8e31ff294ab96dbdbd17173a9c1dd1806a3fa59afff6f60ee581fbc09ae0/mitol_django_payment_gateway-2026.11.23-py3-none-any.whl", hash = "sha256:848c3ac53507f515a793a15e51c4d29a0db5a73b8d9300878199b839bc72b0d2", size = 44471, upload-time = "2026-11-23T20:47:40.837Z" },
 ]
 
 [[package]]
@@ -2332,8 +2332,8 @@ requires-dist = [
     { name = "mitol-django-observability", specifier = ">=2026.8.19" },
     { name = "mitol-django-olposthog", specifier = ">=2026.3.6,<2027" },
     { name = "mitol-django-openedx", specifier = "==2026.4.29" },
+    { name = "mitol-django-payment-gateway", specifier = "==2026.11.23" },
     { name = "mitol-django-scim", specifier = "==2026.11.13" },
-    { name = "mitol-django-payment-gateway", specifier = "==2026.11.19" },
     { name = "opentelemetry-instrumentation-celery", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-django", specifier = ">=0.52b0" },
     { name = "opentelemetry-instrumentation-psycopg", specifier = ">=0.52b0" },
