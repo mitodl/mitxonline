@@ -149,6 +149,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    BasketItemTax,
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
@@ -3875,18 +3876,52 @@ def test_basket_discount_changes_recalculate_tax(user, taxed_locale):
     assert item.taxes.get().tax_amount == Decimal("18.00")
 
 
-def test_deleting_basket_with_discount(user, taxed_locale):
-    """Deleting a basket, and with it its discounts, doesn't fail on the tax signal."""
+@pytest.mark.parametrize("delete_via", ["basket", "basket_queryset", "user"])
+def test_deleting_basket_with_discount(mocker, user, taxed_locale, delete_via):
+    """A cascade delete of a basket's discounts doesn't re-tax the basket."""
 
     basket = _located_basket(user)
-    BasketItemFactory.create(basket=basket)
+    item = BasketItemFactory.create(basket=basket)
     BasketDiscount.objects.create(
         redeemed_basket=basket,
         redeemed_discount=UnlimitedUseDiscountFactory.create(),
         redeemed_by=user,
         redemption_date=now_in_utc(),
     )
+    mock_recalc = mocker.patch("ecommerce.api.recalculate_basket_tax")
 
-    basket.delete()
+    if delete_via == "basket":
+        basket.delete()
+    elif delete_via == "basket_queryset":
+        Basket.objects.filter(pk=basket.pk).delete()
+    else:
+        user.delete()
 
+    mock_recalc.assert_not_called()
     assert not Basket.objects.filter(pk=basket.pk).exists()
+    assert not BasketItemTax.objects.filter(basket_item_id=item.id).exists()
+
+
+def test_deleting_basket_discounts_retaxes(mocker, user):
+    """Deleting the discount itself, singly or in bulk, re-taxes the basket."""
+
+    basket = BasketFactory.create(user=user)
+
+    def _add_discount():
+        return BasketDiscount.objects.create(
+            redeemed_basket=basket,
+            redeemed_discount=UnlimitedUseDiscountFactory.create(),
+            redeemed_by=user,
+            redemption_date=now_in_utc(),
+        )
+
+    _add_discount()
+    mock_recalc = mocker.patch("ecommerce.api.recalculate_basket_tax")
+
+    basket.discounts.get().delete()
+    assert mock_recalc.call_count == 1
+
+    _add_discount()
+    assert mock_recalc.call_count == 2
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+    assert mock_recalc.call_count == 3

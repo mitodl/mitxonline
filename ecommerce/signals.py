@@ -1,5 +1,6 @@
 """Signals for ecommerce models"""
 
+from django.db.models import QuerySet
 from django.db.models.signals import post_delete, post_save
 from django.db.transaction import on_commit
 from django.dispatch import receiver
@@ -30,7 +31,16 @@ def recalculate_tax_for_discount_change(sender, instance, **kwargs):  # noqa: AR
     """
     from ecommerce.api import recalculate_basket_tax  # noqa: PLC0415
 
-    # The basket may be going away with the discount (a cascade delete).
+    # A delete that cascades from something else (the basket, or its user)
+    # takes the basket's items with it, so there's nothing to re-tax - and
+    # re-taxing would write tax rows for items about to be deleted.
+    origin = kwargs.get("origin")
+    if origin is not None and not (
+        isinstance(origin, BasketDiscount)
+        or (isinstance(origin, QuerySet) and origin.model is BasketDiscount)
+    ):
+        return
+
     basket = Basket.objects.filter(pk=instance.redeemed_basket_id).first()
     if basket is not None:
         recalculate_basket_tax(basket)
