@@ -1,5 +1,7 @@
 """Courseware models"""
 
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.db import models
 from mitol.common.models import TimestampedModel
@@ -58,6 +60,46 @@ class OpenEdxUser(TimestampedModel):
                 fields=["has_been_synced", "has_sync_error"], name="sync_state_idx"
             )
         ]
+
+
+CLONE_ERROR_BODY_MAX_LENGTH = 500
+
+
+def describe_clone_error(exc: Exception) -> str:
+    """
+    Summarize a failed clone attempt for staff, without an edX error page.
+
+    edx-api-client puts the whole response body in a CourseRunAPIError's
+    message, and a Studio 500 answers with its HTML error page, which the staff
+    dashboard would show as the run's error. A short JSON body (e.g. a 400
+    saying why edX refused the request) is kept; the worker log keeps any body.
+
+    Args:
+    - exc (Exception): what the attempt raised
+    Returns:
+    - str: the exception type and, for an HTTP failure, the status, the call
+      and a short JSON body if there is one
+    """
+
+    response = getattr(exc, "response", None)
+    if response is None:
+        response = getattr(exc.__cause__, "response", None)
+    # A requests Response is falsy for an error status, so test for None.
+    if response is None:
+        return f"{type(exc).__name__}: {exc}"
+
+    summary = f"{type(exc).__name__}: edX returned HTTP {response.status_code}"
+    if response.reason:
+        summary += f" {response.reason}"
+    if response.request is not None:
+        path = urlparse(response.request.url).path
+        summary += f" for {response.request.method} {path}"
+    if (
+        "json" in response.headers.get("Content-Type", "")
+        and len(response.text) <= CLONE_ERROR_BODY_MAX_LENGTH
+    ):
+        summary += f": {response.text}"
+    return summary
 
 
 class CourseRunClone(TimestampedModel):
@@ -123,7 +165,7 @@ class CourseRunClone(TimestampedModel):
         - final (bool): whether no further attempt is coming
         """
 
-        self.error = f"{type(exc).__name__}: {exc}"
+        self.error = describe_clone_error(exc)
         update_fields = ["error", "updated_on"]
         if final:
             self.status = COURSE_RUN_CLONE_STATUS_FAILED

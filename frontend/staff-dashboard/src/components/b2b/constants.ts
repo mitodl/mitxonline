@@ -90,12 +90,15 @@ const errorMessages = (value: unknown) => (Array.isArray(value) ? value.join(" "
 // The provisioning routes answer a refused request with {detail}, or with
 // {errors} (main/exceptions.py wraps a 400's DRF errors), by field or as a
 // list. Without this the notification only carries axios's "Request failed
-// with status code 400". A 500 or 502 can carry an HTML page, which has no
-// place in a notification, so a body that isn't an object is ignored.
+// with status code 400". A 500 or 502 can carry an HTML page or a gateway's
+// own JSON, which have no place in a notification, so any other body is
+// reduced to its HTTP status.
 const apiErrorDescription = (error?: HttpError): string | undefined => {
+    const status = error?.response?.status ?? error?.statusCode;
+    const fallback = status ? `The server answered HTTP ${status}.` : error?.message;
     const data = error?.response?.data;
     if (!data || typeof data !== "object") {
-        return undefined;
+        return fallback;
     }
     if (typeof data.detail === "string") {
         return data.detail;
@@ -110,7 +113,7 @@ const apiErrorDescription = (error?: HttpError): string | undefined => {
             )
             .join(" ");
     }
-    return JSON.stringify(data);
+    return fallback;
 };
 
 export const apiErrorNotification = (message: string) => (error?: HttpError) => ({
