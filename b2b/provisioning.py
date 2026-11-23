@@ -60,6 +60,7 @@ from b2b.exceptions import (
     IdentityProviderNotAdoptableError,
     IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
+    OrganizationKeyInUseError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
@@ -683,6 +684,7 @@ def update_organization(  # noqa: PLR0913
     description=None,
     redirect_url=None,
     domains=None,
+    org_key_prefix=None,
     connection=None,
     actor=None,
 ):
@@ -691,7 +693,11 @@ def update_organization(  # noqa: PLR0913
 
     org_key is deliberately not updatable: it is in every B2B courseware ID via
     create_contract_run_key, which is also why reconcile_single_keycloak_org
-    refuses to change it on adoption.
+    refuses to change it on adoption, and it is the Keycloak organization's
+    alias, which Keycloak does not let change.
+
+    org_key_prefix is in every courseware ID too, but only in MITx Online, so
+    it can change until the organization has a contract run.
 
     Keycloak's organization PUT replaces rather than merges, so this reads the
     current representation and writes it back with the changes applied.
@@ -702,12 +708,14 @@ def update_organization(  # noqa: PLR0913
     - description (str): new description, if changing
     - redirect_url (str): new post-login redirect, if changing
     - domains (list[str]): the complete new domain list, if changing
+    - org_key_prefix (str): new courseware ID prefix, if changing; "" for none
     - connection (KeycloakConnection): an existing connection, if any
     - actor (User): who asked for this, for the audit trail
     Returns:
     - OrganizationPage: the updated organization
     Raises:
     - OrganizationNotProvisionedError: the organization has no Keycloak record
+    - OrganizationKeyInUseError: org_key_prefix changes after a contract run
     """
 
     connection = connection or KeycloakConnection()
@@ -724,18 +732,30 @@ def update_organization(  # noqa: PLR0913
             "description": organization.description,
             "redirect_url": keycloak_org.redirect_url,
             "domains": [domain.name for domain in keycloak_org.domains or []],
+            "org_key_prefix": organization.org_key_prefix,
         }
         requested = {
             "name": name,
             "description": description,
             "redirect_url": redirect_url,
             "domains": list(domains) if domains is not None else None,
+            "org_key_prefix": org_key_prefix,
         }
         changed = {
             field: value
             for field, value in requested.items()
             if value is not None and value != current[field]
         }
+
+        if "org_key_prefix" in changed:
+            if organization.contract_runs_exist():
+                msg = (
+                    f"The courseware ID prefix of '{organization.org_key}' can't "
+                    "change: its contracts already have course runs whose IDs "
+                    "start with the current prefix."
+                )
+                raise OrganizationKeyInUseError(msg)
+            organization.org_key_prefix = org_key_prefix
 
         if name is not None:
             payload["name"] = name

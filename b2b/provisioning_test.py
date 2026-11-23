@@ -36,11 +36,13 @@ from b2b.exceptions import (
     IdentityProviderNotAdoptableError,
     IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
+    OrganizationKeyInUseError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
 )
 from b2b.factories import (
+    ContractPageFactory,
     OrganizationIndexPageFactory,
     OrganizationPageFactory,
     UserOrganizationFactory,
@@ -74,6 +76,7 @@ from b2b.provisioning import (
     update_identity_provider,
     update_organization,
 )
+from courses.factories import CourseRunFactory
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
@@ -1435,6 +1438,86 @@ def test_update_organization_that_changes_nothing_is_not_audited(connection):
     update_organization(organization, connection=connection, name=organization.name)
 
     assert _audits(organization) == []
+
+
+def _keycloak_org_for(organization):
+    return OrganizationRepresentation(
+        id=str(organization.sso_organization_id),
+        name=organization.name,
+        alias=organization.org_key,
+    )
+
+
+def _add_contract_run(organization):
+    run = CourseRunFactory.create()
+    run.b2b_contracts.add(ContractPageFactory.create(organization=organization))
+
+
+@pytest.mark.parametrize("new_prefix", ["NEW_", ""])
+def test_update_organization_changes_the_prefix_before_any_contract_run(
+    connection, staff_user, new_prefix
+):
+    """Nothing has been built from the prefix yet, so it can still be corrected."""
+
+    organization = OrganizationPageFactory.create(org_key_prefix="OLD_")
+    ContractPageFactory.create(organization=organization)
+    connection.organizations.get.return_value = _keycloak_org_for(organization)
+
+    update_organization(
+        organization,
+        connection=connection,
+        actor=staff_user,
+        org_key_prefix=new_prefix,
+    )
+
+    organization.refresh_from_db()
+    assert organization.org_key_prefix == new_prefix
+    (audit,) = _audits(organization)
+    assert audit.data_before == {"org_key_prefix": "OLD_"}
+    assert audit.data_after == {"org_key_prefix": new_prefix}
+
+
+def test_update_organization_refuses_a_prefix_change_after_a_contract_run(
+    connection, staff_user
+):
+    """A run's courseware ID already carries the prefix, so it stays."""
+
+    organization = OrganizationPageFactory.create(org_key_prefix="OLD_")
+    _add_contract_run(organization)
+    connection.organizations.get.return_value = _keycloak_org_for(organization)
+
+    with pytest.raises(OrganizationKeyInUseError):
+        update_organization(
+            organization,
+            connection=connection,
+            actor=staff_user,
+            name="Renamed",
+            org_key_prefix="NEW_",
+        )
+
+    organization.refresh_from_db()
+    assert organization.org_key_prefix == "OLD_"
+    assert organization.name != "Renamed"
+    assert _audits(organization) == []
+    connection.organizations.update.assert_not_called()
+
+
+def test_update_organization_accepts_the_current_prefix_after_a_contract_run(
+    connection,
+):
+    """Sending the prefix unchanged, as an edit form does, is not a change."""
+
+    organization = OrganizationPageFactory.create(org_key_prefix="OLD_")
+    _add_contract_run(organization)
+    connection.organizations.get.return_value = _keycloak_org_for(organization)
+
+    update_organization(
+        organization, connection=connection, name="Renamed", org_key_prefix="OLD_"
+    )
+
+    organization.refresh_from_db()
+    assert organization.name == "Renamed"
+    assert organization.org_key_prefix == "OLD_"
 
 
 def test_set_organization_logo_stores_and_audits_it(staff_user, logo_upload):

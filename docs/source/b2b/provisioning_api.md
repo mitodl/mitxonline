@@ -134,10 +134,15 @@ The Keycloak alias is the `org_key`. This matters because the reconciler
 derives `org_key` from the alias when it adopts an organization, and `org_key`
 is part of every B2B courseware ID (`course-v1:{org_key_prefix}{org_key}+...`).
 For the same reason `org_key` can't be changed after creation, and a `PATCH`
-that includes it gets a 400.
+that includes it gets a 400. Keycloak doesn't allow an organization's alias to
+change either.
 
-`PATCH` accepts `name`, `description`, `redirect_url` and `domains`. `domains`
-replaces the whole list.
+`PATCH` accepts `name`, `description`, `redirect_url`, `domains` and
+`org_key_prefix`. `domains` replaces the whole list. `org_key_prefix` only
+lives in MITx Online, so it can be corrected until the organization has a
+contract run. Once a run exists its courseware ID carries the prefix, and a
+`PATCH` that changes it gets a 409. Every organization in a response has
+`contract_runs_exist`, which says whether the prefix is locked.
 
 Domains are written to Keycloak as verified, with no verification step. That's
 acceptable while MIT staff are the ones asserting domains. It won't be once C2

@@ -135,6 +135,7 @@ class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
     )
     domains = serializers.SerializerMethodField()
     redirect_url = serializers.SerializerMethodField()
+    contract_runs_exist = serializers.SerializerMethodField()
 
     def get_domains(self, instance) -> list[str] | None:
         """Return the organization's Keycloak domains, if they were fetched."""
@@ -149,6 +150,12 @@ class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
 
         keycloak_org = getattr(instance, "keycloak_organization", None)
         return keycloak_org.redirect_url if keycloak_org else None
+
+    def get_contract_runs_exist(self, instance) -> bool:
+        """Whether the organization has a contract run, which locks org_key_prefix."""
+
+        # Annotated by OrganizationProvisioningViewSet's queryset.
+        return instance.annotated_contract_runs_exist
 
     class Meta:
         model = OrganizationPage
@@ -165,6 +172,7 @@ class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
             "redirect_url",
             "onboarding",
             "identity_providers",
+            "contract_runs_exist",
         ]
         read_only_fields = fields
 
@@ -203,6 +211,16 @@ class UpdateOrganizationSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     redirect_url = serializers.CharField(required=False, allow_blank=True)
     domains = serializers.ListField(child=serializers.CharField(), required=False)
+    org_key_prefix = serializers.CharField(
+        max_length=30,
+        required=False,
+        allow_blank=True,
+        validators=[RegexValidator(ORG_KEY_PATTERN, ORG_KEY_PATTERN_MESSAGE)],
+        help_text=(
+            "Courseware ID prefix. Changeable only until the organization has a "
+            "contract run; blank means no prefix."
+        ),
+    )
 
     def validate(self, attrs):
         """Reject any attempt to change the immutable org key."""

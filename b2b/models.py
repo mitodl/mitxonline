@@ -39,7 +39,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_ORG_UPDATED,
 )
 from b2b.exceptions import SourceCourseIncompleteError
-from courses.models import Program
+from courses.models import CourseRun, Program
 from main.models import AuditModel, ValidateOnSaveMixin
 from main.utils import keycloak_realm_url
 from variants.models import SupportedVariant
@@ -306,6 +306,15 @@ class OrganizationPage(Page):
             data_before={"sso_organization_id": str(before) if before else None},
             data_after={"sso_organization_id": str(after) if after else None},
         )
+
+    def contract_runs_exist(self):
+        """
+        Whether any course run is linked to one of this organization's contracts.
+
+        Until one is, nothing has been built from the courseware ID prefix.
+        """
+
+        return CourseRun.objects.filter(b2b_contracts__organization=self).exists()
 
     def get_learners(self):
         """Get the learners associated with this organization."""

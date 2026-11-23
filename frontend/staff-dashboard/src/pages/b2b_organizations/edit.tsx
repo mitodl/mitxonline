@@ -6,8 +6,8 @@ import { OrganizationForm } from "components/b2b/organization_form";
 import { B2B_ORGANIZATIONS } from "components/b2b/constants";
 import { IProvisionedOrganization } from "interfaces";
 
-type EditableField = "name" | "description" | "redirect_url" | "domains";
-const EDITABLE_FIELDS: EditableField[] = ["name", "description", "redirect_url", "domains"];
+type EditableField = "name" | "description" | "redirect_url" | "domains" | "org_key_prefix";
+const EDITABLE_FIELDS: EditableField[] = ["name", "description", "redirect_url", "domains", "org_key_prefix"];
 
 const emptyValue = (field: EditableField) => (field === "domains" ? [] : "");
 
@@ -50,7 +50,11 @@ export const OrganizationEdit = () => {
             <Typography.Paragraph>
                 Org key: <Typography.Text code>{organization?.org_key}</Typography.Text>
             </Typography.Paragraph>
-            <OrganizationForm formProps={{ ...formProps, onFinish }} creating={false} />
+            <OrganizationForm
+                formProps={{ ...formProps, onFinish }}
+                creating={false}
+                prefixLocked={organization?.contract_runs_exist ?? true}
+            />
         </Edit>
     );
 };
