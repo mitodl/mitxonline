@@ -1288,10 +1288,10 @@ def resolve_returned_stripe_order(order):
     Ask Stripe whether a pending order was paid, and fulfill it if so.
 
     Stripe waits up to 10 seconds for the checkout.session.completed webhook
-    to be answered before it sends the learner back to
-    checkout-result-callback, so the order is usually fulfilled by then. When
-    the webhook is slow, fails or is delayed, checking here lets the return
-    report the purchase anyway. If Stripe can't be reached, or the session has
+    to be answered before it sends the learner back to the checkout success
+    route, so the order is usually fulfilled by then. When the webhook is
+    slow, fails or is delayed, checking here lets the return report the
+    purchase anyway. If Stripe can't be reached, or the session has
     no PaymentIntent to record the payment under, the order is left for the
     webhook so the learner's redirect doesn't fail. Orders that aren't
     pending, or have no CheckoutSession (e.g. CyberSource orders), are
