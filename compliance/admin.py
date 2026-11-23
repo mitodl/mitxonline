@@ -106,6 +106,9 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
     @action(
         label="Mark Manually Approved",
         description="Mark this log as manually approved",
+        # POST with a CSRF token, so a cross-site link can't approve a learner.
+        methods=("POST",),
+        button_type="form",
     )
     def mark_manually_approved(self, request, obj):
         """Approve this log, setting approved_by/approved_on to the current admin user and now."""

@@ -431,6 +431,8 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
             | Q(created_on__gte=cutoff)
             | ~Q(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
         )
+        # Only an unexpired approval (handled above) may stand in for a check.
+        .exclude(decision=ExportComplianceDecision.MANUALLY_APPROVED)
         .order_by("-created_on")
         .first()
     )
@@ -438,8 +440,8 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
 
 def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None:
     """
-    Return the user's most recent DECLINED export compliance log, unless an
-    accepted log was recorded after it or the user has an unexpired manual
+    Return the user's most recent DECLINED export compliance log, unless a
+    COMPLETED log was recorded after it or the user has an unexpired manual
     approval.
 
     INVALID_REQUEST is a problem with the learner's profile data, not a
@@ -455,8 +457,9 @@ def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None
     )
     if decline is None:
         return None
+    # An expired manual approval no longer resolves anything.
     if logs.filter(
-        decision__in=ExportComplianceLog.ACCEPTED_DECISIONS,
+        decision=ExportComplianceDecision.COMPLETED,
         created_on__gt=decline.created_on,
     ).exists():
         return None

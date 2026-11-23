@@ -27,7 +27,7 @@ def test_mark_manually_approved_action(client, admin_user):
         decision=ExportComplianceDecision.DECLINED
     )
 
-    response = client.get(_action_url(log_entry), follow=True)
+    response = client.post(_action_url(log_entry), follow=True)
 
     assert response.status_code == 200
     log_entry.refresh_from_db()
@@ -39,6 +39,21 @@ def test_mark_manually_approved_action(client, admin_user):
         expires_on in str(message) for message in get_messages(response.wsgi_request)
     )
     assert expires_on in response.content.decode()
+
+
+def test_mark_manually_approved_action_rejects_get(client, admin_user):
+    """A GET must not approve the log, so a cross-site link can't approve anyone"""
+    client.force_login(admin_user)
+    log_entry = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+
+    response = client.get(_action_url(log_entry))
+
+    assert response.status_code == 405
+    log_entry.refresh_from_db()
+    assert log_entry.decision == ExportComplianceDecision.DECLINED
+    assert log_entry.approved_on is None
 
 
 def test_mark_manually_approved_action_reports_validation_errors(
@@ -54,7 +69,7 @@ def test_mark_manually_approved_action_reports_validation_errors(
         side_effect=ValidationError("boom"),
     )
 
-    response = client.get(_action_url(log_entry), follow=True)
+    response = client.post(_action_url(log_entry), follow=True)
 
     assert response.status_code == 200
     messages = [str(message) for message in get_messages(response.wsgi_request)]

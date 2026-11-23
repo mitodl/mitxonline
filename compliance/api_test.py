@@ -865,3 +865,41 @@ def test_get_unresolved_export_compliance_decline_ignored_during_manual_approval
 
     settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 0
     assert get_unresolved_export_compliance_decline(user) == newer_decline
+
+
+def test_verify_user_with_exports_rechecks_original_run_after_approval_expires(
+    mocker, export_settings
+):
+    """An expired manual approval no longer covers the run it was approved for."""
+    user = _complete_user()
+    run = CourseRunFactory.create()
+    _approved_log(user, run, now_in_utc() - relativedelta(months=13))
+    response = SimpleNamespace(
+        status="COMPLETED",
+        id="new-request-id",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.request_id == "new-request-id"
+
+
+def test_get_unresolved_export_compliance_decline_ignores_expired_approval(settings):
+    """An expired manual approval no longer resolves an earlier decline."""
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    user = UserFactory.create()
+    approved_on = now_in_utc() - relativedelta(months=13)
+    decline = ExportComplianceLogFactory.create(user=user, decision=DECLINED)
+    ExportComplianceLog.objects.filter(pk=decline.pk).update(
+        created_on=approved_on - timedelta(days=5)
+    )
+    _approved_log(user, CourseRunFactory.create(), approved_on)
+
+    assert get_unresolved_export_compliance_decline(user) == decline
