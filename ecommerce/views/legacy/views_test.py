@@ -812,6 +812,44 @@ def test_checkout_result_get_reports_only_fulfilled_orders(
     assert resp.url == reverse("user-dashboard")
 
 
+@pytest.mark.parametrize("paid", [True, False])
+def test_checkout_result_get_resolves_pending_order(
+    mocker, settings, user, user_client, paid
+):
+    """
+    If the learner gets back before the webhook has fulfilled the order, the
+    order is checked with Stripe, and reported as fulfilled if it was paid.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    def resolve(returned_order):
+        if paid:
+            Order.objects.filter(pk=returned_order.pk).update(
+                state=OrderStatus.FULFILLED
+            )
+            returned_order.refresh_from_db()
+        return returned_order
+
+    mock_resolve = mocker.patch(
+        "ecommerce.api.resolve_returned_stripe_order", side_effect=resolve
+    )
+    session = user_client.session
+    session["order_reference_number"] = order.reference_number
+    session.save()
+    user_client.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+
+    resp = user_client.get(reverse("checkout-result-callback"))
+
+    mock_resolve.assert_called_once_with(order)
+    if paid:
+        assert (
+            resp.url
+            == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        )
+    else:
+        assert resp.url == reverse("user-dashboard")
+
+
 @pytest.mark.parametrize(
     "cart_exists, cart_empty",  # noqa: PT006
     [(True, False), (True, True), (False, True)],
@@ -2241,7 +2279,7 @@ def test_checkout_result_success_redirects_to_dashboard(user, client):
 
 
 def test_checkout_result_success_redirects_to_learn(settings, user, user_client):
-    """Orders that go to the Learn dashboard are sent there as pending, not fulfilled."""
+    """An order that's still pending goes to the Learn dashboard as pending, not fulfilled."""
 
     settings.MIT_LEARN_DASHBOARD_URL = "https://learn.mit.edu/dashboard"
     order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
@@ -2262,12 +2300,50 @@ def test_checkout_result_success_redirects_to_learn(settings, user, user_client)
     assert order.state == OrderStatus.PENDING
 
 
+@pytest.mark.parametrize("paid", [True, False])
+def test_checkout_result_success_resolves_pending_order(
+    mocker, settings, user, user_client, paid
+):
+    """
+    If the learner gets back before the webhook has fulfilled the order, the
+    order is checked with Stripe, and reported as fulfilled if it was paid.
+    """
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+
+    def resolve(returned_order):
+        if paid:
+            Order.objects.filter(pk=returned_order.pk).update(
+                state=OrderStatus.FULFILLED
+            )
+            returned_order.refresh_from_db()
+        return returned_order
+
+    mock_resolve = mocker.patch(
+        "ecommerce.api.resolve_returned_stripe_order", side_effect=resolve
+    )
+
+    resp = user_client.get(
+        reverse(
+            "checkout-result-success",
+            kwargs={"reference_number": order.reference_number},
+        )
+    )
+
+    mock_resolve.assert_called_once_with(order)
+    order_status = OrderStatus.FULFILLED if paid else OrderStatus.PENDING
+    assert (
+        resp.url
+        == f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status={order_status}&order_id={order.id}"
+    )
+
+
 @pytest.mark.parametrize("is_anonymous", [True, False])
 def test_checkout_result_success_ignores_other_users_orders(
-    user, user_client, is_anonymous
+    mocker, user, user_client, is_anonymous
 ):
     """Another user's reference number (or no login) gets the plain dashboard redirect."""
 
+    mock_resolve = mocker.patch("ecommerce.api.resolve_returned_stripe_order")
     order = OrderFactory.create(state=OrderStatus.PENDING)
     client = Client() if is_anonymous else user_client
 
@@ -2283,6 +2359,7 @@ def test_checkout_result_success_ignores_other_users_orders(
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
     )
+    mock_resolve.assert_not_called()
 
 
 def test_checkout_result_cancel_redirects_to_cart(user, user_client):

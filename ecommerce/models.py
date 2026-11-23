@@ -46,6 +46,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     REFUND_WINDOW_DAYS,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
@@ -978,6 +980,24 @@ class OrderFlow:
             # SA responses use req_amount; REST API responses use amount
             raw_amount = payment_data.get("amount") or payment_data.get("req_amount", 0)
             transaction_payload["amount"] = Decimal(str(raw_amount))
+        elif (
+            self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE
+            and payment_data.get("object") == STRIPE_OBJECT_CHECKOUT_SESSION
+            and reason != STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+        ):
+            # A paid CheckoutSession, from checking the session with Stripe
+            # rather than from the webhook. The initial CheckoutSession
+            # transaction already uses the session ID, so record the payment
+            # under its PaymentIntent (expanded or not).
+            payment_intent = payment_data.get("payment_intent")
+            transaction_payload["transaction_id"] = (
+                payment_intent.get("id")
+                if isinstance(payment_intent, dict)
+                else payment_intent
+            )
+            transaction_payload["amount"] = (
+                Decimal(payment_data.get("amount_total") or 0) / 100
+            )
         elif self.order.gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
             # This expects the Event, which has a unique ID.
             transaction_payload["transaction_id"] = payment_data.get("id")

@@ -896,18 +896,19 @@ class CheckoutCallbackView(View):
         """
         Process a GET request to this endpoint.
 
-        Stripe just redirects users back to the app, for both successful and
-        canceled checkouts, and the order is fulfilled by the webhook. So only
-        report the order as fulfilled once it is; otherwise just go back to the
-        dashboard.
+        Stripe CheckoutSessions created before the success and cancel routes
+        were added still return here, for both successful and canceled
+        checkouts. If the order is still pending, ask Stripe whether it was
+        paid, and only report the order as fulfilled once it is; otherwise go
+        back to the dashboard.
         """
 
         order_ref = request.session.pop("order_reference_number", None)
         if order_ref:
-            order = Order.objects.filter(
-                reference_number=order_ref, state=OrderStatus.FULFILLED
-            ).first()
+            order = Order.objects.filter(reference_number=order_ref).first()
             if order:
+                order = api.resolve_returned_stripe_order(order)
+            if order and order.state == OrderStatus.FULFILLED:
                 return _learn_dashboard_redirect(order)
 
         return HttpResponseRedirect(reverse("user-dashboard"))
@@ -917,14 +918,17 @@ class CheckoutResultSuccessView(View):
     """
     Landing page for a user returning from a successful Stripe checkout.
 
-    Stripe sends the actual result of the transaction to the webhook
-    asynchronously, so landing here doesn't mean the payment went through.
-    This only redirects the user to their dashboard with a message saying the
-    payment is being processed; it doesn't touch the order.
+    Stripe waits up to 10 seconds for the checkout.session.completed webhook
+    that fulfills the order before redirecting here, so landing here doesn't
+    mean the order has been fulfilled. If the user's order is still pending,
+    this asks Stripe whether it was paid and fulfills it if so, then sends the
+    user to the Learn dashboard with the order's current state. Without a
+    matching order, the user goes to their dashboard with a message saying the
+    payment is being processed.
     """
 
     def get(self, request, reference_number):
-        """Redirect the user to the appropriate dashboard."""
+        """Fulfill the order if Stripe says it was paid, and redirect the user."""
 
         order = (
             Order.objects.filter(
@@ -935,6 +939,7 @@ class CheckoutResultSuccessView(View):
         )
 
         if order:
+            order = api.resolve_returned_stripe_order(order)
             return _learn_dashboard_redirect(order, order_status=order.state)
 
         return redirect_with_user_message(
