@@ -2338,3 +2338,33 @@ def test_pending_order_copies_location(settings, user, from_basket):
         assert order.location_source == GEOLOCATION_TYPE_NONE
         assert order.user_locations == []
         assert order.location_determined_on is None
+
+
+def test_create_from_basket_copies_tax(user, taxed_locale):
+    """Order lines are taxed at the basket's rate versions, and the total includes the tax."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket = BasketFactory.create(user=user)
+    item = BasketItem.objects.create(basket=basket, product=product)
+    basket.set_location(
+        [UserCalculatedLocation("IN", GEOLOCATION_TYPE_GEOIP, "1.2.3.4")]
+    )
+    basket.save()
+    from ecommerce.api import recalculate_basket_tax  # noqa: PLC0415
+
+    recalculate_basket_tax(basket)
+    version = item.taxes.get().tax_rate_version
+
+    # The rate changes before checkout; the order keeps the basket's version.
+    taxed_locale.tax_rate = Decimal(20)
+    taxed_locale.save()
+
+    order = PendingOrder.create_from_basket(basket)
+
+    line_tax = order.lines.get().taxes.get()
+    assert line_tax.tax_rate_version == version
+    assert line_tax.rate == Decimal(18)
+    assert line_tax.tax_amount == Decimal("18.00")
+    assert line_tax.taxable_amount == Decimal("100.00")
+    assert order.total_price_paid == Decimal("118.00")

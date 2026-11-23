@@ -79,6 +79,7 @@ export type TransactionalLine = {
   content_title: ?string,
   price: number,
   total_paid: number,
+  tax_paid?: string,
   quantity: number
 }
 
@@ -87,6 +88,9 @@ export type OrderReceipt = {
   lines: Array<TransactionalLine>,
   id: number,
   total_price_paid: number,
+  subtotal?: string,
+  tax_amount?: string,
+  taxes?: Array<Tax>,
   state: string,
   reference_number: string,
   discounts: Array<Discount>,
@@ -95,4 +99,10 @@ export type OrderReceipt = {
   transactions: Transactions,
   street_address: StreetAddress,
   purchaser: Purchaser
+}
+
+export type Tax = {
+  tax_rate_name: string,
+  rate: string,
+  tax_amount: string
 }

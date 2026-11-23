@@ -12,7 +12,7 @@ import { pathOr } from "ramda"
 // $FlowFixMe
 import { Modal, ModalBody, ModalHeader } from "reactstrap"
 
-import type { BasketItem, Discount } from "../../../flow/cartTypes"
+import type { BasketItem, Discount, Tax } from "../../../flow/cartTypes"
 import type { Country, CurrentUser } from "../../../flow/authTypes"
 
 import Loader from "../../../components/Loader"
@@ -31,6 +31,8 @@ import {
   totalPriceSelector,
   discountedPriceSelector,
   discountSelector,
+  taxesSelector,
+  grandTotalSelector,
   applyDiscountCodeMutation
 } from "../../../lib/queries/cart"
 import users, { currentUserSelector } from "../../../lib/queries/users"
@@ -45,6 +47,8 @@ type Props = {
   cartItems: Array<BasketItem>,
   totalPrice: number,
   discountedPrice: number,
+  taxes: Array<Tax>,
+  grandTotal: number,
   discounts: Array<Discount>,
   isLoading: boolean,
   applyDiscountCode: (code: string) => Promise<any>,
@@ -223,7 +227,14 @@ export class CartPage extends React.Component<Props, CartState> {
   }
 
   renderOrderSummaryCard() {
-    const { totalPrice, discountedPrice, discounts, currentUser } = this.props
+    const {
+      totalPrice,
+      discountedPrice,
+      discounts,
+      taxes,
+      grandTotal,
+      currentUser
+    } = this.props
     const refunds = []
 
     return (
@@ -232,6 +243,8 @@ export class CartPage extends React.Component<Props, CartState> {
         orderFulfilled={false}
         discountedPrice={discountedPrice}
         discounts={discounts}
+        taxes={taxes}
+        grandTotal={grandTotal}
         refunds={refunds}
         addDiscount={this.addDiscount.bind(this)}
         discountCode={this.state.discountCode}
@@ -335,6 +348,8 @@ const mapStateToProps = createStructuredSelector({
   totalPrice:      totalPriceSelector,
   discountedPrice: discountedPriceSelector,
   discounts:       discountSelector,
+  taxes:           taxesSelector,
+  grandTotal:      grandTotalSelector,
   isLoading:       pathOr(true, ["queries", cartQueryKey, "isPending"]),
   currentUser:     currentUserSelector,
   countries:       users.countriesSelector

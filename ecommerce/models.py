@@ -368,6 +368,16 @@ class Basket(TimestampedModel, UserLocationModel):
 
         return True
 
+    def get_tax_records(self) -> list[BasketItemTax]:
+        """
+        Return the tax records on all of the basket's items.
+
+        Loads them in one query, once per basket instance.
+        """
+
+        models.prefetch_related_objects([self], "basket_items__taxes")
+        return [tax for item in self.basket_items.all() for tax in item.taxes.all()]
+
     def get_products(self):
         """
         Returns the products that have been added to the basket so far.
@@ -437,6 +447,12 @@ class BasketItem(TimestampedModel):
     def base_price(self):
         """Returns the total price of the basket item without discounts."""
         return self.product.price * self.quantity
+
+    @property
+    def tax_amount(self) -> Decimal:
+        """Return the total tax charged on this item."""
+
+        return sum((tax.tax_amount for tax in self.taxes.all()), Decimal("0.00"))
 
 
 PROGRAM_PRODUCTS_ONLY_ERROR = (
@@ -1195,6 +1211,16 @@ class Order(TimestampedModel, UserLocationModel):
         help_text="The payment gateway used for this order. Must match one of the supported payment gateways in ol-django.",
     )
 
+    def get_tax_records(self) -> list[LineTax]:
+        """
+        Return the tax records on all of the order's lines.
+
+        Loads them in one query, once per order instance.
+        """
+
+        models.prefetch_related_objects([self], "lines__taxes")
+        return [tax for line in self.lines.all() for tax in line.taxes.all()]
+
     def get_object_flow(self):
         """Instantiate the flow without default constructor"""
         return OrderFlow(self, user=self.purchaser)
@@ -1430,13 +1456,14 @@ class PendingOrder(Order):
     """An order that is pending payment"""
 
     @transaction.atomic
-    def _create_with_data(
+    def _create_with_data(  # noqa: PLR0913
         self,
         products: List[Tuple[Product, ContractPage | None]],  # noqa: UP006
         user: User,
         discounts: List[Discount] | None = None,  # noqa: UP006
         gateway_type: str = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY,
         location_from: UserLocationModel | None = None,
+        taxes_by_product: dict[int, list[TaxRecord]] | None = None,
     ):
         """
         Creates a new PendingOrder with the supplied data.
@@ -1454,6 +1481,9 @@ class PendingOrder(Order):
             gateway_type (str): The PaymentGateway class for the order.
             location_from (UserLocationModel|None): a record (usually the
                 basket) to copy the user's location from.
+            taxes_by_product (dict|None): tax records (usually the basket
+                items') keyed by product ID. Each line is taxed at the same
+                rate versions, on the line's own price.
 
         Returns:
             PendingOrder
@@ -1524,7 +1554,9 @@ class PendingOrder(Order):
                 ),
                 b2b_contract=contract,
             )
-            total += line.discounted_price
+            total += line.discounted_price + Line.record_taxes(
+                line, (taxes_by_product or {}).get(product.id, [])
+            )
 
         order.total_price_paid = total
 
@@ -1553,8 +1585,18 @@ class PendingOrder(Order):
             basket_discount.redeemed_discount
             for basket_discount in basket.discounts.all()
         ]
+        taxes_by_product = {}
+        for item in basket.basket_items.prefetch_related("taxes"):
+            taxes_by_product[item.product_id] = list(item.taxes.all())
+
         order = cls._create_with_data(
-            cls, products, basket.user, discounts, gateway_type, location_from=basket
+            cls,
+            products,
+            basket.user,
+            discounts,
+            gateway_type,
+            location_from=basket,
+            taxes_by_product=taxes_by_product,
         )
         return order  # noqa: RET504
 
@@ -1743,6 +1785,35 @@ class Line(TimestampedModel):
                 name="unique_order_purchased_object",
             )
         ]
+
+    @staticmethod
+    def record_taxes(line: Line, tax_records: Iterable[TaxRecord]) -> Decimal:
+        """
+        Tax a line at the rate versions of the given tax records.
+
+        The tax is worked out again on the line's own price, so it matches
+        what the line charges.
+
+        Returns:
+        - Decimal: the total tax recorded
+        """
+        from ecommerce.tax import calculate_tax_from_version  # noqa: PLC0415
+
+        total = Decimal("0.00")
+        for record in tax_records:
+            calculated = calculate_tax_from_version(
+                line.discounted_price, record.tax_rate_version
+            )
+            LineTax.objects.create(line=line, **LineTax.fields_from(calculated))
+            total += calculated.tax_amount
+
+        return total
+
+    @property
+    def tax_amount(self) -> Decimal:
+        """Return the total tax charged on this line."""
+
+        return sum((tax.tax_amount for tax in self.taxes.all()), Decimal("0.00"))
 
     @property
     def item_description(self):
@@ -2075,3 +2146,73 @@ class RefundRequest(TimestampedModel):
 
     def __str__(self):
         return f"RefundRequest for Order {self.order_id} by {self.user.email}"
+
+
+class TaxRecord(TimestampedModel):
+    """
+    A tax charged on one item, as calculated.
+
+    The amounts are stored as calculated, for auditing, alongside a link to the
+    exact version of the TaxRate that was applied. An item can carry more than
+    one tax (e.g. national and local), so these hang off the item rather than
+    being fields on it.
+    """
+
+    tax_rate_version = models.ForeignKey(
+        "reversion.Version",
+        on_delete=models.PROTECT,
+        related_name="+",
+        help_text="The version of the TaxRate applied.",
+    )
+    tax_rate_name = models.CharField(
+        max_length=100, help_text="The name of the tax (e.g. VAT), as applied."
+    )
+    rate = models.DecimalField(
+        max_digits=7,
+        decimal_places=4,
+        help_text="The percentage applied.",
+    )
+    taxable_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=5,
+        help_text="The amount the tax was calculated on.",
+    )
+    tax_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=2,
+        help_text="The tax charged.",
+    )
+    calculated_on = models.DateTimeField(help_text="When the tax was calculated.")
+
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def fields_from(cls, calculated: CalculatedTax) -> dict:
+        """Return the field values for a calculated tax."""
+
+        return {
+            "tax_rate_version": calculated.tax_rate_version,
+            "tax_rate_name": calculated.tax_rate_name,
+            "rate": calculated.rate,
+            "taxable_amount": calculated.taxable_amount,
+            "tax_amount": calculated.tax_amount,
+            "calculated_on": now_in_utc(),
+        }
+
+    def __str__(self):
+        return f"{self.tax_rate_name} {self.rate}%: {self.tax_amount}"
+
+
+class BasketItemTax(TaxRecord):
+    """A tax charged on a basket item."""
+
+    basket_item = models.ForeignKey(
+        BasketItem, on_delete=models.CASCADE, related_name="taxes"
+    )
+
+
+class LineTax(TaxRecord):
+    """A tax charged on an order line."""
+
+    line = models.ForeignKey(Line, on_delete=models.CASCADE, related_name="taxes")

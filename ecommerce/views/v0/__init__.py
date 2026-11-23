@@ -1097,6 +1097,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
                     queryset=Line.objects.select_related(
                         "product_version"
                     ).prefetch_related(
+                        # Read by LineSerializer's tax fields.
+                        "taxes",
                         # all_objects: CourseRun.objects hides source runs, and
                         # a run bought before it was flagged as one still has
                         # to resolve, as Django's unfiltered default lookup
@@ -1104,7 +1106,7 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
                         GenericPrefetch(
                             "purchased_object",
                             [CourseRun.all_objects.select_related("course")],
-                        )
+                        ),
                     ),
                 ),
             )

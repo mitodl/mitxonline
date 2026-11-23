@@ -25,10 +25,91 @@ from ecommerce.models import (
     Order,
     validate_discount_shape,
 )
+from ecommerce.tax import summarize_taxes
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from location.constants import GEOLOCATION_TYPE_CHOICES
 from main.settings import TIME_ZONE
 from users.serializers import ExtendedLegalAddressSerializer
+
+
+class TaxLineSerializer(serializers.Serializer):
+    """One tax charged, with its total."""
+
+    tax_rate_name = serializers.CharField(read_only=True)
+    rate = serializers.DecimalField(max_digits=7, decimal_places=4, read_only=True)
+    tax_amount = serializers.DecimalField(
+        max_digits=20, decimal_places=2, read_only=True
+    )
+
+
+class TaxRecordSerializer(TaxLineSerializer):
+    """A tax charged on one basket item or order line."""
+
+    taxable_amount = serializers.DecimalField(
+        max_digits=20, decimal_places=2, read_only=True
+    )
+    calculated_on = serializers.DateTimeField(read_only=True)
+
+
+# Tax totals for a basket. Expects the serializer to have get_discounted_price.
+# Reads basket_items and their taxes through .all(), so a prefetch serves it.
+class BasketTaxFieldsMixin(serializers.Serializer):
+    tax_amount = serializers.SerializerMethodField()
+    grand_total = serializers.SerializerMethodField()
+    taxes = serializers.SerializerMethodField()
+
+    def _tax_records(self, instance):
+        return instance.get_tax_records()
+
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
+    def get_tax_amount(self, instance) -> Decimal:
+        """Get the total tax on the basket."""
+        return sum(
+            (tax.tax_amount for tax in self._tax_records(instance)), Decimal("0.00")
+        )
+
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
+    def get_grand_total(self, instance) -> Decimal:
+        """Get the price after discounts, plus tax."""
+        return Decimal(self.get_discounted_price(instance)) + self.get_tax_amount(
+            instance
+        )
+
+    @extend_schema_field(TaxLineSerializer(many=True))
+    def get_taxes(self, instance) -> list[dict]:
+        """Get the taxes on the basket, totalled by tax."""
+        return TaxLineSerializer(
+            summarize_taxes(self._tax_records(instance)), many=True
+        ).data
+
+
+# Tax totals for an order. total_price_paid already includes the tax.
+class OrderTaxFieldsMixin(serializers.Serializer):
+    subtotal = serializers.SerializerMethodField()
+    tax_amount = serializers.SerializerMethodField()
+    taxes = serializers.SerializerMethodField()
+
+    def _tax_records(self, instance):
+        return instance.get_tax_records()
+
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
+    def get_tax_amount(self, instance) -> Decimal:
+        """Get the total tax charged on the order."""
+        return sum(
+            (tax.tax_amount for tax in self._tax_records(instance)), Decimal("0.00")
+        )
+
+    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
+    def get_subtotal(self, instance) -> Decimal:
+        """Get the order's price before tax."""
+        return Decimal(instance.total_price_paid) - self.get_tax_amount(instance)
+
+    @extend_schema_field(TaxLineSerializer(many=True))
+    def get_taxes(self, instance) -> list[dict]:
+        """Get the taxes charged on the order, totalled by tax."""
+        return TaxLineSerializer(
+            summarize_taxes(self._tax_records(instance)), many=True
+        ).data
 
 
 # The user's location, for baskets and orders. Declared as plain strings rather
@@ -344,6 +425,7 @@ class NestedBasketSerializer(serializers.ModelSerializer):
 
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
     basket = NestedBasketSerializer(read_only=True)
+    taxes = TaxRecordSerializer(many=True, read_only=True)
     product = serializers.SerializerMethodField()
 
     def get_product(self, instance):
@@ -351,11 +433,13 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.BasketItem
-        fields = ["basket", "product", "id"]
+        fields = ["basket", "product", "id", "taxes"]
         depth = 1
 
 
-class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
+class BasketWithProductSerializer(
+    BasketTaxFieldsMixin, UserLocationFieldsMixin, serializers.ModelSerializer
+):
     """Serializer for Basket model with product details"""
 
     basket_items = serializers.SerializerMethodField()
@@ -397,7 +481,9 @@ class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSeri
         """
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related("product")
+            for basket in instance.basket_items.select_related(
+                "product"
+            ).prefetch_related("taxes")
         ]
 
     @extend_schema_field(Decimal)
@@ -448,6 +534,9 @@ class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSeri
             "discounts",
             "location_country_code",
             "location_source",
+            "tax_amount",
+            "grand_total",
+            "taxes",
         ]
 
 
@@ -459,6 +548,8 @@ class LineSerializer(serializers.ModelSerializer):
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
 
+    taxes = TaxRecordSerializer(many=True, read_only=True)
+
     class Meta:
         fields = [
             "quantity",
@@ -468,11 +559,14 @@ class LineSerializer(serializers.ModelSerializer):
             "total_price",
             "id",
             "product",
+            "taxes",
         ]
         model = models.Line
 
 
-class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
+class OrderSerializer(
+    OrderTaxFieldsMixin, UserLocationFieldsMixin, serializers.ModelSerializer
+):
     lines = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
@@ -638,6 +732,9 @@ class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
             "refund_eligible",
             "location_country_code",
             "location_source",
+            "subtotal",
+            "tax_amount",
+            "taxes",
         ]
         model = models.Order
 
@@ -994,6 +1091,7 @@ class TransactionLineSerializer(serializers.BaseSerializer):
         line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
+            tax_paid=str(instance.tax_amount),
             discount=str(discount),
             CEUs=None,
             content_title=content_title,
@@ -1007,7 +1105,7 @@ class TransactionLineSerializer(serializers.BaseSerializer):
         return line  # noqa: RET504
 
 
-class OrderReceiptSerializer(serializers.ModelSerializer):
+class OrderReceiptSerializer(OrderTaxFieldsMixin, serializers.ModelSerializer):
     """
     Serializer for extracting receipt info from an Order object
     This hews pretty closely to the data format in xPro but modified a bit
@@ -1045,5 +1143,14 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
         return TransactionPurchaserSerializer(instance).data
 
     class Meta:
-        fields = ["purchaser", "lines", "coupon", "order", "receipt"]
+        fields = [
+            "purchaser",
+            "lines",
+            "coupon",
+            "order",
+            "receipt",
+            "subtotal",
+            "tax_amount",
+            "taxes",
+        ]
         model = models.Order

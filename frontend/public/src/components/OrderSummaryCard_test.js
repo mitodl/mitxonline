@@ -49,6 +49,38 @@ describe("OrderSummaryCard", () => {
     assert.include(wrapper.text(), "-$100.00")
   })
 
+  it("shows each tax and a total that includes it", () => {
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        taxes={[{ tax_rate_name: "VAT", rate: "18.0000", tax_amount: "18.00" }]}
+        grandTotal="118.00"
+        isAuthenticated={true}
+      />
+    )
+
+    const taxRow = wrapper.find(".order-summary-tax")
+    assert.equal(taxRow.length, 1)
+    assert.include(taxRow.text(), "VAT (18%)")
+    assert.include(taxRow.text(), "$18.00")
+    assert.include(wrapper.find("h5").at(1).text(), "$118.00")
+  })
+
+  it("shows no tax row, and the discounted price as the total, without tax", () => {
+    const wrapper = shallow(
+      <OrderSummaryCard
+        {...baseProps}
+        discountedPrice={80}
+        taxes={[]}
+        grandTotal="80.00"
+        isAuthenticated={true}
+      />
+    )
+
+    assert.isFalse(wrapper.find(".order-summary-tax").exists())
+    assert.include(wrapper.find("h5").at(1).text(), "$80.00")
+  })
+
   it("does not render the coupon form when logged out", () => {
     const wrapper = shallow(
       <OrderSummaryCard {...baseProps} isAuthenticated={false} />

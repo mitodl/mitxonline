@@ -43,6 +43,7 @@ from ecommerce.constants import (
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
     BASKET_UPDATE_ADD_ITEM,
+    BASKET_UPDATE_CHECKOUT,
     BASKET_UPDATE_CLAIM,
     CHECKOUT_CANCEL_ROUTE_MAP,
     CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
@@ -93,6 +94,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    BasketItemTax,
     Discount,
     DiscountProduct,
     DiscountRedemption,
@@ -109,6 +111,7 @@ from ecommerce.models import (
     UserDiscount,
 )
 from ecommerce.tasks import perform_downgrade_from_order
+from ecommerce.tax import calculate_tax_from_version, get_tax_rate_for_locations
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
 from main import features
@@ -304,6 +307,13 @@ def generate_checkout_payload(  # noqa: PLR0913
     if preflight_error:
         return preflight_error
 
+    # Run the basket hooks once more: this records where the user is as they
+    # check out, and works out the tax again on the final prices (pre-flight
+    # can change the basket's discounts).
+    checkout_update = BasketUpdate(operation=BASKET_UPDATE_CHECKOUT)
+    run_basket_pre_update_hooks(request, basket, checkout_update)
+    run_basket_post_update_hooks(request, basket, checkout_update)
+
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
@@ -316,8 +326,11 @@ def generate_checkout_payload(  # noqa: PLR0913
         items=[],
     )
 
-    for line_item in order.lines.all():
+    for line_item in order.lines.prefetch_related("taxes"):
         field_dict = line_item.product_version.field_dict
+        # The gateway takes the line's total tax. CyberSource sends it in its
+        # tax fields; Stripe adds it to the line's price, as inclusive tax.
+        line_tax = line_item.tax_amount
         gateway_order.items.append(
             GatewayCartItem(
                 code=field_dict["content_type_id"],
@@ -325,10 +338,10 @@ def generate_checkout_payload(  # noqa: PLR0913
                 quantity=1,
                 sku=f"{field_dict['content_type_id']}-{field_dict['object_id']}",
                 unitprice=line_item.discounted_price,
-                taxable=0,
+                taxable=line_tax,
             )
         )
-        total_price += line_item.discounted_price
+        total_price += line_item.discounted_price + line_tax
 
     if total_price == 0:
         with transaction.atomic():
@@ -706,6 +719,37 @@ def add_product_to_basket(
     )
 
     return item, created
+
+
+def recalculate_basket_tax(basket: Basket):
+    """
+    Work out the tax on each item in the basket, replacing what was there.
+
+    Whether the user is taxed, and at what rate, comes from the location
+    recorded on the basket (see the BasketLocation hook) and the "tax"
+    LocationFlags. Each item is taxed on its discounted price, so call this
+    again whenever the basket's contents or discounts change.
+
+    Args:
+    - basket (Basket): the basket to tax
+    """
+
+    tax_rate = get_tax_rate_for_locations(basket.user_locations)
+    version = tax_rate.current_version if tax_rate else None
+
+    with transaction.atomic():
+        BasketItemTax.objects.filter(basket_item__basket=basket).delete()
+
+        if version is None:
+            return
+
+        for item in basket.basket_items.select_related("product"):
+            calculated = calculate_tax_from_version(
+                item.discounted_price, version, tax_rate=tax_rate
+            )
+            BasketItemTax.objects.create(
+                basket_item=item, **BasketItemTax.fields_from(calculated)
+            )
 
 
 ANONYMOUS_BASKET_SESSION_KEY = "anonymous_basket_id"
@@ -1987,6 +2031,9 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
             defaults=defaults,
             create_defaults=defaults,
         )
+
+        # The tax is charged on the discounted price, so it changes too.
+        recalculate_basket_tax(basket)
 
 
 def create_verified_program_discount(program):
