@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 import sentry_sdk
 from CyberSource.rest import ApiException
+from dateutil.relativedelta import relativedelta
 from django.core.exceptions import ImproperlyConfigured
 from mitol.common.utils.datetime import now_in_utc
 
@@ -16,6 +17,7 @@ from compliance.api import (
     _build_export_payload,
     _normalize_administrative_area,
     decrypt_export_compliance_log,
+    get_active_manual_approval,
     get_cybersource_client,
     get_latest_export_compliance_log,
     get_missing_export_compliance_fields,
@@ -29,7 +31,7 @@ from compliance.exceptions import (
 )
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision, ExportComplianceLog
-from courses.factories import CourseRunFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from main.sentry import EXPORT_COMPLIANCE_USER_TAG, before_send
 from users.factories import UserFactory
 from users.models import User
@@ -724,3 +726,142 @@ def test_verify_user_with_exports_reraises_other_api_errors(
 
     with pytest.raises(ApiException):
         verify_user_with_exports(user, run)
+
+
+def _approved_log(user, courseware_object, approved_on):
+    """Create a manually approved log for a user, approved at approved_on."""
+    log_entry = ExportComplianceLogFactory.create(
+        user=user,
+        courseware_object=courseware_object,
+        decision=MANUALLY_APPROVED,
+        approved_by=UserFactory.create(),
+        approved_on=approved_on,
+        request_id="approved-request-id",
+    )
+    # The admin action approves the original DECLINED row in place, so it
+    # keeps its original created_on.
+    ExportComplianceLog.objects.filter(pk=log_entry.pk).update(
+        created_on=approved_on - timedelta(days=2)
+    )
+    return log_entry
+
+
+@pytest.mark.parametrize(
+    ("months_ago", "days_offset", "is_active"),
+    [
+        (0, 0, True),
+        (11, 0, True),
+        (12, 1, True),
+        (12, -1, False),
+        (24, 0, False),
+    ],
+)
+def test_get_active_manual_approval(settings, months_ago, days_offset, is_active):
+    """A manual approval covers the user for EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS."""
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    user = UserFactory.create()
+    approved_on = (
+        now_in_utc() - relativedelta(months=months_ago) + timedelta(days=days_offset)
+    )
+    approval = _approved_log(user, CourseRunFactory.create(), approved_on)
+    ExportComplianceLogFactory.create(user=UserFactory.create(), decision=DECLINED)
+
+    assert get_active_manual_approval(user) == (approval if is_active else None)
+
+
+def test_get_active_manual_approval_uses_setting(settings):
+    """The approval period comes from the setting."""
+    user = UserFactory.create()
+    _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=4)
+    )
+
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 6
+    assert get_active_manual_approval(user) is not None
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 3
+    assert get_active_manual_approval(user) is None
+
+
+def test_get_active_manual_approval_uses_newest_approval(settings):
+    """A newer approval of an old log restarts the period."""
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    user = UserFactory.create()
+    _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=13)
+    )
+    newest = _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=1)
+    )
+
+    assert get_active_manual_approval(user) == newest
+
+
+@pytest.mark.parametrize("courseware_factory", [CourseRunFactory, ProgramFactory])
+def test_verify_user_with_exports_uses_manual_approval_for_other_courseware(
+    mocker, export_settings, courseware_factory
+):
+    """An unexpired manual approval for one run accepts any run or program without a new check."""
+    user = UserFactory.create()
+    approval = _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=6)
+    )
+    # A decline from before the approval must not win over it.
+    older_decline = ExportComplianceLogFactory.create(user=user, decision=DECLINED)
+    ExportComplianceLog.objects.filter(pk=older_decline.pk).update(
+        created_on=approval.approved_on - timedelta(days=1)
+    )
+    mock_client = mocker.Mock()
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, courseware_factory.create())
+
+    mock_client.validate_export_compliance.assert_not_called()
+    assert result.accepted is True
+    assert result.decision == MANUALLY_APPROVED
+    assert result.request_id == "approved-request-id"
+    assert ExportComplianceLog.objects.filter(user=user).count() == 2
+
+
+def test_verify_user_with_exports_rechecks_after_manual_approval_expires(
+    mocker, export_settings
+):
+    """Once a manual approval expires, enrolling in another run runs a new CyberSource check."""
+    user = _complete_user()
+    _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=13)
+    )
+    response = SimpleNamespace(
+        status="DECLINED",
+        id="new-request-id",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, CourseRunFactory.create())
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.accepted is False
+    assert result.request_id == "new-request-id"
+
+
+def test_get_unresolved_export_compliance_decline_ignored_during_manual_approval(
+    settings,
+):
+    """An unexpired manual approval resolves declines, even ones logged after the approved log."""
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    user = UserFactory.create()
+    approved_on = now_in_utc() - timedelta(days=1)
+    _approved_log(user, CourseRunFactory.create(), approved_on)
+    newer_decline = ExportComplianceLogFactory.create(user=user, decision=DECLINED)
+    ExportComplianceLog.objects.filter(pk=newer_decline.pk).update(
+        created_on=approved_on - timedelta(hours=1)
+    )
+
+    assert get_unresolved_export_compliance_decline(user) is None
+
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 0
+    assert get_unresolved_export_compliance_decline(user) == newer_decline

@@ -384,13 +384,42 @@ def log_export_compliance_check(
     )
 
 
+def get_active_manual_approval(user) -> ExportComplianceLog | None:
+    """
+    Return the user's newest manual approval if it hasn't expired yet.
+
+    A manual approval covers every course run and program, not just the one
+    the declined check was for, until EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS
+    after it was approved.
+    """
+    approval = (
+        ExportComplianceLog.objects.filter(
+            user=user,
+            decision=ExportComplianceDecision.MANUALLY_APPROVED,
+            approved_on__isnull=False,
+        )
+        .order_by("-approved_on")
+        .first()
+    )
+    if approval is None or approval.approval_expires_on <= now_in_utc():
+        return None
+    return approval
+
+
 def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
     """
-    Return the most recent export compliance log for a user that either
-    matches the given courseware object, was created within the last 24
-    hours (regardless of courseware object), or represents a prior failed
-    check for this user (regardless of age or courseware object), if any.
+    Return the export compliance log to reuse for a user and courseware object.
+
+    An unexpired manual approval wins, whatever it was for. Otherwise this is
+    the most recent log that either matches the given courseware object, was
+    created within the last 24 hours (regardless of courseware object), or
+    represents a prior failed check for this user (regardless of age or
+    courseware object), if any.
     """
+    approval = get_active_manual_approval(user)
+    if approval is not None:
+        return approval
+
     cutoff = now_in_utc() - RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW
     return (
         ExportComplianceLog.objects.filter(user=user)
@@ -410,11 +439,14 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
 def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None:
     """
     Return the user's most recent DECLINED export compliance log, unless an
-    accepted log was recorded after it.
+    accepted log was recorded after it or the user has an unexpired manual
+    approval.
 
     INVALID_REQUEST is a problem with the learner's profile data, not a
     screening result, so it doesn't count here.
     """
+    if get_active_manual_approval(user) is not None:
+        return None
     logs = ExportComplianceLog.objects.filter(user=user)
     decline = (
         logs.filter(decision=ExportComplianceDecision.DECLINED)
@@ -450,9 +482,9 @@ def decrypt_export_compliance_log(
 def verify_user_with_exports(user, run) -> ExportComplianceResult:
     """
     Verify a user against CyberSource export compliance services for a given
-    CourseRun or Program, reusing any cached result (accepted or failed)
-    for the same courseware object, from the last 24 hours, or representing
-    a prior failed check for this user.
+    CourseRun or Program, reusing an unexpired manual approval, or any cached
+    result (accepted or failed) for the same courseware object, from the last
+    24 hours, or representing a prior failed check for this user.
     """
     # Lets main.sentry identify the learner on an error event without the
     # email and username data_collection's user_info would attach. Set before

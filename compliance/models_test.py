@@ -1,5 +1,7 @@
 """Tests for compliance app models."""
 
+from datetime import UTC, datetime
+
 import pytest
 from django.core.exceptions import ValidationError
 from mitol.common.utils.datetime import now_in_utc
@@ -68,3 +70,18 @@ def test_courseware_object_resolves_program():
     program = ProgramFactory.create()
     log_entry = ExportComplianceLogFactory.create(courseware_object=program)
     assert log_entry.courseware_object == program
+
+
+def test_approval_expires_on(settings):
+    """Only a manually approved log has an expiry, set by the configured months"""
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    approved_on = datetime(2026, 1, 31, tzinfo=UTC)
+    approved = ExportComplianceLogFactory.build(
+        decision=ExportComplianceDecision.MANUALLY_APPROVED, approved_on=approved_on
+    )
+    declined = ExportComplianceLogFactory.build(
+        decision=ExportComplianceDecision.DECLINED, approved_on=approved_on
+    )
+
+    assert approved.approval_expires_on == datetime(2027, 1, 31, tzinfo=UTC)
+    assert declined.approval_expires_on is None

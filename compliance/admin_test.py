@@ -34,6 +34,11 @@ def test_mark_manually_approved_action(client, admin_user):
     assert log_entry.decision == ExportComplianceDecision.MANUALLY_APPROVED
     assert log_entry.approved_by == admin_user
     assert log_entry.approved_on is not None
+    expires_on = f"{log_entry.approval_expires_on:%Y-%m-%d}"
+    assert any(
+        expires_on in str(message) for message in get_messages(response.wsgi_request)
+    )
+    assert expires_on in response.content.decode()
 
 
 def test_mark_manually_approved_action_reports_validation_errors(

@@ -80,6 +80,7 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         "courseware_content_type",
         "courseware_object_id",
         "decision",
+        "approval_expires_on",
     )
     list_filter = (
         ExportComplianceDecisionFilter,
@@ -88,8 +89,13 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         ExportComplianceManuallyApprovedFilter,
     )
     search_fields = ("user__email", "user__username")
-    readonly_fields = get_field_names(ExportComplianceLog)
+    readonly_fields = [*get_field_names(ExportComplianceLog), "approval_expires_on"]
     change_actions = ["mark_manually_approved"]
+
+    @admin.display(description="Approval expires on")
+    def approval_expires_on(self, obj):
+        """Show when a manual approval stops covering new enrollments."""
+        return obj.approval_expires_on
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
@@ -116,4 +122,8 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
             )
             return
         obj.save()
-        self.message_user(request, f"Manually approved log {obj.id}.")
+        self.message_user(
+            request,
+            f"Manually approved log {obj.id}. The learner can enroll in any "
+            f"course run or program until {obj.approval_expires_on:%Y-%m-%d}.",
+        )

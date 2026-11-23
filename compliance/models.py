@@ -1,5 +1,9 @@
 """Compliance app models"""
 
+from datetime import datetime
+
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -71,6 +75,18 @@ class ExportComplianceLog(TimestampedModel):
         ExportComplianceDecision.COMPLETED,
         ExportComplianceDecision.MANUALLY_APPROVED,
     }
+
+    @property
+    def approval_expires_on(self) -> datetime | None:
+        """Return when this log's manual approval stops covering new enrollments."""
+        if (
+            self.decision != ExportComplianceDecision.MANUALLY_APPROVED
+            or self.approved_on is None
+        ):
+            return None
+        return self.approved_on + relativedelta(
+            months=settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS
+        )
 
     @property
     def accepted(self) -> bool:
