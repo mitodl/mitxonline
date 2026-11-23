@@ -29,8 +29,11 @@ from ecommerce.models import (
     RefundRequestStatus,
 )
 from ecommerce.serializers import (
+    BasketTaxFieldsMixin,
     DiscountShapeMixin,
     NestedBasketSerializer,
+    OrderTaxFieldsMixin,
+    TaxRecordSerializer,
     UserLocationFieldsMixin,
     discount_is_price_neutral,
 )
@@ -87,6 +90,7 @@ class TransactionLineSerializer(serializers.Serializer):
     end_date = serializers.DateTimeField()
     # These pricing fields get cast to str in to_representation.
     total_paid = serializers.CharField()
+    tax_paid = serializers.CharField()
     discount = serializers.CharField()
     price = serializers.CharField()
     has_free_audit = serializers.BooleanField()
@@ -117,6 +121,7 @@ class TransactionLineSerializer(serializers.Serializer):
         line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
+            tax_paid=str(instance.tax_amount),
             discount=str(discount),
             CEUs=None,
             content_title=content_title,
@@ -350,6 +355,7 @@ class RedeemedDiscountSerializer(serializers.ModelSerializer):
 
 class BasketItemWithProductSerializer(serializers.ModelSerializer):
     basket = NestedBasketSerializer(read_only=True)
+    taxes = TaxRecordSerializer(many=True, read_only=True)
     product = serializers.SerializerMethodField()
 
     def get_product(self, instance):
@@ -357,11 +363,13 @@ class BasketItemWithProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.BasketItem
-        fields = ["basket", "product", "id"]
+        fields = ["basket", "product", "id", "taxes"]
         depth = 1
 
 
-class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
+class BasketWithProductSerializer(
+    BasketTaxFieldsMixin, UserLocationFieldsMixin, serializers.ModelSerializer
+):
     """Serializer for Basket model with product details"""
 
     basket_items = serializers.SerializerMethodField()
@@ -403,7 +411,9 @@ class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSeri
         """
         return [
             BasketItemWithProductSerializer(instance=basket, context=self.context).data
-            for basket in instance.basket_items.select_related("product")
+            for basket in instance.basket_items.select_related(
+                "product"
+            ).prefetch_related("taxes")
         ]
 
     @extend_schema_field(Decimal)
@@ -458,6 +468,9 @@ class BasketWithProductSerializer(UserLocationFieldsMixin, serializers.ModelSeri
             "discounts",
             "location_country_code",
             "location_source",
+            "tax_amount",
+            "grand_total",
+            "taxes",
         ]
 
 
@@ -573,6 +586,8 @@ class LineSerializer(serializers.ModelSerializer):
     total_price = serializers.DecimalField(max_digits=9, decimal_places=2)
     id = serializers.IntegerField()
 
+    taxes = TaxRecordSerializer(many=True, read_only=True)
+
     class Meta:
         fields = [
             "quantity",
@@ -581,11 +596,14 @@ class LineSerializer(serializers.ModelSerializer):
             "total_price",
             "id",
             "product",
+            "taxes",
         ]
         model = models.Line
 
 
-class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
+class OrderSerializer(
+    OrderTaxFieldsMixin, UserLocationFieldsMixin, serializers.ModelSerializer
+):
     lines = serializers.SerializerMethodField()
     discounts = serializers.SerializerMethodField()
     refunds = serializers.SerializerMethodField()
@@ -776,6 +794,9 @@ class OrderSerializer(UserLocationFieldsMixin, serializers.ModelSerializer):
             "refund_reviewed_on",
             "location_country_code",
             "location_source",
+            "subtotal",
+            "tax_amount",
+            "taxes",
         ]
         model = models.Order
 
@@ -1178,7 +1199,7 @@ class TransactionOrderSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class OrderReceiptSerializer(serializers.ModelSerializer):
+class OrderReceiptSerializer(OrderTaxFieldsMixin, serializers.ModelSerializer):
     """
     Serializer for extracting receipt info from an Order object
     This hews pretty closely to the data format in xPro but modified a bit
@@ -1216,7 +1237,16 @@ class OrderReceiptSerializer(serializers.ModelSerializer):
         return TransactionPurchaserSerializer(instance).data
 
     class Meta:
-        fields = ["purchaser", "lines", "coupon", "order", "receipt"]
+        fields = [
+            "purchaser",
+            "lines",
+            "coupon",
+            "order",
+            "receipt",
+            "subtotal",
+            "tax_amount",
+            "taxes",
+        ]
         model = models.Order
 
 

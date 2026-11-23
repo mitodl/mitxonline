@@ -79,6 +79,7 @@ from ecommerce.api import (
     process_stripe_checkout_expired,
     process_stripe_refund_updated,
     quote_user_price,
+    recalculate_basket_tax,
     refund_order,
     unenroll_learner_from_order,
 )
@@ -86,6 +87,7 @@ from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
     BASKET_UPDATE_ADD_ITEM,
     BASKET_UPDATE_CLAIM,
+    DISCOUNT_TYPE_DOLLARS_OFF,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -147,6 +149,7 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    BasketItemTax,
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
@@ -169,6 +172,7 @@ from flexiblepricing.factories import (
     approve_flexible_price,
 )
 from location.constants import GEOLOCATION_TYPE_GEOIP
+from location.dataclasses import UserCalculatedLocation
 from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
@@ -3734,3 +3738,190 @@ def test_claim_anonymous_basket_runs_hooks(user, basket_hooks):
         assert kwargs["basket"].id == anon_basket.id
         assert kwargs["basket"].user_id == user.id
         assert kwargs["update"].operation == BASKET_UPDATE_CLAIM
+
+
+def _located_basket(user, country_code="IN"):
+    """Return a basket for the user, located in the given country."""
+
+    basket = BasketFactory.create(user=user)
+    basket.set_location(
+        [UserCalculatedLocation(country_code, GEOLOCATION_TYPE_GEOIP, "1.2.3.4")]
+    )
+    basket.save()
+    return basket
+
+
+def test_recalculate_basket_tax(user, taxed_locale):
+    """Each item is taxed on its price, at the located country's rate version."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(
+        basket=basket, product=ProductFactory.create(price=Decimal("100.00"))
+    )
+
+    recalculate_basket_tax(basket)
+
+    tax = item.taxes.get()
+    assert tax.tax_amount == Decimal("18.00")
+    assert tax.rate == Decimal(18)
+    assert tax.tax_rate_name == "VAT"
+    assert tax.taxable_amount == Decimal("100.00")
+    assert tax.tax_rate_version == taxed_locale.current_version
+    assert tax.calculated_on is not None
+
+
+def test_recalculate_basket_tax_untaxed(user, taxed_locale):
+    """A basket outside a taxed country has its old tax records removed."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(basket=basket)
+    recalculate_basket_tax(basket)
+    assert item.taxes.count() == 1
+
+    basket.set_location(
+        [UserCalculatedLocation("US", GEOLOCATION_TYPE_GEOIP, "1.2.3.4")]
+    )
+    basket.save()
+    recalculate_basket_tax(basket)
+
+    assert item.taxes.count() == 0
+
+
+def test_apply_discount_recalculates_tax(user, taxed_locale):
+    """Applying a discount taxes the item on its discounted price."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(
+        basket=basket, product=ProductFactory.create(price=Decimal("100.00"))
+    )
+    recalculate_basket_tax(basket)
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=Decimal(50)
+    )
+
+    apply_discount_to_basket(basket, discount)
+
+    tax = item.taxes.get()
+    assert tax.taxable_amount == Decimal("50.00")
+    assert tax.tax_amount == Decimal("9.00")
+
+
+def test_add_product_to_basket_taxes_item(user, taxed_locale):
+    """With the real hooks, adding an item locates the user and taxes the item."""
+
+    basket = BasketFactory.create(user=user)
+
+    item, _ = add_product_to_basket(
+        authed_request(user),
+        basket,
+        ProductFactory.create(price=Decimal("10.00")),
+    )
+
+    assert item.tax_amount == Decimal("1.80")
+
+
+@pytest.mark.parametrize("taxed", [True, False])
+def test_generate_checkout_payload_tax(mocker, settings, user, taxed_locale, taxed):
+    """Checkout sends each line's tax to the gateway, and the order total includes it."""
+
+    if not taxed:
+        settings.LOCATION_FORCE_COUNTRY = "US"
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    mock_start_payment = mocker.patch(
+        "ecommerce.api.PaymentGateway.start_payment",
+        return_value={"payload": mocker.MagicMock()},
+    )
+
+    generate_checkout_payload(
+        authed_request(user), gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
+
+    expected_tax = Decimal("18.00") if taxed else Decimal("0.00")
+    gateway_order = mock_start_payment.call_args.args[1]
+    assert [item.taxable for item in gateway_order.items] == [expected_tax]
+    assert [item.unitprice for item in gateway_order.items] == [Decimal("100.00")]
+
+    order = PendingOrder.objects.get(purchaser=user)
+    assert order.total_price_paid == Decimal("100.00") + expected_tax
+    assert order.lines.get().tax_amount == expected_tax
+    # Checkout re-locates the user, and the order records it.
+    assert order.location_country_code == ("IN" if taxed else "US")
+
+
+def test_basket_discount_changes_recalculate_tax(user, taxed_locale):
+    """Adding or removing a BasketDiscount directly re-taxes the basket."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(
+        basket=basket, product=ProductFactory.create(price=Decimal("100.00"))
+    )
+    recalculate_basket_tax(basket)
+    assert item.taxes.get().tax_amount == Decimal("18.00")
+
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=Decimal(50)
+    )
+    basket_discount = BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_discount=discount,
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+    )
+    assert item.taxes.get().tax_amount == Decimal("9.00")
+
+    basket_discount.delete()
+    assert item.taxes.get().tax_amount == Decimal("18.00")
+
+
+@pytest.mark.parametrize("delete_via", ["basket", "basket_queryset", "user"])
+def test_deleting_basket_with_discount(mocker, user, taxed_locale, delete_via):
+    """A cascade delete of a basket's discounts doesn't re-tax the basket."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_discount=UnlimitedUseDiscountFactory.create(),
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+    )
+    mock_recalc = mocker.patch("ecommerce.api.recalculate_basket_tax")
+
+    if delete_via == "basket":
+        basket.delete()
+    elif delete_via == "basket_queryset":
+        Basket.objects.filter(pk=basket.pk).delete()
+    else:
+        user.delete()
+
+    mock_recalc.assert_not_called()
+    assert not Basket.objects.filter(pk=basket.pk).exists()
+    assert not BasketItemTax.objects.filter(basket_item_id=item.id).exists()
+
+
+def test_deleting_basket_discounts_retaxes(mocker, user):
+    """Deleting the discount itself, singly or in bulk, re-taxes the basket."""
+
+    basket = BasketFactory.create(user=user)
+
+    def _add_discount():
+        return BasketDiscount.objects.create(
+            redeemed_basket=basket,
+            redeemed_discount=UnlimitedUseDiscountFactory.create(),
+            redeemed_by=user,
+            redemption_date=now_in_utc(),
+        )
+
+    _add_discount()
+    mock_recalc = mocker.patch("ecommerce.api.recalculate_basket_tax")
+
+    basket.discounts.get().delete()
+    assert mock_recalc.call_count == 1
+
+    _add_discount()
+    assert mock_recalc.call_count == 2
+    BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+    assert mock_recalc.call_count == 3

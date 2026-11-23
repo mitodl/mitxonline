@@ -24,12 +24,14 @@ from ecommerce.models import (
     Basket,
     BasketDiscount,
     BasketItem,
+    BasketItemTax,
     CanceledOrder,
     Discount,
     DiscountProduct,
     DiscountRedemption,
     FulfilledOrder,
     Line,
+    LineTax,
     Order,
     OrderFlow,
     OrderStatus,
@@ -635,6 +637,39 @@ class StripeEventTypeNamespaceFilter(admin.SimpleListFilter):
             queryset = queryset.filter(event_type__startswith=self.value())
 
         return queryset
+
+
+class TaxRecordAdmin(ReadOnlyModelAdmin):
+    """Read-only admin for tax records: they're written by the tax calculation."""
+
+    list_display = (
+        "id",
+        "tax_rate_name",
+        "rate",
+        "taxable_amount",
+        "tax_amount",
+        "calculated_on",
+    )
+    list_filter = ("tax_rate_name",)
+
+
+@admin.register(BasketItemTax)
+class BasketItemTaxAdmin(TaxRecordAdmin):
+    """Admin for BasketItemTax"""
+
+    model = BasketItemTax
+    list_display = ("basket_item", *TaxRecordAdmin.list_display)
+    raw_id_fields = ("basket_item", "tax_rate_version")
+
+
+@admin.register(LineTax)
+class LineTaxAdmin(TaxRecordAdmin):
+    """Admin for LineTax"""
+
+    model = LineTax
+    list_display = ("line", *TaxRecordAdmin.list_display)
+    search_fields = ("line__order__reference_number",)
+    raw_id_fields = ("line", "tax_rate_version")
 
 
 @admin.register(StripeEventLog)

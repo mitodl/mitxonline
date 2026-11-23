@@ -95,6 +95,7 @@ def build_expected_line(instance):
     return dict(  # noqa: C408
         quantity=instance.quantity,
         total_paid=str(total_paid),
+        tax_paid=str(instance.tax_amount),
         discount=str(discount),
         CEUs=None,
         content_title=content_title,

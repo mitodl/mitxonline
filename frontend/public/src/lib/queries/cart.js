@@ -15,6 +15,8 @@ export const discountedPriceSelector = pathOr(null, [
   "discountedPrice"
 ])
 export const discountSelector = pathOr(null, ["entities", "discounts"])
+export const taxesSelector = pathOr(null, ["entities", "taxes"])
+export const grandTotalSelector = pathOr(null, ["entities", "grandTotal"])
 export const cartQueryKey = "cartItems"
 export const orderHistoryQueryKey = "orderHistory"
 export const receiptQueryKey = "orderReceipt"
@@ -40,14 +42,18 @@ export const cartQuery = () => ({
       cartItems:       cartItems,
       totalPrice:      json.total_price,
       discountedPrice: json.discounted_price,
-      discounts:       discounts
+      discounts:       discounts,
+      taxes:           json.taxes || [],
+      grandTotal:      json.grand_total
     }
   },
   update: {
     cartItems:       nextState,
     totalPrice:      nextState,
     discountedPrice: nextState,
-    discounts:       nextState
+    discounts:       nextState,
+    taxes:           nextState,
+    grandTotal:      nextState
   },
   force: true
 })

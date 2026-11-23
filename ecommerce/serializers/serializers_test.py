@@ -10,6 +10,7 @@ from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory, ProgramRunFactory
 from courses.models import CourseRun, ProgramRun
+from ecommerce import serializers as ecommerce_serializers
 from ecommerce.constants import (
     CYBERSOURCE_CARD_TYPES,
     DISCOUNT_TYPE_DOLLARS_OFF,
@@ -20,13 +21,22 @@ from ecommerce.constants import (
 )
 from ecommerce.discounts import DiscountType
 from ecommerce.factories import (
+    BasketFactory,
     BasketItemFactory,
     OrderFactory,
     ProductFactory,
     ProgramProductFactory,
+    TransactionFactory,
     UnlimitedUseDiscountFactory,
 )
-from ecommerce.models import BasketDiscount, Line, Order, OrderStatus
+from ecommerce.models import (
+    BasketDiscount,
+    BasketItem,
+    Line,
+    Order,
+    OrderStatus,
+    PendingOrder,
+)
 from ecommerce.serializers import (
     BaseProductSerializer,
     BasketItemSerializer,
@@ -493,6 +503,7 @@ def test_order_receipt_lines_serializer(settings, mocker, user, products, user_c
         line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
+            tax_paid=str(instance.tax_amount),
             discount=str(discount),
             CEUs=None,
             content_title=content_title,
@@ -531,6 +542,7 @@ def test_program_order_receipt_lines_serializer(settings, mocker, user, user_cli
         line = dict(  # noqa: C408
             quantity=instance.quantity,
             total_paid=str(total_paid),
+            tax_paid=str(instance.tax_amount),
             discount=str(discount),
             CEUs=None,
             content_title=content_title,
@@ -600,3 +612,49 @@ def test_discount_serializer_runs_the_program_child_purchase_shape_rules():
 
     assert not serializer.is_valid()
     assert "store 0" in str(serializer.errors)
+
+
+@pytest.mark.skip_nplusone_check
+def test_order_serializers_include_tax(user, taxed_locale):
+    """The order, line, and receipt serializers return the tax charged."""
+
+    from ecommerce.api import recalculate_basket_tax  # noqa: PLC0415
+    from ecommerce.serializers import v0 as v0_serializers  # noqa: PLC0415
+    from location.constants import GEOLOCATION_TYPE_GEOIP  # noqa: PLC0415
+    from location.dataclasses import UserCalculatedLocation  # noqa: PLC0415
+
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    basket.set_location(
+        [UserCalculatedLocation("IN", GEOLOCATION_TYPE_GEOIP, "1.2.3.4")]
+    )
+    basket.save()
+    recalculate_basket_tax(basket)
+    order = PendingOrder.create_from_basket(basket)
+    # The receipt reads the payment transaction.
+    TransactionFactory.create(order=order, amount=order.total_price_paid)
+
+    expected_taxes = [
+        {"tax_rate_name": "VAT", "rate": "18.0000", "tax_amount": "18.00"}
+    ]
+    for module in (v0_serializers, ecommerce_serializers):
+        order_data = module.OrderSerializer(order).data
+        assert Decimal(order_data["subtotal"]) == Decimal("100.00")
+        assert Decimal(order_data["tax_amount"]) == Decimal("18.00")
+        assert Decimal(order_data["total_price_paid"]) == Decimal("118.00")
+        assert [dict(tax) for tax in order_data["taxes"]] == expected_taxes
+        # The order serializers' lines are receipt lines.
+        assert order_data["lines"][0]["tax_paid"] == "18.00"
+
+        # Order history uses LineSerializer.
+        line = module.LineSerializer(order.lines.get()).data
+        assert Decimal(line["taxes"][0]["tax_amount"]) == Decimal("18.00")
+        assert line["taxes"][0]["tax_rate_name"] == "VAT"
+
+        receipt = module.OrderReceiptSerializer(order).data
+        assert Decimal(receipt["subtotal"]) == Decimal("100.00")
+        assert Decimal(receipt["tax_amount"]) == Decimal("18.00")
+        assert [dict(tax) for tax in receipt["taxes"]] == expected_taxes
+        assert receipt["lines"][0]["tax_paid"] == "18.00"

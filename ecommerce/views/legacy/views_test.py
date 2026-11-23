@@ -2,6 +2,7 @@ import operator as op
 import random
 import uuid
 from datetime import datetime, timedelta
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -2309,3 +2310,26 @@ def test_checkout_result_cancel_redirects_to_cart(user, user_client):
     )
     order.refresh_from_db()
     assert order.state == OrderStatus.PENDING
+
+
+def test_redeem_discount_retaxes_cart(user, user_drf_client, taxed_locale):
+    """Redeeming a coupon on the cart page re-taxes the cart on the discounted price."""
+
+    product = ProductFactory.create(price=Decimal("100.00"))
+    resp = user_drf_client.post(
+        reverse("checkout_api-add_to_cart"), data={"product_id": product.id}
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_PERCENT_OFF, amount=Decimal(50)
+    )
+
+    resp = user_drf_client.post(
+        reverse("checkout_api-redeem_discount"), {"discount": discount.discount_code}
+    )
+    assert resp.json()["message"] == "Discount applied"
+
+    cart = user_drf_client.get(reverse("checkout_api-cart")).json()
+    assert Decimal(cart["discounted_price"]) == Decimal("50.00")
+    assert Decimal(cart["tax_amount"]) == Decimal("9.00")
+    assert Decimal(cart["grand_total"]) == Decimal("59.00")

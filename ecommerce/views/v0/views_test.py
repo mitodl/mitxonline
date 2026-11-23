@@ -1823,8 +1823,9 @@ def test_order_history_retrieve(user, user_drf_client):
 # serializer reads the run and its course, both of which that prefetch loads.
 QUERIES_PER_ADDITIONAL_ORDER = 0
 
-# What one request costs before any order is serialized.
-FIXED_QUERIES_PER_PAGE = 6
+# What one request costs before any order is serialized. (One of these is the
+# prefetch of the lines' tax records.)
+FIXED_QUERIES_PER_PAGE = 7
 
 
 def _create_order_with_line(user, product_factory=ProductFactory):
@@ -2620,3 +2621,25 @@ def test_update_basket_item_unchanged(user_drf_client, user):
     )
 
     assert resp.status_code == 200
+
+
+def test_basket_response_includes_tax(user, user_client, taxed_locale):
+    """The basket API returns the tax on each item and in total."""
+
+    product = ProductFactory.create(price=Decimal("100.00"))
+
+    resp = user_client.post(
+        reverse("v0:baskets_api-create_from_product", kwargs={"product_id": product.id})
+    )
+
+    data = resp.json()
+    assert Decimal(data["discounted_price"]) == Decimal("100.00")
+    assert Decimal(data["tax_amount"]) == Decimal("18.00")
+    assert Decimal(data["grand_total"]) == Decimal("118.00")
+    assert len(data["taxes"]) == 1
+    assert data["taxes"][0]["tax_rate_name"] == "VAT"
+    assert Decimal(data["taxes"][0]["rate"]) == Decimal(18)
+    assert Decimal(data["taxes"][0]["tax_amount"]) == Decimal("18.00")
+    [item] = data["basket_items"]
+    assert Decimal(item["taxes"][0]["tax_amount"]) == Decimal("18.00")
+    assert item["taxes"][0]["tax_rate_name"] == "VAT"

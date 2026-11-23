@@ -1,6 +1,7 @@
 """Tests for tax calculation."""
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 import reversion
@@ -15,9 +16,23 @@ from ecommerce.models import Product, TaxRate
 from ecommerce.tax import (
     calculate_tax,
     calculate_tax_for_product,
+    calculate_tax_from_version,
     get_product,
     get_tax_rate_for_locale,
+    get_tax_rate_for_locations,
+    summarize_taxes,
 )
+from location.constants import (
+    GEOLOCATION_TYPE_GEOIP,
+    GEOLOCATION_TYPE_PROFILE,
+    LOCATION_FLAG_RULE_MATCH_ANY,
+    LOCATION_FLAG_RULE_MATCH_GEOIP_ANY,
+    LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL,
+    LOCATION_FLAG_TYPE_BLOCKED,
+    LOCATION_FLAG_TYPE_TAX,
+)
+from location.dataclasses import UserCalculatedLocation
+from location.factories import LocationFlagFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -278,3 +293,117 @@ def test_calculate_tax_for_product():
 
     assert result.tax_amount == Decimal("18.00")
     assert result.total == Decimal("118.00")
+
+
+def test_calculate_tax_uses_version_snapshot():
+    """Tax worked out from a version uses that version's rate, not the live row's."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    old_version = tax_rate.current_version
+
+    tax_rate.tax_rate = Decimal(20)
+    tax_rate.tax_rate_name = "GST"
+    tax_rate.save()
+
+    result = calculate_tax_from_version(Decimal("100.00"), old_version)
+
+    assert result.tax_rate_version == old_version
+    assert result.rate == Decimal(18)
+    assert result.tax_amount == Decimal("18.00")
+    assert result.tax_rate_name == old_version.field_dict["tax_rate_name"]
+    assert result.is_taxed is True
+
+    current = calculate_tax(Decimal("100.00"), tax_rate)
+    assert current.tax_rate_version == tax_rate.current_version
+    assert current.rate == Decimal(20)
+    assert current.tax_rate_name == "GST"
+
+
+def test_calculate_tax_from_version_none():
+    """No version means no tax."""
+
+    result = calculate_tax_from_version(Decimal("10.00"), None)
+
+    assert result.is_taxed is False
+    assert result.tax_amount == 0
+    assert result.total == Decimal("10.00")
+
+
+def _locations(profile=None, geoip=None):
+    """Build a list of user locations."""
+
+    locations = []
+    if profile:
+        locations.append(UserCalculatedLocation(profile, GEOLOCATION_TYPE_PROFILE, ""))
+    if geoip:
+        locations.append(
+            UserCalculatedLocation(geoip, GEOLOCATION_TYPE_GEOIP, "1.2.3.4")
+        )
+    return locations
+
+
+@pytest.mark.parametrize(
+    ("rule", "profile", "geoip", "taxed"),
+    [
+        (LOCATION_FLAG_RULE_MATCH_ANY, "IN", None, True),
+        (LOCATION_FLAG_RULE_MATCH_ANY, "US", "IN", True),
+        (LOCATION_FLAG_RULE_MATCH_ANY, "US", "GB", False),
+        (LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL, "US", "IN", False),
+        (LOCATION_FLAG_RULE_MATCH_PROFILE_GEOIP_ALL, "IN", "IN", True),
+        (LOCATION_FLAG_RULE_MATCH_GEOIP_ANY, "IN", None, False),
+    ],
+)
+def test_get_tax_rate_for_locations(rule, profile, geoip, taxed):
+    """A user is taxed when a tax flag's rule matches their locations and a rate exists."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN")
+    LocationFlagFactory.create(
+        flag_type=LOCATION_FLAG_TYPE_TAX, determination_rule=rule, country_code="IN"
+    )
+
+    result = get_tax_rate_for_locations(_locations(profile, geoip))
+
+    assert result == (tax_rate if taxed else None)
+
+
+def test_get_tax_rate_for_locations_needs_flag_and_rate():
+    """Without a tax flag, or without a rate, the user isn't taxed."""
+
+    locations = _locations("IN", "IN")
+
+    TaxRateFactory.create(country_code="IN")
+    LocationFlagFactory.create(
+        flag_type=LOCATION_FLAG_TYPE_BLOCKED,
+        determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
+        country_code="IN",
+    )
+    assert get_tax_rate_for_locations(locations) is None
+
+    LocationFlagFactory.create(
+        flag_type=LOCATION_FLAG_TYPE_TAX,
+        determination_rule=LOCATION_FLAG_RULE_MATCH_ANY,
+        country_code="GB",
+    )
+    assert get_tax_rate_for_locations(_locations("GB")) is None
+    assert get_tax_rate_for_locations([]) is None
+
+
+def test_summarize_taxes():
+    """Records for the same tax are totalled together."""
+
+    records = [
+        SimpleNamespace(
+            tax_rate_name="VAT", rate=Decimal(18), tax_amount=Decimal("1.80")
+        ),
+        SimpleNamespace(
+            tax_rate_name="VAT", rate=Decimal(18), tax_amount=Decimal("3.60")
+        ),
+        SimpleNamespace(
+            tax_rate_name="City", rate=Decimal(2), tax_amount=Decimal("0.20")
+        ),
+    ]
+
+    assert summarize_taxes(records) == [
+        {"tax_rate_name": "VAT", "rate": Decimal(18), "tax_amount": Decimal("5.40")},
+        {"tax_rate_name": "City", "rate": Decimal(2), "tax_amount": Decimal("0.20")},
+    ]

@@ -41,6 +41,11 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
     }
 
     const orderDate = parseDateString(orderReceipt.created_on)
+    const showTax = orderReceipt.lines.some(line => Number(line.tax_paid) > 0)
+    const taxNames =
+      orderReceipt.taxes && orderReceipt.taxes.length > 0 ?
+        orderReceipt.taxes.map(tax => tax.tax_rate_name).join(", ") :
+        "Tax"
     return (
       <div className="receipt-wrapper">
         <div className="receipt-row p-b-80">
@@ -175,6 +180,7 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                 <th>Quantity</th>
                 <th>Unit Price</th>
                 {discountAmountText !== null ? <th>Discount</th> : null}
+                {showTax ? <th>{taxNames}</th> : null}
                 <th>Total Paid</th>
               </tr>
             </thead>
@@ -203,8 +209,20 @@ export class ReceiptPageDetailCard extends React.Component<Props> {
                         <div>{discountAmountText}</div>
                       </td>
                     ) : null}
+                    {showTax ? (
+                      <td>
+                        <div>${line.tax_paid}</div>
+                      </td>
+                    ) : null}
                     <td>
-                      <div>${line.total_paid}</div>
+                      <div>
+                        $
+                        {showTax ?
+                          (
+                            Number(line.total_paid) + Number(line.tax_paid)
+                          ).toFixed(2) :
+                          line.total_paid}
+                      </div>
                     </td>
                   </tr>
                 )

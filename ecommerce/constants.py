@@ -266,9 +266,13 @@ STRIPE_OVERALL_CHECKOUT_STATUS_ERROR = "error"
 
 # Basket update operations, passed to the basket_pre_update and
 # basket_post_update hooks.
+# "checkout" changes nothing; it's run just before an order is made from the
+# basket, so the hooks can bring the basket up to date (location, tax).
 BASKET_UPDATE_ADD_ITEM = "add_item"
+BASKET_UPDATE_CHECKOUT = "checkout"
 BASKET_UPDATE_CLAIM = "claim"
 BASKET_UPDATE_OPERATIONS = [
     BASKET_UPDATE_ADD_ITEM,
+    BASKET_UPDATE_CHECKOUT,
     BASKET_UPDATE_CLAIM,
 ]

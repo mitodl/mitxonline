@@ -4728,13 +4728,31 @@ components:
           allOf:
           - $ref: '#/components/schemas/LocationSourceEnum'
           readOnly: true
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        grand_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxLine'
+          readOnly: true
       required:
       - basket_items
       - discounted_price
       - discounts
+      - grand_total
       - id
       - location_country_code
       - location_source
+      - tax_amount
+      - taxes
       - total_price
     BlankEnum:
       enum:
@@ -6503,11 +6521,17 @@ components:
           allOf:
           - $ref: '#/components/schemas/LineProduct'
           readOnly: true
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxRecord'
+          readOnly: true
       required:
       - id
       - item_description
       - product
       - quantity
+      - taxes
       - total_price
       - unit_price
     LineProduct:
@@ -7149,6 +7173,21 @@ components:
           allOf:
           - $ref: '#/components/schemas/LocationSourceEnum'
           readOnly: true
+        subtotal:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        taxes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaxLine'
+          readOnly: true
       required:
       - created_on
       - discounts
@@ -7165,6 +7204,9 @@ components:
       - refunds
       - state
       - street_address
+      - subtotal
+      - tax_amount
+      - taxes
       - total_price_paid
       - transactions
     OrderHistory:
@@ -9031,6 +9073,59 @@ components:
       - variant_industry_label
       - variant_length
       - variant_length_label
+    TaxLine:
+      type: object
+      description: One tax charged, with its total.
+      properties:
+        tax_rate_name:
+          type: string
+          readOnly: true
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,4})?$
+          readOnly: true
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - rate
+      - tax_amount
+      - tax_rate_name
+    TaxRecord:
+      type: object
+      description: A tax charged on one basket item or order line.
+      properties:
+        tax_rate_name:
+          type: string
+          readOnly: true
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,4})?$
+          readOnly: true
+        tax_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        taxable_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          readOnly: true
+        calculated_on:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - calculated_on
+      - rate
+      - tax_amount
+      - tax_rate_name
+      - taxable_amount
     TransactionLine:
       type: object
       description: Serializes a line item from a transaction.
@@ -9053,6 +9148,8 @@ components:
           format: date-time
         total_paid:
           type: string
+        tax_paid:
+          type: string
         discount:
           type: string
         price:
@@ -9070,6 +9167,7 @@ components:
       - quantity
       - readable_id
       - start_date
+      - tax_paid
       - total_paid
     User:
       type: object

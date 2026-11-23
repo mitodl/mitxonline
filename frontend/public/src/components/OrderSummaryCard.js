@@ -5,13 +5,15 @@ import { Formik, FormikProps } from "formik"
 import { Button, Badge } from "reactstrap"
 import { formatLocalePrice } from "../lib/util"
 import ApplyCouponForm from "./forms/ApplyCouponForm"
-import type { Discount, Refund } from "../flow/cartTypes"
+import type { Discount, Refund, Tax } from "../flow/cartTypes"
 
 type Props = {
   totalPrice: number,
   orderFulfilled: boolean,
   discountedPrice: number,
   discounts: Array<Discount>,
+  taxes?: Array<Tax>,
+  grandTotal?: number | string,
   refunds: Array<Refund>,
   addDiscount?: Function,
   discountCode: string,
@@ -86,6 +88,28 @@ export class OrderSummaryCard extends React.Component<Props, State> {
         </div>
       </div>
     )
+  }
+
+  renderTaxes() {
+    const { taxes } = this.props
+
+    if (!taxes || taxes.length === 0) {
+      return null
+    }
+
+    return taxes.map(tax => (
+      <div
+        className="d-flex justify-content-between order-summary-tax"
+        key={`${tax.tax_rate_name}-${tax.rate}`}
+      >
+        <div className="flex-grow-1">
+          {tax.tax_rate_name} ({Number(tax.rate)}%)
+        </div>
+        <div className="ml-auto">
+          {formatLocalePrice(Number(tax.tax_amount))}
+        </div>
+      </div>
+    ))
   }
 
   renderAppliedCoupons() {
@@ -189,6 +213,8 @@ export class OrderSummaryCard extends React.Component<Props, State> {
       discountedPrice,
       totalPrice,
       discounts,
+      taxes,
+      grandTotal,
       addDiscount,
       discountCode,
       cardTitle,
@@ -198,6 +224,14 @@ export class OrderSummaryCard extends React.Component<Props, State> {
 
     const fmtPrice = formatLocalePrice(totalPrice)
     const fmtDiscountPrice = formatLocalePrice(discountedPrice)
+    // With tax, the total is the price after discounts plus tax.
+    const fmtTotal =
+      taxes &&
+      taxes.length > 0 &&
+      grandTotal !== undefined &&
+      grandTotal !== null ?
+        formatLocalePrice(Number(grandTotal)) :
+        fmtDiscountPrice || fmtPrice
     const title = cardTitle ? cardTitle : "Order Summary"
 
     // Only show discount code in field if there's no discount already applied
@@ -216,6 +250,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
             </div>
 
             {this.renderAppliedCoupons()}
+            {this.renderTaxes()}
             {refunds === null || refunds.length === 0 ?
               this.renderFulfilledTag() :
               this.renderRefunds()}
@@ -226,7 +261,7 @@ export class OrderSummaryCard extends React.Component<Props, State> {
               <h5>Total</h5>
             </div>
             <div className="ml-auto">
-              <h5>{fmtDiscountPrice || fmtPrice}</h5>
+              <h5>{fmtTotal}</h5>
             </div>
           </div>
 

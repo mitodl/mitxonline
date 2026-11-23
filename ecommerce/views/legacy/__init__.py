@@ -1317,6 +1317,8 @@ class OrderHistoryViewSet(ReadOnlyModelViewSet):
         return (
             Order.objects.filter(purchaser=self.request.user)
             .filter(state__in=[OrderStatus.FULFILLED, OrderStatus.REFUNDED])
+            # Read by LineSerializer's tax fields.
+            .prefetch_related("lines__taxes")
             .order_by("-created_on")
             .all()
         )
