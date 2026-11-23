@@ -3848,3 +3848,45 @@ def test_generate_checkout_payload_tax(mocker, settings, user, taxed_locale, tax
     assert order.lines.get().tax_amount == expected_tax
     # Checkout re-locates the user, and the order records it.
     assert order.location_country_code == ("IN" if taxed else "US")
+
+
+def test_basket_discount_changes_recalculate_tax(user, taxed_locale):
+    """Adding or removing a BasketDiscount directly re-taxes the basket."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(
+        basket=basket, product=ProductFactory.create(price=Decimal("100.00"))
+    )
+    recalculate_basket_tax(basket)
+    assert item.taxes.get().tax_amount == Decimal("18.00")
+
+    discount = UnlimitedUseDiscountFactory.create(
+        discount_type=DISCOUNT_TYPE_DOLLARS_OFF, amount=Decimal(50)
+    )
+    basket_discount = BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_discount=discount,
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+    )
+    assert item.taxes.get().tax_amount == Decimal("9.00")
+
+    basket_discount.delete()
+    assert item.taxes.get().tax_amount == Decimal("18.00")
+
+
+def test_deleting_basket_with_discount(user, taxed_locale):
+    """Deleting a basket, and with it its discounts, doesn't fail on the tax signal."""
+
+    basket = _located_basket(user)
+    BasketItemFactory.create(basket=basket)
+    BasketDiscount.objects.create(
+        redeemed_basket=basket,
+        redeemed_discount=UnlimitedUseDiscountFactory.create(),
+        redeemed_by=user,
+        redemption_date=now_in_utc(),
+    )
+
+    basket.delete()
+
+    assert not Basket.objects.filter(pk=basket.pk).exists()

@@ -727,8 +727,9 @@ def recalculate_basket_tax(basket: Basket):
 
     Whether the user is taxed, and at what rate, comes from the location
     recorded on the basket (see the BasketLocation hook) and the "tax"
-    LocationFlags. Each item is taxed on its discounted price, so call this
-    again whenever the basket's contents or discounts change.
+    LocationFlags. Each item is taxed on its discounted price, so this runs
+    again whenever the basket changes: the BasketTax hook covers item changes
+    and checkout, and a BasketDiscount signal covers discount changes.
 
     Args:
     - basket (Basket): the basket to tax
@@ -744,6 +745,8 @@ def recalculate_basket_tax(basket: Basket):
             return
 
         for item in basket.basket_items.select_related("product"):
+            # The item's discounted price reads its basket; reuse this one.
+            item.basket = basket
             calculated = calculate_tax_from_version(
                 item.discounted_price, version, tax_rate=tax_rate
             )
@@ -2031,9 +2034,6 @@ def apply_discount_to_basket(basket: Basket, discount: Discount, *, allow_finaid
             defaults=defaults,
             create_defaults=defaults,
         )
-
-        # The tax is charged on the discounted price, so it changes too.
-        recalculate_basket_tax(basket)
 
 
 def create_verified_program_discount(program):
