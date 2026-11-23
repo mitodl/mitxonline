@@ -2579,3 +2579,44 @@ def test_add_basket_item_keeps_existing_quantity(user_drf_client, user):
     item.refresh_from_db()
     assert item.quantity == 3
     assert basket.basket_items.count() == 1
+
+
+@pytest.mark.parametrize("method", ["put", "patch"])
+@pytest.mark.parametrize("field", ["basket", "product"])
+def test_update_basket_item_cant_move_it(user_drf_client, user, method, field):
+    """An item can't be moved to another basket, or given another product."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket)
+    other_basket = BasketFactory.create()
+    changes = {
+        "basket": {"basket": other_basket.id, "product": item.product.id},
+        "product": {"basket": basket.id, "product": ProductFactory.create().id},
+    }[field]
+
+    resp = getattr(user_drf_client, method)(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, item.id]),
+        data=changes,
+        format="json",
+    )
+
+    assert resp.status_code == 400
+    assert field in resp.json()["errors"]
+    item.refresh_from_db()
+    assert item.basket == basket
+    assert other_basket.basket_items.count() == 0
+
+
+def test_update_basket_item_unchanged(user_drf_client, user):
+    """An update that changes nothing still succeeds."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket)
+
+    resp = user_drf_client.put(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, item.id]),
+        data={"basket": basket.id, "product": item.product.id},
+        format="json",
+    )
+
+    assert resp.status_code == 200

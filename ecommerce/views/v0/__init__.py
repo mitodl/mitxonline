@@ -27,7 +27,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.exceptions import NotFound, ParseError, ValidationError
 from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -156,6 +156,26 @@ class BasketItemViewSet(ModelViewSet):
             self.request, basket, serializer.validated_data["product"]
         )
         serializer.instance = item
+
+    def perform_update(self, serializer):
+        """
+        Refuse to move an item to another basket or change its product.
+
+        Those are the only fields an update could change, and either would
+        change a basket's contents without the basket API (and so without its
+        ownership check and hooks). Add a new item instead.
+        """
+
+        item = serializer.instance
+        for field in ("basket", "product"):
+            if field in serializer.validated_data and serializer.validated_data[
+                field
+            ] != getattr(item, field):
+                raise ValidationError(
+                    {field: "A basket item's basket and product can't be changed."}
+                )
+
+        serializer.save()
 
 
 @extend_schema_view(
