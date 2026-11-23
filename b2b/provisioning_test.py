@@ -1508,6 +1508,33 @@ def test_update_organization_refuses_a_prefix_change_after_a_contract_run(
     connection.organizations.update.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("courseware_id", "locked"),
+    [
+        ("course-v1:OLD_EXAMPLEU+CS101+1T1C2026", True),
+        ("course-v1:OTHER_EXAMPLEU+CS101+1T1C2026", False),
+        ("course-v1:OLD_EXAMPLEUX+CS101+1T1C2026", False),
+    ],
+)
+def test_contract_runs_exist_counts_an_unlinked_run_built_from_the_prefix(
+    courseware_id, locked
+):
+    """
+    Removing every run from a contract unlinks them, but their IDs remain.
+
+    Only a run whose ID starts with this prefix and key counts, so another
+    prefix or a longer key sharing the same start does not lock it.
+    """
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", org_key_prefix="OLD_"
+    )
+    ContractPageFactory.create(organization=organization)
+    CourseRunFactory.create(courseware_id=courseware_id)
+
+    assert organization.contract_runs_exist() is locked
+
+
 def test_update_organization_accepts_the_current_prefix_after_a_contract_run(
     connection,
 ):

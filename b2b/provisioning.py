@@ -751,8 +751,8 @@ def update_organization(  # noqa: PLR0913
             if organization.contract_runs_exist():
                 msg = (
                     f"The courseware ID prefix of '{organization.org_key}' can't "
-                    "change: its contracts already have course runs, and runs "
-                    "created for them carry the current prefix."
+                    "change: course runs have already been created for its "
+                    "contracts, and their IDs carry the current prefix."
                 )
                 raise OrganizationKeyInUseError(msg)
             organization.org_key_prefix = org_key_prefix

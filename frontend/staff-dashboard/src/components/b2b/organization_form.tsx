@@ -42,10 +42,10 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
             rules={[{ max: 30 }, ORG_KEY_RULE]}
             extra={
                 prefixLocked
-                    ? "This organization's contracts already have course runs, and runs created for them carry this prefix, so it can no longer change."
+                    ? "Course runs have already been created for this organization's contracts, and their IDs carry this prefix, so it can no longer change."
                     : creating
                       ? PREFIX_HELP
-                      : `${PREFIX_HELP} It can be corrected until the organization's contracts have course runs.`
+                      : `${PREFIX_HELP} It can be corrected until course runs are created for the organization's contracts.`
             }
         >
             <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear disabled={prefixLocked} />

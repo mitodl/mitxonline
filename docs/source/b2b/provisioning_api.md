@@ -141,8 +141,11 @@ change either.
 `org_key_prefix`. `domains` replaces the whole list. `org_key_prefix` only
 lives in MITx Online, so it can be corrected until the organization has a
 contract run. Once a run exists its courseware ID carries the prefix, and a
-`PATCH` that changes it gets a 409. Every organization in a response has
-`contract_runs_exist`, which says whether the prefix is locked.
+`PATCH` that changes it gets a 409. A run counts while it is linked to one of
+the organization's contracts, and afterwards too if its ID starts with
+`course-v1:{org_key_prefix}{org_key}+`, so removing every run from a contract
+doesn't unlock a prefix that is already in use. Every organization in a
+response has `contract_runs_exist`, which says whether the prefix is locked.
 
 Domains are written to Keycloak as verified, with no verification step. That's
 acceptable while MIT staff are the ones asserting domains. It won't be once C2

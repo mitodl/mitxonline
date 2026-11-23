@@ -312,20 +312,34 @@ def test_patch_refuses_a_prefix_change_after_a_contract_run(admin_drf_client):
     assert organization.org_key_prefix == "OLD_"
 
 
-@pytest.mark.parametrize("has_run", [True, False])
-def test_organizations_report_whether_contract_runs_exist(admin_drf_client, has_run):
-    """The list and the detail both say whether the prefix is locked."""
+@pytest.mark.parametrize(
+    ("run", "locked"),
+    [("linked", True), ("unlinked_with_prefix", True), (None, False)],
+)
+def test_organizations_report_whether_contract_runs_exist(
+    admin_drf_client, run, locked
+):
+    """
+    The list and the detail both say whether the prefix is locked.
 
-    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    A run unlinked from the contract still counts when its ID carries the
+    prefix, which the annotation builds from the row's own columns.
+    """
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", org_key_prefix="UAI_"
+    )
     contract = ContractPageFactory.create(organization=organization)
-    if has_run:
+    if run == "linked":
         CourseRunFactory.create().b2b_contracts.add(contract)
+    elif run == "unlinked_with_prefix":
+        CourseRunFactory.create(courseware_id="course-v1:UAI_EXAMPLEU+CS101+1T1C2026")
 
     detail = admin_drf_client.get(_organization_url(organization.org_key)).json()
     (listed,) = admin_drf_client.get(_organizations_url()).json()["results"]
 
-    assert detail["contract_runs_exist"] is has_run
-    assert listed["contract_runs_exist"] is has_run
+    assert detail["contract_runs_exist"] is locked
+    assert listed["contract_runs_exist"] is locked
 
 
 def test_patch_updates_the_mutable_fields(admin_drf_client, mocker):

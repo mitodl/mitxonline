@@ -10,6 +10,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
+from django.db.models import Q, Value
+from django.db.models.functions import Concat
 from django.http import Http404
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -307,16 +309,45 @@ class OrganizationPage(Page):
             data_after={"sso_organization_id": str(after) if after else None},
         )
 
-    def contract_runs_exist(self):
+    @staticmethod
+    def contract_runs(organization, org_key_prefix, org_key):
         """
-        Whether any course run is linked to one of this organization's contracts.
+        Course runs that lock an organization's courseware ID prefix.
 
-        Until one is, nothing has been built from the courseware ID prefix.
+        A run counts if it is linked to one of the organization's contracts, or
+        if its courseware ID starts with the prefix and key, which catches runs
+        unlinked from a contract after they were built. The arguments are
+        expressions so the same filter works for one organization and inside
+        an annotation (OuterRef).
+
+        Args:
+        - organization (int | Expression): the organization's primary key
+        - org_key_prefix (Expression): its courseware ID prefix
+        - org_key (Expression): its org key
+        Returns:
+        - QuerySet[CourseRun]: the runs, source runs included
         """
 
+        id_start = Concat(
+            Value("course-v1:"),
+            org_key_prefix,
+            org_key,
+            Value("+"),
+            output_field=models.CharField(),
+        )
         # all_objects: CourseRun.objects hides source runs, which can be
         # attached to a contract as they are.
-        return CourseRun.all_objects.filter(b2b_contracts__organization=self).exists()
+        return CourseRun.all_objects.filter(
+            Q(b2b_contracts__organization=organization)
+            | Q(courseware_id__startswith=id_start)
+        )
+
+    def contract_runs_exist(self):
+        """Whether a course run locks this organization's courseware ID prefix."""
+
+        return self.contract_runs(
+            self.pk, Value(self.org_key_prefix), Value(self.org_key)
+        ).exists()
 
     def get_learners(self):
         """Get the learners associated with this organization."""

@@ -209,7 +209,9 @@ class OrganizationProvisioningViewSet(
         .prefetch_related("identity_providers")
         .annotate(
             annotated_contract_runs_exist=Exists(
-                CourseRun.all_objects.filter(b2b_contracts__organization=OuterRef("pk"))
+                OrganizationPage.contract_runs(
+                    OuterRef("pk"), OuterRef("org_key_prefix"), OuterRef("org_key")
+                )
             )
         )
         .order_by("name")
