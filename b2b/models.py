@@ -522,11 +522,9 @@ class ContractProgramItem(Orderable):
         if is_new and not skip_run_creation:
             from b2b.tasks import create_program_contract_runs  # noqa: PLC0415
 
-            create_program_contract_runs.delay(
-                self.contract.id,
-                self.program.id,
-                org_prefix=self.contract.organization.org_key_prefix,
-            )
+            # No org_prefix: the task reads the organization's prefix when it
+            # runs, so a prefix corrected while it is queued is the one used.
+            create_program_contract_runs.delay(self.contract.id, self.program.id)
             log.info(
                 "Queued contract run creation for program %s in contract %s",
                 self.program.id,

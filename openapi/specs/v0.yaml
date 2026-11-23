@@ -1025,6 +1025,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProvisioningDetail'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
         '502':
           content:
             application/json:

@@ -303,6 +303,7 @@ class OrganizationProvisioningViewSet(
         responses={
             200: ProvisionedOrganizationSerializer,
             400: DetailSerializer,
+            409: DetailSerializer,
             502: DetailSerializer,
         },
     )

@@ -42,7 +42,7 @@ export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, 
             rules={[{ max: 30 }, ORG_KEY_RULE]}
             extra={
                 prefixLocked
-                    ? "This organization's contracts already have course runs whose IDs use this prefix, so it can no longer change."
+                    ? "This organization's contracts already have course runs, and runs created for them carry this prefix, so it can no longer change."
                     : creating
                       ? PREFIX_HELP
                       : `${PREFIX_HELP} It can be corrected until the organization's contracts have course runs.`
