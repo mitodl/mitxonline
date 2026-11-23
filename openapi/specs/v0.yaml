@@ -1067,6 +1067,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedOrganizationProvisioningAuditList'
           description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/logo/:
+    put:
+      operationId: b2b_provisioning_organizations_logo_update
+      description: |-
+        Replace the organization's logo.
+
+        The logo is stored only in MITx Online, so this works for an
+        organization with no Keycloak record, and the response does not read
+        domains or redirect_url from Keycloak (they are null, as in the list).
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationLogoRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+    delete:
+      operationId: b2b_provisioning_organizations_logo_destroy
+      description: Remove the organization's logo.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/:
     post:
       operationId: b2b_provisioning_organizations_onboarding_create
@@ -7385,6 +7435,15 @@ components:
       - protocol
       - service_provider
       - updated_on
+    OrganizationLogoRequest:
+      type: object
+      description: Request body for replacing an organization's logo.
+      properties:
+        logo:
+          type: string
+          format: binary
+      required:
+      - logo
     OrganizationManagerCheck:
       type: object
       description: Response shape for the org-manager check.
@@ -8491,6 +8550,13 @@ components:
           type: string
           readOnly: true
           description: Any useful extra information about the organization
+        logo:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+          description: The organization's logo. Will be displayed in the app in various
+            places.
         slug:
           type: string
           readOnly: true
@@ -8530,6 +8596,7 @@ components:
       - domains
       - id
       - identity_providers
+      - logo
       - name
       - onboarding
       - org_key

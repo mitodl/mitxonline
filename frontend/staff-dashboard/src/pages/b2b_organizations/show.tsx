@@ -5,6 +5,7 @@ import { Card, Col, Descriptions, Row, Space, Tag, Typography } from "antd";
 
 import { Contracts } from "components/b2b/contracts";
 import { IdentityProviders } from "components/b2b/identity_providers";
+import { LogoCard } from "components/b2b/logo_card";
 import { OnboardingCard } from "components/b2b/onboarding_card";
 import { ProvisioningEvents } from "components/b2b/provisioning_events";
 import { IProvisionedOrganization } from "interfaces";
@@ -61,7 +62,10 @@ export const OrganizationShow: React.FC = () => {
                         </Card>
                     </Col>
                     <Col xs={24} lg={10}>
-                        <OnboardingCard organization={organization} />
+                        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+                            <OnboardingCard organization={organization} />
+                            <LogoCard organization={organization} />
+                        </Space>
                     </Col>
                     <Col span={24}>
                         {organization.sso_organization_id ? (

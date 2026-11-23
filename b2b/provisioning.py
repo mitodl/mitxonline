@@ -727,6 +727,43 @@ def update_organization(  # noqa: PLR0913
     return organization
 
 
+def set_organization_logo(organization, logo, *, actor=None):
+    """
+    Replace or clear an organization's logo.
+
+    The logo exists only in MITx Online, so unlike update_organization this
+    needs no Keycloak record. The replaced file stays in storage: Wagtail
+    revisions saved before this change still name it.
+
+    Args:
+    - organization (OrganizationPage): the organization
+    - logo (UploadedFile | None): the new logo, or None to clear it
+    - actor (User): who asked for this, for the audit trail
+    Returns:
+    - OrganizationPage: the updated organization
+    """
+
+    with transaction.atomic():
+        organization = _locked(organization)
+        before = organization.logo.name or None
+
+        if logo is None and before is None:
+            return organization
+
+        organization.logo = logo
+        organization.save()
+
+        _audit(
+            organization,
+            PROVISIONING_ACTION_ORG_UPDATED,
+            actor=actor,
+            data_before={"logo": before},
+            data_after={"logo": organization.logo.name or None},
+        )
+
+    return organization
+
+
 def set_onboarding_state(organization, state, *, notes=None, actor=None):
     """
     Record where an organization is in the onboarding sequence.

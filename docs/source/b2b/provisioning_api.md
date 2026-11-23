@@ -55,6 +55,8 @@ GET    /api/v0/b2b/provisioning/organizations/
 POST   /api/v0/b2b/provisioning/organizations/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/
+PUT    /api/v0/b2b/provisioning/organizations/{org_key}/logo/
+DELETE /api/v0/b2b/provisioning/organizations/{org_key}/logo/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/events/
 ```
@@ -98,6 +100,20 @@ configured. The list response doesn't make a Keycloak call per row, so those
 two fields are null there. The list filters on `q` (name or org key) and
 `onboarding_state`.
 
+### Logo
+
+`PUT .../logo/` takes a multipart body with one `logo` file, which must be an
+image Pillow can open (the same check the Wagtail form made). `DELETE
+.../logo/` clears it. Both return the organization with `logo` as a URL (or
+null), and both are audited.
+
+The logo is stored only in MITx Online, so these routes work for an
+organization with no Keycloak record and don't call Keycloak; `domains` and
+`redirect_url` are null in their responses, as in the list. A replaced file is
+left in storage because older Wagtail revisions still name it. Every field on
+the Wagtail organization page's content tab is read-only, logo included; the
+Promote tab still allows editing the slug.
+
 ### Onboarding state
 
 Each organization has one `OrganizationOnboarding` record answering "how far
@@ -113,7 +129,7 @@ start at `org_created`, and so do organizations the reconciler adopts.
 
 Every change made through the provisioning functions writes an
 `OrganizationProvisioningAudit` row in the same transaction: organization
-create and update, onboarding changes, and IdP create, update, transition,
+create and update, logo changes, onboarding changes, and IdP create, update, transition,
 metadata refresh and delete. Each row records who made the change and the data before
 and after it. `GET .../events/` returns them newest first.
 

@@ -275,16 +275,31 @@ def test_organization_page_sso_change_as_text_is_recorded_in_canonical_form():
     assert audit.data_after == {"sso_organization_id": str(new_id)}
 
 
-def test_organization_page_wagtail_form_edits_only_the_logo():
-    """The provisioned fields are read-only panels, so the form has no such fields."""
+def test_organization_page_wagtail_form_edits_nothing_provisioned():
+    """Every provisioned field, the logo included, is a read-only panel."""
     org = OrganizationPageFactory.create()
     editor = UserFactory.create(is_staff=True, is_superuser=True)
 
     form_class = org.get_edit_handler().get_form_class()
     form = form_class(instance=org, for_user=editor)
 
-    assert "logo" in form.fields
+    assert "logo" in org.PROVISIONED_FIELDS
     assert not set(org.PROVISIONED_FIELDS) & set(form.fields)
+
+
+def test_organization_page_publish_keeps_the_dashboard_logo(logo_upload):
+    """A revision saved before a dashboard upload doesn't put the old logo back."""
+    org = OrganizationPageFactory.create()
+    stale = org.save_revision(user=UserFactory.create(is_staff=True))
+
+    org.logo = logo_upload()
+    org.save()
+    uploaded = org.logo.name
+
+    stale.publish()
+
+    org.refresh_from_db()
+    assert org.logo.name == uploaded
 
 
 def test_organization_page_sso_audit_can_be_skipped():

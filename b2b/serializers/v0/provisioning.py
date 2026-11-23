@@ -157,6 +157,7 @@ class ProvisionedOrganizationSerializer(serializers.ModelSerializer):
             "org_key",
             "org_key_prefix",
             "description",
+            "logo",
             "slug",
             "sso_organization_id",
             "domains",
@@ -445,6 +446,13 @@ class IdentityProviderTransitionSerializer(serializers.Serializer):
     """Request body for moving an identity provider's lifecycle state."""
 
     state = serializers.ChoiceField(choices=IDP_LIFECYCLE_CHOICES)
+
+
+class OrganizationLogoSerializer(serializers.Serializer):
+    """Request body for replacing an organization's logo."""
+
+    # Validated the way the Wagtail form validated it: Pillow must open it.
+    logo = serializers.ImageField()
 
 
 class SetOnboardingStateSerializer(serializers.Serializer):
