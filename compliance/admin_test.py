@@ -1,6 +1,7 @@
 """Tests for compliance admin views"""
 
 import pytest
+from django.contrib.auth.models import Permission
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -8,6 +9,7 @@ from mitol.common.utils.datetime import now_in_utc
 
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -51,6 +53,30 @@ def test_mark_manually_approved_action_rejects_get(client, admin_user):
     response = client.get(_action_url(log_entry))
 
     assert response.status_code == 405
+    log_entry.refresh_from_db()
+    assert log_entry.decision == ExportComplianceDecision.DECLINED
+    assert log_entry.approved_on is None
+
+
+def test_mark_manually_approved_action_requires_change_permission(client):
+    """Staff who can only view logs can't approve one, and don't see the button"""
+    viewer = UserFactory.create(is_staff=True)
+    viewer.user_permissions.add(
+        Permission.objects.get(codename="view_exportcompliancelog")
+    )
+    client.force_login(viewer)
+    log_entry = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+    change_url = reverse(
+        "admin:compliance_exportcompliancelog_change", args=(log_entry.pk,)
+    )
+
+    assert "Mark Manually Approved" not in client.get(change_url).content.decode()
+    response = client.post(_action_url(log_entry), follow=True)
+
+    messages = [str(message) for message in get_messages(response.wsgi_request)]
+    assert any("permission" in message for message in messages)
     log_entry.refresh_from_db()
     assert log_entry.decision == ExportComplianceDecision.DECLINED
     assert log_entry.approved_on is None

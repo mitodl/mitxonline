@@ -97,6 +97,13 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         """Show when a manual approval stops covering new enrollments."""
         return obj.approval_expires_on
 
+    def get_change_actions(self, request, object_id, form_url):
+        """Hide the approve button from staff who can't change logs."""
+        actions = super().get_change_actions(request, object_id, form_url)
+        if not self.has_change_permission(request):
+            return [a for a in actions if a != "mark_manually_approved"]
+        return actions
+
     def has_add_permission(self, request):  # noqa: ARG002
         return False
 
@@ -112,6 +119,14 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
     )
     def mark_manually_approved(self, request, obj):
         """Approve this log, setting approved_by/approved_on to the current admin user and now."""
+        # django-object-actions only checks admin-site access, not model perms.
+        if not self.has_change_permission(request, obj):
+            self.message_user(
+                request,
+                "You don't have permission to approve export compliance logs.",
+                level=messages.ERROR,
+            )
+            return
         obj.decision = ExportComplianceDecision.MANUALLY_APPROVED
         obj.approved_by = request.user
         obj.approved_on = now_in_utc()

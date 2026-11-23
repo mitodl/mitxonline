@@ -384,15 +384,9 @@ def log_export_compliance_check(
     )
 
 
-def get_active_manual_approval(user) -> ExportComplianceLog | None:
-    """
-    Return the user's newest manual approval if it hasn't expired yet.
-
-    A manual approval covers every course run and program, not just the one
-    the declined check was for, until EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS
-    after it was approved.
-    """
-    approval = (
+def _get_latest_manual_approval(user) -> ExportComplianceLog | None:
+    """Return the user's most recently approved manual approval, expired or not."""
+    return (
         ExportComplianceLog.objects.filter(
             user=user,
             decision=ExportComplianceDecision.MANUALLY_APPROVED,
@@ -401,6 +395,17 @@ def get_active_manual_approval(user) -> ExportComplianceLog | None:
         .order_by("-approved_on")
         .first()
     )
+
+
+def get_active_manual_approval(user) -> ExportComplianceLog | None:
+    """
+    Return the user's newest manual approval if it hasn't expired yet.
+
+    A manual approval covers every course run and program, not just the one
+    the declined check was for, until EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS
+    after it was approved.
+    """
+    approval = _get_latest_manual_approval(user)
     if approval is None or approval.approval_expires_on <= now_in_utc():
         return None
     return approval
@@ -414,14 +419,15 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
     the most recent log that either matches the given courseware object, was
     created within the last 24 hours (regardless of courseware object), or
     represents a prior failed check for this user (regardless of age or
-    courseware object), if any.
+    courseware object), if any. Once an approval has expired, only checks
+    recorded after it expired are reused, so the learner is screened again.
     """
-    approval = get_active_manual_approval(user)
-    if approval is not None:
+    approval = _get_latest_manual_approval(user)
+    if approval is not None and approval.approval_expires_on > now_in_utc():
         return approval
 
     cutoff = now_in_utc() - RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW
-    return (
+    logs = (
         ExportComplianceLog.objects.filter(user=user)
         .filter(
             Q(
@@ -433,9 +439,10 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
         )
         # Only an unexpired approval (handled above) may stand in for a check.
         .exclude(decision=ExportComplianceDecision.MANUALLY_APPROVED)
-        .order_by("-created_on")
-        .first()
     )
+    if approval is not None:
+        logs = logs.filter(created_on__gte=approval.approval_expires_on)
+    return logs.order_by("-created_on").first()
 
 
 def get_unresolved_export_compliance_decline(user) -> ExportComplianceLog | None:

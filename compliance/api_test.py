@@ -5,6 +5,7 @@ import uuid
 from datetime import timedelta
 from types import SimpleNamespace
 
+import freezegun
 import pytest
 import sentry_sdk
 from CyberSource.rest import ApiException
@@ -756,6 +757,8 @@ def _approved_log(user, courseware_object, approved_on):
         (24, 0, False),
     ],
 )
+# relativedelta clamps month ends (e.g. Feb 29 -> Feb 28), so pin mid-month.
+@freezegun.freeze_time("2026-06-15 12:00:00")
 def test_get_active_manual_approval(settings, months_ago, days_offset, is_active):
     """A manual approval covers the user for EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS."""
     settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
@@ -903,3 +906,58 @@ def test_get_unresolved_export_compliance_decline_ignores_expired_approval(setti
     _approved_log(user, CourseRunFactory.create(), approved_on)
 
     assert get_unresolved_export_compliance_decline(user) == decline
+
+
+def test_verify_user_with_exports_rechecks_old_pass_after_approval_expires(
+    mocker, export_settings
+):
+    """After an approval expires, a pass from before it isn't reused, even for its own run."""
+    user = _complete_user()
+    run = CourseRunFactory.create()
+    old_pass = ExportComplianceLogFactory.create(
+        user=user, courseware_object=run, decision=COMPLETED
+    )
+    approved_on = now_in_utc() - relativedelta(months=13)
+    ExportComplianceLog.objects.filter(pk=old_pass.pk).update(
+        created_on=approved_on - timedelta(days=30)
+    )
+    _approved_log(user, CourseRunFactory.create(), approved_on)
+    response = SimpleNamespace(
+        status="DECLINED",
+        id="new-request-id",
+        export_compliance_information=SimpleNamespace(info_codes=[]),
+        error_information=None,
+        message=None,
+    )
+    mock_client = mocker.Mock()
+    mock_client.validate_export_compliance.return_value = response
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_called_once()
+    assert result.accepted is False
+
+
+def test_verify_user_with_exports_reuses_check_made_after_approval_expired(
+    mocker, export_settings
+):
+    """A check recorded after the approval expired is reused as usual."""
+    user = UserFactory.create()
+    run = CourseRunFactory.create()
+    approval = _approved_log(
+        user, CourseRunFactory.create(), now_in_utc() - relativedelta(months=13)
+    )
+    new_pass = ExportComplianceLogFactory.create(
+        user=user, courseware_object=run, decision=COMPLETED, request_id="new-pass"
+    )
+    ExportComplianceLog.objects.filter(pk=new_pass.pk).update(
+        created_on=approval.approval_expires_on + timedelta(days=1)
+    )
+    mock_client = mocker.Mock()
+    mocker.patch("compliance.api.get_cybersource_client", return_value=mock_client)
+
+    result = verify_user_with_exports(user, run)
+
+    mock_client.validate_export_compliance.assert_not_called()
+    assert result.request_id == "new-pass"
