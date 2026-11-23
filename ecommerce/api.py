@@ -19,7 +19,11 @@ from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
 from mitol.payment_gateway.api import CartItem as GatewayCartItem
 from mitol.payment_gateway.api import Order as GatewayOrder
-from mitol.payment_gateway.api import PaymentGateway, ProcessorResponse
+from mitol.payment_gateway.api import (
+    PaymentGateway,
+    ProcessorResponse,
+    StripePaymentGateway,
+)
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
     MITOL_PAYMENT_GATEWAY_STRIPE,
@@ -2183,6 +2187,33 @@ def _get_stripe_checkout_session_v1():
     return stripe_gateway.stripe_client.v1.checkout.sessions
 
 
+def _retrieve_stripe_checkout_session(session_id: str):
+    """
+    Retrieve a CheckoutSession with its PaymentIntent expanded.
+
+    Custom payment methods (e.g. PayPal) don't create a PaymentIntent; the
+    session links to a PaymentRecord instead, but only on a preview API
+    version. Refund events for those payments only carry the PaymentRecord, so
+    we need it to find the order later.
+    """
+
+    retrieve_kwargs = {}
+    if settings.MITOL_PAYMENT_GATEWAY_STRIPE_ENABLE_PAYMENT_METHOD_TYPES:
+        retrieve_kwargs["options"] = {
+            "stripe_version": StripePaymentGateway._get_preview_api_version()  # noqa: SLF001
+        }
+
+    return _get_stripe_checkout_session_v1().retrieve(
+        session_id,
+        {
+            "expand": [
+                "payment_intent",
+            ],
+        },
+        **retrieve_kwargs,
+    )
+
+
 def process_stripe_checkout_session_status(checkout_session: dict | str):
     """
     Process the provided Stripe CheckoutSession and provide its status.
@@ -2201,8 +2232,6 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
     - something, dunno yet
     """
 
-    stripe_checkout_session_client = _get_stripe_checkout_session_v1()
-
     if isinstance(checkout_session, dict):
         session_id = checkout_session.get("id")
     else:
@@ -2212,16 +2241,7 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
         msg = "checkout session ID not found"
         raise ValueError(msg)
 
-    # Call this directly so we can tell the client to expand payment_intent.
-
-    cs = stripe_checkout_session_client.retrieve(
-        session_id,
-        {
-            "expand": [
-                "payment_intent",
-            ],
-        },
-    )
+    cs = _retrieve_stripe_checkout_session(session_id)
 
     # The session itself has two status fields: status and payment_status
     # status is the session status - open, complete, expired
@@ -2235,6 +2255,7 @@ def process_stripe_checkout_session_status(checkout_session: dict | str):
         "action_reason": "",
         "checkout_session_id": cs.id,
         "payment_intent_id": "",
+        "payment_record_id": getattr(cs, "payment_record", None) or "",
         "transaction": cs.to_dict(for_json=True),
     }
 
@@ -2341,8 +2362,17 @@ def process_stripe_checkout_completed(event):
         )
     else:
         basket = Basket.objects.filter(user=order.purchaser).first()
+        payment_data = event.to_dict(for_json=True)
 
-        fulfill_completed_order(order, event.to_dict(for_json=True), basket)
+        # Webhook events use the account's API version, which doesn't include
+        # the session's PaymentRecord, so copy it over from the session we
+        # just retrieved. Refunds for custom payment methods are matched on it.
+        if status_obj["payment_record_id"]:
+            payment_data["data"]["object"]["payment_record"] = status_obj[
+                "payment_record_id"
+            ]
+
+        fulfill_completed_order(order, payment_data, basket)
 
         order.refresh_from_db()
 
@@ -2401,16 +2431,43 @@ def find_order_for_stripe_payment_intent(payment_intent_id: str) -> Order | None
     - Order, or None if no order has a transaction for the PaymentIntent
     """
 
+    return _find_stripe_order_for_payment(
+        Q(data__data__object__payment_intent=payment_intent_id)
+        | Q(data__payment_intent=payment_intent_id)
+        | Q(data__payment_intent__id=payment_intent_id)
+    )
+
+
+def find_order_for_stripe_payment_record(payment_record_id: str) -> Order | None:
+    """
+    Find the order that was paid for with the given Stripe PaymentRecord.
+
+    Payments made with a custom payment method (e.g. PayPal) don't have a
+    PaymentIntent; Stripe links the CheckoutSession to a PaymentRecord instead.
+    The ID is in data.object.payment_record when the transaction data is the
+    checkout.session.completed Event, or payment_record for a CheckoutSession.
+
+    Args:
+    - payment_record_id (str): the Stripe PaymentRecord ID
+    Returns:
+    - Order, or None if no order has a transaction for the PaymentRecord
+    """
+
+    return _find_stripe_order_for_payment(
+        Q(data__data__object__payment_record=payment_record_id)
+        | Q(data__payment_record=payment_record_id)
+    )
+
+
+def _find_stripe_order_for_payment(match: Q) -> Order | None:
+    """Return the order for the newest Stripe payment transaction that matches."""
+
     payment_transaction = (
         Transaction.objects.filter(
             transaction_type=TRANSACTION_TYPE_PAYMENT,
             order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
         )
-        .filter(
-            Q(data__data__object__payment_intent=payment_intent_id)
-            | Q(data__payment_intent=payment_intent_id)
-            | Q(data__payment_intent__id=payment_intent_id)
-        )
+        .filter(match)
         .select_related("order")
         .order_by("-created_on")
         .first()
@@ -2466,24 +2523,26 @@ def process_stripe_refund_updated(event: stripe.Event):  # noqa: PLR0911
         )
         return True
 
-    payment_intent_id = refund.get("payment_intent")
-
-    if not payment_intent_id:
+    # Refunds for custom payment methods (e.g. PayPal) have a PaymentRecord
+    # instead of a PaymentIntent.
+    if payment_id := refund.get("payment_intent"):
+        order = find_order_for_stripe_payment_intent(payment_id)
+    elif payment_id := refund.get("payment_record"):
+        order = find_order_for_stripe_payment_record(payment_id)
+    else:
         log.error(
-            "process_stripe_refund_updated: refund %s (event %s) has no PaymentIntent",
+            "process_stripe_refund_updated: refund %s (event %s) has no PaymentIntent or PaymentRecord",
             refund_id,
             event.id,
         )
         return False
 
-    order = find_order_for_stripe_payment_intent(payment_intent_id)
-
     if not order:
         log.error(
-            "process_stripe_refund_updated: refund %s (event %s) is for PaymentIntent %s, which doesn't match any order",
+            "process_stripe_refund_updated: refund %s (event %s) is for payment %s, which doesn't match any order",
             refund_id,
             event.id,
-            payment_intent_id,
+            payment_id,
         )
         return False
 

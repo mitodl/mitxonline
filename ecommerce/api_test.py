@@ -64,6 +64,7 @@ from ecommerce.api import (
     establish_basket,
     establish_basket_for_request,
     find_order_for_stripe_payment_intent,
+    find_order_for_stripe_payment_record,
     find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
     fulfill_order_from_cybersource_transaction,
@@ -2832,13 +2833,14 @@ class MockedCheckoutSessionClient:
     cancel_reason = ""
     reference_number = ""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         session_status,
         payment_status,
         payment_intent_status,
         cancel_reason,
         ref_no,
+        payment_record_id="",
     ):
         """Set up the session with the noted statuses."""
 
@@ -2848,9 +2850,14 @@ class MockedCheckoutSessionClient:
         # These get ignored later on if expand doesn't get set.
         self.payment_intent_status = payment_intent_status
         self.cancel_reason = cancel_reason
+        # Only returned when retrieved with a preview API version, like Stripe.
+        self.payment_record_id = payment_record_id
+        self.retrieve_options = None
 
-    def retrieve(self, session_id, options=None):
+    def retrieve(self, session_id, params=None, options=None):
         """Retrieve the (fake) checkout session."""
+
+        self.retrieve_options = options
 
         session = stripe_checkout_session()
         session.id = session_id
@@ -2858,10 +2865,15 @@ class MockedCheckoutSessionClient:
         session.payment_status = self.payment_status
         session.client_reference_id = self.reference_number
 
+        if self.payment_record_id and str(
+            (options or {}).get("stripe_version", "")
+        ).endswith(".preview"):
+            session.payment_record = self.payment_record_id
+
         if (
-            isinstance(options, dict)
-            and "expand" in options
-            and "payment_intent" in options["expand"]
+            isinstance(params, dict)
+            and "expand" in params
+            and "payment_intent" in params["expand"]
             and len(self.payment_intent_status) > 0
         ):
             session.payment_intent = stripe_payment_intent()
@@ -3028,6 +3040,61 @@ def test_process_stripe_checkout_completed(  # noqa: PLR0913
         assert updated_order.state == OrderStatus.ERRORED
 
 
+@pytest.mark.parametrize("payment_method_types_enabled", [True, False])
+def test_process_stripe_checkout_completed_custom_payment_method(
+    mocker, settings, bootstrapped_verified_program, payment_method_types_enabled
+):
+    """
+    A custom payment method (e.g. PayPal) checkout has no PaymentIntent, just a
+    PaymentRecord. The order should be fulfilled, and the PaymentRecord saved
+    with the payment so the refund can be matched to it later. The PaymentRecord
+    is only on preview API versions, so it's only requested if custom payment
+    method types are turned on.
+    """
+
+    settings.MITOL_PAYMENT_GATEWAY_STRIPE_ENABLE_PAYMENT_METHOD_TYPES = (
+        payment_method_types_enabled
+    )
+    *_, cr_product = bootstrapped_verified_program
+    order_line = LineFactory.create(
+        product_version=Version.objects.get_for_object(cr_product).get(),
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+    cs_client = MockedCheckoutSessionClient(
+        STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
+        STRIPE_PAYMENT_STATUS_PAID,
+        "",
+        "",
+        order_line.order.reference_number,
+        payment_record_id=STRIPE_TEST_PAYMENT_RECORD_ID,
+    )
+    mocker.patch(
+        "ecommerce.api._get_stripe_checkout_session_v1", return_value=cs_client
+    )
+
+    updated_order = process_stripe_checkout_completed(
+        _configure_checkout_session_object(order_line)
+    )
+
+    assert updated_order.state == OrderStatus.FULFILLED
+    payment_data = updated_order.transactions.get(
+        transaction_type=TRANSACTION_TYPE_PAYMENT
+    ).data
+    if payment_method_types_enabled:
+        assert cs_client.retrieve_options["stripe_version"].endswith(".preview")
+        assert (
+            payment_data["data"]["object"]["payment_record"]
+            == STRIPE_TEST_PAYMENT_RECORD_ID
+        )
+        assert (
+            find_order_for_stripe_payment_record(STRIPE_TEST_PAYMENT_RECORD_ID)
+            == updated_order
+        )
+    else:
+        assert cs_client.retrieve_options is None
+        assert "payment_record" not in payment_data["data"]["object"]
+
+
 def test_process_stripe_checkout_expired(bootstrapped_verified_program):
     """
     Test that expiry works as expected.
@@ -3130,6 +3197,7 @@ def test_revalidation_passes_a_resolvable_program_child_purchase_discount(
 
 
 STRIPE_TEST_PAYMENT_INTENT_ID = "pi_1GszsK2eZvKYlo2CfhZyoZLp"
+STRIPE_TEST_PAYMENT_RECORD_ID = "pr_test_65Vn0dl402JSKo4eCDq41Ae4ZdXmfNLVJQ"
 
 
 def _stripe_payment_transaction_data(data_shape, payment_intent_id):
@@ -3140,7 +3208,32 @@ def _stripe_payment_transaction_data(data_shape, payment_intent_id):
     - session: a CheckoutSession with an unexpanded PaymentIntent
     - session_expanded: a CheckoutSession with the PaymentIntent expanded
       (from the pending order check)
+    - record_event / record_session: the event or CheckoutSession for a custom
+      payment method payment, which has a PaymentRecord and no PaymentIntent
+      (payment_intent_id is used as the PaymentRecord ID)
     """
+
+    if data_shape == "record_event":
+        return {
+            "id": f"evt_{uuid.uuid4().hex}",
+            "object": "event",
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "object": "checkout.session",
+                    "payment_intent": None,
+                    "payment_record": payment_intent_id,
+                }
+            },
+        }
+
+    if data_shape == "record_session":
+        return {
+            "id": f"cs_{uuid.uuid4().hex}",
+            "object": "checkout.session",
+            "payment_intent": None,
+            "payment_record": payment_intent_id,
+        }
 
     if data_shape == "event":
         return {
@@ -3198,6 +3291,7 @@ def _configure_refund_event(
     *,
     status="succeeded",
     payment_intent_id=STRIPE_TEST_PAYMENT_INTENT_ID,
+    payment_record_id=None,
     amount=1000,
 ):
     """Generate a Stripe refund event."""
@@ -3205,6 +3299,7 @@ def _configure_refund_event(
     refund = stripe_refund()
     refund.status = status
     refund.payment_intent = payment_intent_id
+    refund.payment_record = payment_record_id
     refund.amount = amount
 
     event = stripe_event()
@@ -3223,6 +3318,22 @@ def test_find_order_for_stripe_payment_intent(data_shape):
     _create_stripe_order_with_payment(payment_intent_id="pi_someotherintent")
 
     assert find_order_for_stripe_payment_intent(STRIPE_TEST_PAYMENT_INTENT_ID) == order
+
+
+@pytest.mark.parametrize("data_shape", ["record_event", "record_session"])
+def test_find_order_for_stripe_payment_record(data_shape):
+    """The order should be found from the PaymentRecord of a custom payment."""
+
+    order = _create_stripe_order_with_payment(
+        data_shape=data_shape, payment_intent_id=STRIPE_TEST_PAYMENT_RECORD_ID
+    )
+    _create_stripe_order_with_payment(
+        data_shape=data_shape, payment_intent_id="pr_test_someotherrecord"
+    )
+    _create_stripe_order_with_payment()
+
+    assert find_order_for_stripe_payment_record(STRIPE_TEST_PAYMENT_RECORD_ID) == order
+    assert find_order_for_stripe_payment_record("pr_test_nomatch") is None
 
 
 def test_find_order_for_stripe_payment_intent_no_match():
@@ -3261,6 +3372,36 @@ def test_process_stripe_refund_updated(
     assert refund_transaction.amount == Decimal(amount) / 100
     assert refund_transaction.data == event.data.object.to_dict(for_json=True)
 
+    downgrade_task_mock.assert_called_once_with(order.id)
+
+
+def test_process_stripe_refund_updated_payment_record(
+    mocker, django_capture_on_commit_callbacks
+):
+    """
+    A refund for a custom payment method (e.g. PayPal) has a PaymentRecord and
+    no PaymentIntent; it should refund the order paid with that PaymentRecord.
+    """
+
+    downgrade_task_mock = mocker.patch(
+        "ecommerce.tasks.perform_downgrade_from_order.delay"
+    )
+    order = _create_stripe_order_with_payment(
+        data_shape="record_event", payment_intent_id=STRIPE_TEST_PAYMENT_RECORD_ID
+    )
+    event = _configure_refund_event(
+        payment_intent_id=None, payment_record_id=STRIPE_TEST_PAYMENT_RECORD_ID
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        result = process_stripe_refund_updated(event)
+
+    assert result == order
+    assert result.state == OrderStatus.REFUNDED
+    assert (
+        order.transactions.get(transaction_type=TRANSACTION_TYPE_REFUND).transaction_id
+        == event.data.object.id
+    )
     downgrade_task_mock.assert_called_once_with(order.id)
 
 
@@ -3342,8 +3483,17 @@ def test_process_stripe_refund_updated_wrong_order_state(
     downgrade_task_mock.assert_not_called()
 
 
-@pytest.mark.parametrize("payment_intent_id", [None, "pi_nomatchingorder"])
-def test_process_stripe_refund_updated_no_order(mocker, payment_intent_id):
+@pytest.mark.parametrize(
+    ("payment_intent_id", "payment_record_id"),
+    [
+        (None, None),
+        ("pi_nomatchingorder", None),
+        (None, "pr_test_nomatchingorder"),
+    ],
+)
+def test_process_stripe_refund_updated_no_order(
+    mocker, payment_intent_id, payment_record_id
+):
     """The refund should fail if there's no order for it."""
 
     downgrade_task_mock = mocker.patch(
@@ -3353,7 +3503,10 @@ def test_process_stripe_refund_updated_no_order(mocker, payment_intent_id):
 
     assert (
         process_stripe_refund_updated(
-            _configure_refund_event(payment_intent_id=payment_intent_id)
+            _configure_refund_event(
+                payment_intent_id=payment_intent_id,
+                payment_record_id=payment_record_id,
+            )
         )
         is False
     )
