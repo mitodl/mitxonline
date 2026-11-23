@@ -1,7 +1,7 @@
 import React from "react";
 import { Edit } from "@refinedev/antd";
 import { useApiUrl, useCustom, useCustomMutation, useGo, useParsed } from "@refinedev/core";
-import { Descriptions, Form, Input, Radio, Typography } from "antd";
+import { Alert, Descriptions, Form, Input, Radio, Typography } from "antd";
 
 import { AttributeMapping, IAttributeRow, fromMaps, toMap } from "components/b2b/attribute_mapping";
 import { B2B_ORGANIZATIONS, PROVISIONING_RESOURCE, apiErrorNotification } from "components/b2b/constants";
@@ -122,9 +122,17 @@ export const IdentityProviderEdit: React.FC = () => {
             isLoading={isLoading}
             headerButtons={<></>}
             canDelete={false}
-            saveButtonProps={{ onClick: () => form.submit(), loading: updating, disabled: !idp }}
+            saveButtonProps={{ onClick: () => form.submit(), loading: updating, disabled: !idp || idp.pulumi_managed }}
         >
-            {idp && (
+            {idp?.pulumi_managed && (
+                <Alert
+                    type="info"
+                    showIcon
+                    message={`${alias} is managed by Pulumi`}
+                    description="Change it in ol-infrastructure. The provisioning API refuses changes to it until it has been released from Pulumi."
+                />
+            )}
+            {idp && !idp.pulumi_managed && (
                 <Form<IIdentityProviderEditForm>
                     form={form}
                     layout="vertical"

@@ -87,6 +87,7 @@ class OrganizationIdentityProviderSerializer(serializers.ModelSerializer):
             "metadata_source",
             "metadata_artifact",
             "metadata_fetched_at",
+            "pulumi_managed",
             "service_provider",
             "login_url",
             "created_on",
