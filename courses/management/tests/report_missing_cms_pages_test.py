@@ -119,14 +119,18 @@ def test_report_missing_cms_pages_eligible_users_only_filter():
         grade=0.9,
     )
 
+    # The program enrollment's mode doesn't affect certificate eligibility
     eligible_program = ProgramFactory.create(page=None, live=True)
     ProgramEnrollmentFactory.create(
         program=eligible_program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
         active=True,
     )
 
-    ineligible_program = ProgramFactory.create(page=None, live=True)
+    # Not eligible because the program doesn't issue certificates
+    ineligible_program = ProgramFactory.create(
+        page=None, live=True, certificates_disabled=True
+    )
     ProgramEnrollmentFactory.create(
         program=ineligible_program,
         enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,

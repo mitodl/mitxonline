@@ -34,7 +34,10 @@ from courses.api import (
     deactivate_run_enrollment,
     downgrade_program_enrollment_and_verified_runs,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_REFUNDED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
+)
 from courses.models import CourseRunEnrollment, Program
 from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
@@ -116,7 +119,7 @@ from main.constants import (
 from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
 from openedx.api import create_user
-from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 from openedx.tasks import create_user_from_id
 
 log = logging.getLogger(__name__)
@@ -1979,9 +1982,9 @@ def _get_verified_program_course_run_product_and_discount(user, courserun, progr
     """
 
     if not program.enrollments.filter(
-        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=True
+        user=user, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE, active=True
     ).exists():
-        msg = f"No verified enrollment for {user} for program {program}"
+        msg = f"No upgraded enrollment for {user} for program {program}"
         raise VerifiedProgramNoEnrollmentError(msg)
 
     # The program's internal discount prices whatever it is attached to, so

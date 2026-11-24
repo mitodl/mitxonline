@@ -16,6 +16,7 @@ from trino.auth import BasicAuthentication
 
 from cms.api import create_default_courseware_page
 from cms.models import CertificatePage, SignatoryPage
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.models import (
     Course,
     CourseRun,
@@ -32,7 +33,7 @@ from ecommerce.api import fulfill_completed_order
 from ecommerce.constants import ZERO_PAYMENT_DATA
 from ecommerce.models import Discount, Order, OrderStatus, PendingOrder, Product
 from openedx.api import repair_faulty_edx_user
-from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.models import GENDER_CHOICES, LegalAddress, User, UserProfile
 
 # StarRocks fails a query whose result is still being read query_timeout seconds
@@ -906,11 +907,14 @@ class Command(BaseCommand):
                 program_id__in=program_ids,
             ).values_list("user_id", "program_id")
         )
+        # These come with an earned program certificate, not a purchase, so the
+        # enrollment is audit: the certificate doesn't depend on the mode, and an
+        # upgraded enrollment would entitle the learner to verified runs for free.
         new_enrollment_objects = [
             ProgramEnrollment(
                 user_id=row["user_mitxonline_id"],
                 program_id=row["program_id"],
-                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+                enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
             )
             for row in rows
             if (row["user_mitxonline_id"], row["program_id"]) not in existing
@@ -1097,12 +1101,12 @@ class Command(BaseCommand):
                     if (
                         existing_enrollment
                         and existing_enrollment.enrollment_mode
-                        == EDX_ENROLLMENT_VERIFIED_MODE
+                        == PROGRAM_ENROLLMENT_UPGRADE_MODE
                     ):
                         self.stdout.write(
                             self.style.WARNING(
                                 f"Skipping order creation: user={user.id} is already enrolled "
-                                f"in verified mode for program={program.id}"
+                                f"in upgraded mode for program={program.id}"
                             )
                         )
                         continue

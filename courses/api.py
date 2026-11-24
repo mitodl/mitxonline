@@ -58,6 +58,7 @@ from courses.constants import (
     ENROLL_CHANGE_STATUS_DEFERRED,
     ENROLL_CHANGE_STATUS_REFUNDED,
     ENROLL_CHANGE_STATUS_UNENROLLED,
+    PROGRAM_ENROLLMENT_UPGRADE_MODE,
     PROGRAM_TEXT_ID_PREFIX,
 )
 from courses.exceptions import CountryBlockedError, EnrollmentError
@@ -464,10 +465,10 @@ def reconcile_verified_program_enrollments(
         len(verified_program_enrollments) == 1
         and verified_program_enrollments[0].program == root_program
     ):
-        # The verified enrollment that's here is for the root program, so we can
-        # create a verified enrollment for the other program.
+        # The upgraded enrollment that's here is for the root program, so we can
+        # create an upgraded enrollment for the other program.
         create_program_enrollments(
-            user, programs, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+            user, programs, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
         )
     elif (
         len(verified_program_enrollments) == 1
@@ -826,20 +827,20 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
     if (
         program_enrollment is not None
         and program_enrollment.active
-        and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        and program_enrollment.enrollment_mode == PROGRAM_ENROLLMENT_UPGRADE_MODE
     ):
         downgraded_program_enrollment = _downgrade_or_deactivate_program_enrollment(
             user, program
         )
 
-    # Programs nested in this one (at any depth) carry verified enrollments
+    # Programs nested in this one (at any depth) carry upgraded enrollments
     # because of this purchase too; handle them the same way.
     program_tree_ids = Program.expand_nested_program_ids([program.id])
     nested_program_ids = program_tree_ids - {program.id}
     nested_enrollments = ProgramEnrollment.objects.filter(
         user=user,
         program_id__in=nested_program_ids,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         b2b_contract__isnull=True,
     ).select_related("program")
     for nested_enrollment in nested_enrollments:
@@ -923,7 +924,7 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
 
 def _downgrade_or_deactivate_program_enrollment(user, program):
     """
-    Move a user's verified ProgramEnrollment back to audit, or deactivate it
+    Move a user's upgraded ProgramEnrollment back to audit, or deactivate it
     if the program has no audit track.
 
     Returns:
@@ -934,7 +935,7 @@ def _downgrade_or_deactivate_program_enrollment(user, program):
         enrollment = ProgramEnrollment.objects.filter(
             user=user,
             program=program,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
         ).first()
         if enrollment is not None:
             enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_REFUNDED, no_user=True)
@@ -2123,7 +2124,7 @@ def explain_program_requirements(user, program) -> RequirementResult | None:
 class ProgramCertificateSkipReason(StrEnum):
     """Why generate_program_certificate didn't return a certificate."""
 
-    NO_VERIFIED_ENROLLMENT = "no verified enrollment in the program"
+    NO_ACTIVE_ENROLLMENT = "no active enrollment in the program"
     REQUIREMENTS_NOT_MET = "program requirements are not met"
     CERTIFICATES_DISABLED = "certificates are disabled for this program"
     NO_CERTIFICATE_PAGE = (
@@ -2142,8 +2143,13 @@ class ProgramCertificateResult(NamedTuple):
 
 def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
     """
-    Create a program certificate if the user has a verified enrollment in the
-    program and certificates or passing grades in the program's required courses.
+    Create a program certificate if the user is enrolled in the program, has
+    certificates or passing grades in enough of the program's courses to satisfy
+    its requirement tree, and the program is set up to issue certificates
+    (certificates enabled, with a live certificate page).
+
+    The program enrollment's mode is not considered: it records whether the
+    learner purchased the program, not whether they should get a certificate.
 
     Args:
         user (User): a Django user.
@@ -2176,19 +2182,17 @@ def generate_program_certificate_with_result(user, program, force_create=False):
 
     if (
         not force_create
-        and not program.enrollments.filter(
-            user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
-        ).exists()
+        and not program.enrollments.filter(user=user, active=True).exists()
     ):
         log.warning(
-            "Skipping program enrollment generation for %s in %s: no verified enrollment",
+            "Skipping program certificate generation for %s in %s: no active enrollment",
             user,
             program,
         )
         return ProgramCertificateResult(
             None,
             created=False,
-            skip_reason=ProgramCertificateSkipReason.NO_VERIFIED_ENROLLMENT,
+            skip_reason=ProgramCertificateSkipReason.NO_ACTIVE_ENROLLMENT,
         )
 
     existing_cert = ProgramCertificate.all_objects.filter(
@@ -2302,9 +2306,8 @@ def get_eligible_program_certificate_candidates():
     certificate but do not yet have one.
 
     Filters applied:
-    - Enrollment is active
-    - Enrollment mode is verified
-    - Program is live
+    - Enrollment is active (any mode)
+    - Program is live and has certificates enabled
     - No existing ProgramCertificate (including revoked) for the same user+program pair
 
     The queryset is ordered by primary key for stable pk-windowed batching and
@@ -2320,8 +2323,8 @@ def get_eligible_program_certificate_candidates():
 
     return (
         ProgramEnrollment.objects.filter(
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
             program__live=True,
+            program__certificates_disabled=False,
         )
         .annotate(has_program_cert=Exists(existing_cert))
         .filter(has_program_cert=False)
@@ -2342,7 +2345,7 @@ def generate_missing_program_certificates(
     batch_size=500,
 ):
     """
-    Reconciliation job that creates program certificates for every verified,
+    Reconciliation job that creates program certificates for every active,
     live-program enrollment that is missing one and has earned it.
 
     Processes candidates in pk-windowed batches so the full result set is never
@@ -3044,64 +3047,3 @@ def rerun_course_run(  # noqa: PLR0913
             process_course_run_clone(new_run, base_run.courseware_id)
 
     return new_run
-
-
-def get_audit_program_enrollments_for_upgrade():
-    """
-    Return audit program enrollments with what
-    upgrade_program_enrollment_if_eligible reads already loaded: each program's
-    requirement nodes, and those of any program a node requires.
-
-    Returns:
-        QuerySet[ProgramEnrollment]
-    """
-    return (
-        ProgramEnrollment.objects.filter(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
-        .select_related("program", "user")
-        .prefetch("certificate")
-        .prefetch_related(
-            Prefetch(
-                "program__all_requirements",
-                queryset=ProgramRequirement.objects.select_related(
-                    "required_program"
-                ).prefetch_related("required_program__all_requirements"),
-            )
-        )
-    )
-
-
-def upgrade_program_enrollment_if_eligible(program_enrollment):
-    """
-    Upgrade a program enrollment to verified when the learner holds an active
-    verified enrollment in enough of the program's courses to satisfy its
-    requirement tree.
-
-    Returns:
-        (ProgramEnrollment, bool): A tuple containing a
-        ProgramEnrollment paired
-        with a boolean indicating whether the enrollment was upgraded.
-    """
-    if program_enrollment.certificate is not None:
-        return program_enrollment, False
-
-    verified_course_ids = set(
-        CourseRunEnrollment.objects.filter(
-            user=program_enrollment.user,
-            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
-            active=True,
-        ).values_list("run__course_id", flat=True)
-    )
-
-    def _is_satisfied(program):
-        return is_requirement_tree_satisfied(
-            program,
-            course_satisfied=verified_course_ids.__contains__,
-            program_satisfied=_is_satisfied,
-        )
-
-    if not _is_satisfied(program_enrollment.program):
-        return program_enrollment, False
-
-    program_enrollment.enrollment_mode = EDX_ENROLLMENT_VERIFIED_MODE
-    program_enrollment.save_and_log(None)
-    return program_enrollment, True

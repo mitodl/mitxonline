@@ -7,6 +7,7 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
+from courses.constants import PROGRAM_ENROLLMENT_UPGRADE_MODE
 from courses.factories import (
     CourseFactory,
     CourseRunCertificateFactory,
@@ -153,7 +154,7 @@ def test_program_certificate_management_create(
     ProgramEnrollment.objects.create(
         user=user,
         program=program_with_empty_requirements,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     mocker.patch(
@@ -241,7 +242,7 @@ def test_program_certificate_management_create_lists_missing_requirements(user):
     course = CourseFactory.create()
     program = _program_needing(course)
     ProgramEnrollment.objects.create(
-        user=user, program=program, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        user=user, program=program, enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE
     )
 
     output = _call_create(program, user=user)
@@ -258,7 +259,7 @@ def test_program_certificate_management_create_reports_skip_reason(user):
 
     output = _call_create(program, user=user)
 
-    assert "Certificate: not created, no verified enrollment in the program." in output
+    assert "Certificate: not created, no active enrollment in the program." in output
     assert "Requirements:" not in output
 
 
@@ -267,14 +268,14 @@ def test_program_certificate_management_bulk_create_reports_skips(verbosity):
     """Bulk creation counts skips by reason and, with -v 2 or more, lists each user"""
     course = CourseFactory.create()
     program = _program_needing(course)
-    audit_user, verified_user = UserFactory.create_batch(2)
+    audit_user, upgrade_user = UserFactory.create_batch(2)
     ProgramEnrollment.objects.create(
         user=audit_user, program=program, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
     )
     ProgramEnrollment.objects.create(
-        user=verified_user,
+        user=upgrade_user,
         program=program,
-        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        enrollment_mode=PROGRAM_ENROLLMENT_UPGRADE_MODE,
     )
 
     output = _call_create(program, verbosity=verbosity)
@@ -283,9 +284,10 @@ def test_program_certificate_management_bulk_create_reports_skips(verbosity):
         f"Successfully created 0 certificates for program {program.readable_id}"
         in output
     )
-    assert "Skipped 1 user(s): no verified enrollment in the program." in output
-    assert "Skipped 1 user(s): program requirements are not met." in output
-    listed = f"Skipped {verified_user.edx_username} ({verified_user.email})"
+    # The enrollment mode doesn't matter, so both users are skipped for the
+    # same reason.
+    assert "Skipped 2 user(s): program requirements are not met." in output
+    listed = f"Skipped {upgrade_user.edx_username} ({upgrade_user.email})"
     missing = f"Missing: {course.readable_id} {course.title} (not enrolled in any run)"
     breakdown = f"✗ {course.readable_id} {course.title}: not enrolled in any run"
     assert (listed in output) is (verbosity >= 2)

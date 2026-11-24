@@ -19,11 +19,13 @@ PROGRAM_DISPLAY_MODE_CHOICES = [
 ]
 
 # Program enrollment modes. "upgrade" is the program-only mode for a learner who
-# purchased the program (or was granted it through a B2B contract), and is
+# purchased the program (or was granted it through a B2B contract), which
+# entitles them to verified course run enrollments within it. It is
 # deliberately not edX's "verified", which keeps its course run meaning and must
-# not be used for runs. Nothing sets "upgrade" yet: it is published here first
-# so API consumers can handle it before program enrollments move to it
-# (hq#14063). Until then upgraded program enrollments use "verified".
+# not be used for runs (hq#14063). Program enrollments are otherwise audit.
+# "verified" stays in PROGRAM_ENROLLMENT_MODES only because it is a published
+# API value and rows written by older code may still hold it; nothing sets it
+# on a program enrollment any more, and such rows are not treated as upgraded.
 PROGRAM_ENROLLMENT_UPGRADE_MODE = "upgrade"
 PROGRAM_ENROLLMENT_MODES = (
     EDX_ENROLLMENT_AUDIT_MODE,
