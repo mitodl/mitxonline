@@ -75,7 +75,7 @@ class Command(BaseCommand):
         if has_credential:
             self.stdout.write(
                 self.style.WARNING(
-                    f"Replacing verifiable credential for certificate {certificate}"
+                    f"Attempting to replace verifiable credential for certificate {certificate}"
                 )
             )
         credential = create_verifiable_credential(
@@ -144,13 +144,11 @@ class Command(BaseCommand):
                 else:
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"DRY RUN -- Backfilled certificate for program {cert}"
+                            f"DRY RUN -- Would backfill certificate {cert}"
                         )
                     )
                 time.sleep(sleep)
             except Exception:  # noqa: BLE001, PERF203
                 self.stderr.write(
-                    self.style.ERROR(
-                        f"Failed to backfill certificate for program {cert}"
-                    )
+                    self.style.ERROR(f"Failed to backfill certificate {cert}")
                 )

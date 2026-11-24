@@ -2654,10 +2654,10 @@ def create_verifiable_credential(
     replace_existing=False,
 ) -> VerifiableCredential | None:
     """
-    Create a verifiable credential for the given course run certificate.
+    Create a verifiable credential for the given course run or program certificate.
 
     Args:
-        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+        certificate (CourseRunCertificate | ProgramCertificate): The certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
         replace_existing (bool): If True, replace the certificate's existing verifiable credential. The new
             credential is signed first, and the old one is only deleted in the same transaction that saves the
@@ -2682,10 +2682,12 @@ def create_verifiable_credential(
         credential = request_verifiable_credential(payload)
 
         with transaction.atomic():
-            if replace_existing and certificate.verifiable_credential:
+            if replace_existing and certificate.verifiable_credential_id:
                 # The credential's uuid is its primary key and comes from the certificate uuid, so the old
                 # row has to be deleted before the new one is created.
-                certificate.verifiable_credential.delete()
+                VerifiableCredential.objects.filter(
+                    pk=certificate.verifiable_credential_id
+                ).delete()
             verifiable_credential = VerifiableCredential.objects.create(
                 uuid=credential["id"], credential_data=credential
             )
