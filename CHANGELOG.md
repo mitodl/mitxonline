@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.24.1] - 2026-11-24
+
+### Changes
+
+- **Record the identity providers Pulumi created in Keycloak** (#4321) by tmacey@mit.edu
+- **Upload an organization's logo from the staff dashboard** (#4319) by tmacey@mit.edu
+- **Move the uv.lock revision check to v1.1.0** (#4329) by rhysyngsun@users.noreply.github.com
+
 ## [2026.11.23.1] - 2026-11-23
 
 ### Changes
