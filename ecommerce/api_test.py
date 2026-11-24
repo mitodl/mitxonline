@@ -4061,3 +4061,31 @@ def test_add_product_to_basket_locks_basket(user, mocker):
     add_product_to_basket(request, basket, ProductFactory.create())
 
     assert events[:2] == ["lock", "pre"]
+
+
+@pytest.mark.parametrize("matches_order", [True, False])
+def test_fulfill_completed_order_locks_basket_before_deleting(
+    mocker, user, matches_order
+):
+    """Fulfillment locks the basket before deleting it, as adds do."""
+
+    mocker.patch("ecommerce.api.sync_hubspot_deal")
+    basket = BasketFactory.create(user=user)
+    mocker.patch.object(Basket, "compare_to_order", return_value=matches_order)
+    events = []
+    mocker.patch(
+        "ecommerce.api.lock_basket",
+        side_effect=lambda _basket: events.append("lock"),
+    )
+    delete = Basket.delete
+
+    def record_delete(self, *args, **kwargs):
+        events.append("delete")
+        return delete(self, *args, **kwargs)
+
+    mocker.patch.object(Basket, "delete", record_delete)
+
+    fulfill_completed_order(mocker.Mock(), ZERO_PAYMENT_DATA, basket=basket)
+
+    assert events == (["lock", "delete"] if matches_order else ["lock"])
+    assert Basket.objects.filter(pk=basket.pk).exists() is not matches_order

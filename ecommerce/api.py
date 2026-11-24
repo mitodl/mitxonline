@@ -512,8 +512,14 @@ def fulfill_completed_order(
     )
     sync_hubspot_deal(order)
 
-    if basket and basket.compare_to_order(order):
-        basket.delete()
+    if basket:
+        # Lock the basket before deleting it. The delete cascades to the items
+        # first, while an add locks the basket and then its item; taking the
+        # locks in opposite orders could deadlock with a concurrent add.
+        with transaction.atomic():
+            lock_basket(basket)
+            if basket.compare_to_order(order):
+                basket.delete()
 
 
 def get_order_from_cybersource_payment_response(request):
@@ -2272,18 +2278,23 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
 
     basket = establish_basket(request)
 
-    if basket.basket_items.count() > 0:
-        # Stuff in the basket - clear it out first.
-        basket.basket_items.all().delete()
-        basket.discounts.all().delete()
+    # Clear and refill the basket under its lock, so a concurrent change to
+    # the basket can't land in between.
+    with transaction.atomic():
+        lock_basket(basket)
 
-    add_product_to_basket(request, basket, product)
-    BasketDiscount.objects.create(
-        redemption_date=now_in_utc(),
-        redeemed_by=request.user,
-        redeemed_discount=discount,
-        redeemed_basket=basket,
-    )
+        if basket.basket_items.count() > 0:
+            # Stuff in the basket - clear it out first.
+            basket.basket_items.all().delete()
+            basket.discounts.all().delete()
+
+        add_product_to_basket(request, basket, product)
+        BasketDiscount.objects.create(
+            redemption_date=now_in_utc(),
+            redeemed_by=request.user,
+            redeemed_discount=discount,
+            redeemed_basket=basket,
+        )
 
     # Sync with HubSpot for CourseRun and Program products
     sync_hubspot_cart_add(
