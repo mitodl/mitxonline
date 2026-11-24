@@ -23,6 +23,7 @@ from drf_spectacular.utils import OpenApiParameter, extend_schema
 from mitol.common.utils import now_in_utc
 from mitol.olposthog.features import is_enabled as is_posthog_enabled
 from mitol.payment_gateway.api import PaymentGateway
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 from rest_framework import mixins, serializers, status
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from rest_framework.decorators import action
@@ -87,6 +88,7 @@ from ecommerce.serializers import (
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
 )
+from ecommerce.tasks import expire_cancelled_stripe_checkout
 from ecommerce.views.utils import AttachDiscountProductMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
@@ -947,12 +949,23 @@ class CheckoutResultCancelView(LoginRequiredMixin, View):
     """
     Landing page for a user who cancelled a Stripe checkout.
 
-    This only redirects the user back to the cart; the order is left for the
-    webhook to resolve when Stripe expires the checkout session.
+    This queues expiring the order's checkout session, so the payment page
+    can't still be used (e.g. from another tab), and redirects the user back to
+    the cart. The order is cancelled by the webhook once the session expires.
     """
 
-    def get(self, request, reference_number):  # noqa: ARG002
+    def get(self, request, reference_number):
         """Redirect the user to the cart with the payment cancelled message."""
+
+        order = Order.objects.filter(
+            reference_number=reference_number,
+            purchaser=request.user,
+            state=OrderStatus.PENDING,
+            gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        ).first()
+
+        if order:
+            expire_cancelled_stripe_checkout.delay(order.id)
 
         return redirect_with_user_message(
             reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
@@ -1247,6 +1260,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_BASKET_EMPTY},
+            )
+        if "payment_in_progress" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("user-dashboard"),
+                {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING},
             )
 
         if checkout_payload["method"] == "GET":

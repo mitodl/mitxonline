@@ -29,7 +29,11 @@ from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_STRIPE,
 )
 from reversion.models import Version
-from stripe import APIConnectionError, convert_to_stripe_object
+from stripe import (
+    APIConnectionError,
+    InvalidRequestError,
+    convert_to_stripe_object,
+)
 from zeal import zeal_context
 
 from b2b.constants import CONTRACT_MEMBERSHIP_CODE
@@ -63,6 +67,7 @@ from ecommerce.api import (
     downgrade_learner_from_order,
     establish_basket,
     establish_basket_for_request,
+    expire_stripe_checkout_session,
     find_order_for_stripe_payment_intent,
     find_paid_program_order_for_zero_value_order,
     fulfill_completed_order,
@@ -79,6 +84,7 @@ from ecommerce.api import (
     process_stripe_refund_updated,
     quote_user_price,
     refund_order,
+    supersede_open_stripe_checkouts,
     unenroll_learner_from_order,
 )
 from ecommerce.constants import (
@@ -163,7 +169,10 @@ from flexiblepricing.factories import (
     FlexiblePriceTierFactory,
     approve_flexible_price,
 )
-from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
+from main.constants import (
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+    USER_MSG_TYPE_PROFILE_INCOMPLETE,
+)
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
 from users.factories import UserFactory
@@ -3578,3 +3587,167 @@ def test_generate_checkout_payload_return_urls(
     else:
         assert success_url.endswith(reverse("checkout-result-callback"))
         assert cancel_url.endswith(reverse("checkout-result-callback"))
+
+
+def _create_stripe_checkout_order(user, product, session_id="cs_test_open"):
+    """Create a pending Stripe order for the product, with its CheckoutSession logged."""
+
+    line = LineFactory.create(
+        product_version=Version.objects.get_for_object(product).first(),
+        order__purchaser=user,
+        order__state=OrderStatus.PENDING,
+        order__gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+    TransactionFactory.create(
+        order=line.order,
+        transaction_id=session_id,
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data={"object": STRIPE_OBJECT_CHECKOUT_SESSION, "id": session_id},
+    )
+    return line.order
+
+
+@pytest.mark.parametrize(
+    ("expire_refused", "session_status", "expected"),
+    [
+        (False, None, True),
+        (True, STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED, True),
+        (True, STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE, False),
+    ],
+)
+def test_expire_stripe_checkout_session(  # noqa: PLR0913
+    mocker, user, products, expire_refused, session_status, expected
+):
+    """
+    The order's CheckoutSession is expired. If Stripe refuses, the session is
+    checked, and only a completed one counts as not expired.
+    """
+
+    mock_client = mocker.patch("ecommerce.api._get_stripe_checkout_session_v1")()
+    if expire_refused:
+        mock_client.expire.side_effect = InvalidRequestError("not open", None)
+    mock_client.retrieve.return_value.status = session_status
+    order = _create_stripe_checkout_order(user, products[0])
+
+    assert expire_stripe_checkout_session(order) is expected
+
+    mock_client.expire.assert_called_once_with("cs_test_open")
+    assert mock_client.retrieve.called is expire_refused
+
+
+def test_expire_stripe_checkout_session_no_session(mocker, user):
+    """An order with no CheckoutSession logged has nothing to expire."""
+
+    mock_get_client = mocker.patch("ecommerce.api._get_stripe_checkout_session_v1")
+    order = OrderFactory.create(
+        purchaser=user, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+
+    assert expire_stripe_checkout_session(order) is True
+    mock_get_client.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("already_paid", "same_product", "can_check_out"),
+    [
+        (False, True, True),
+        (True, True, False),
+        (True, False, True),
+    ],
+)
+def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
+    mocker, user, products, already_paid, same_product, can_check_out
+):
+    """
+    Earlier in-flight Stripe orders have their sessions expired. Checkout is
+    only refused when one of them is already paid for something in the basket.
+    """
+
+    mock_expire = mocker.patch(
+        "ecommerce.api.expire_stripe_checkout_session", return_value=not already_paid
+    )
+    basket = create_basket(user, products[:1])
+    order = _create_stripe_checkout_order(
+        user, products[0] if same_product else products[1]
+    )
+
+    assert supersede_open_stripe_checkouts(basket) is can_check_out
+    mock_expire.assert_called_once_with(order)
+
+
+def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, products):
+    """
+    Orders that aren't in-flight Stripe checkouts for this user, or are older
+    than a session can live, are left alone.
+    """
+
+    mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
+    basket = create_basket(user, products[:1])
+
+    _create_stripe_checkout_order(UserFactory.create(), products[0])
+    OrderFactory.create(
+        purchaser=user,
+        state=OrderStatus.PENDING,
+        gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    )
+    OrderFactory.create(
+        purchaser=user,
+        state=OrderStatus.CANCELED,
+        gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+    )
+    old_order = _create_stripe_checkout_order(user, products[0], "cs_test_old")
+    Order.objects.filter(pk=old_order.pk).update(
+        created_on=now_in_utc() - timedelta(hours=25)
+    )
+
+    assert supersede_open_stripe_checkouts(basket) is True
+    mock_expire.assert_not_called()
+
+
+def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):
+    """A Stripe error is logged, and the rest of the orders are still expired."""
+
+    mock_expire = mocker.patch(
+        "ecommerce.api.expire_stripe_checkout_session",
+        side_effect=[APIConnectionError("Stripe is down"), True],
+    )
+    mock_log = mocker.patch("ecommerce.api.log")
+    basket = create_basket(user, products[:1])
+    first = _create_stripe_checkout_order(user, products[0], "cs_first")
+    second = _create_stripe_checkout_order(user, products[0], "cs_second")
+
+    assert supersede_open_stripe_checkouts(basket) is True
+    assert mock_expire.call_args_list == [mocker.call(first), mocker.call(second)]
+    mock_log.exception.assert_called_once()
+
+
+@pytest.mark.parametrize("can_check_out", [True, False])
+def test_generate_checkout_payload_supersedes_checkouts(
+    mocker, user, products, can_check_out
+):
+    """
+    Checkout supersedes earlier checkouts first, and stops without an order
+    if the learner's already paying for the basket.
+    """
+
+    basket = create_basket(user, products)
+    mock_supersede = mocker.patch(
+        "ecommerce.api.supersede_open_stripe_checkouts", return_value=can_check_out
+    )
+    mocker.patch(
+        "ecommerce.api.PaymentGateway.start_payment",
+        return_value={"payload": mocker.MagicMock()},
+    )
+    mocker.patch("ecommerce.models.Order.get_object_flow")
+
+    payload = generate_checkout_payload(
+        authed_request(user), gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+
+    mock_supersede.assert_called_once_with(basket)
+    assert PendingOrder.objects.filter(purchaser=user).exists() is can_check_out
+    if not can_check_out:
+        assert payload == {
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+        }

@@ -109,3 +109,21 @@ def process_refund_request(refund_request_id):
     send_refund_request_notification_email.delay(
         refund_request_id, auto_refunded=auto_refunded, auto_refund_error=error
     )
+
+
+@app.task(acks_late=True)
+def expire_cancelled_stripe_checkout(order_id):
+    """
+    Expire the CheckoutSession of a Stripe order the learner cancelled, so the
+    payment page can't still be used (e.g. from another tab).
+
+    Args:
+       order_id (int): Id of the order
+    """
+    from ecommerce.api import expire_stripe_checkout_session
+    from ecommerce.models import Order, OrderStatus
+
+    order = Order.objects.filter(pk=order_id, state=OrderStatus.PENDING).first()
+
+    if order:
+        expire_stripe_checkout_session(order)

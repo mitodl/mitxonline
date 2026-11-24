@@ -53,6 +53,7 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
+    STRIPE_CHECKOUT_SESSION_LIFETIME,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
     STRIPE_EVENTS_CHECKOUT_SESSION,
@@ -112,6 +113,7 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
 )
 from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
@@ -300,6 +302,12 @@ def generate_checkout_payload(  # noqa: PLR0913
 
     if preflight_error:
         return preflight_error
+
+    if not supersede_open_stripe_checkouts(basket):
+        return {
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+        }
 
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
@@ -2181,6 +2189,118 @@ def _get_stripe_checkout_session_v1():
 
     stripe_gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
     return stripe_gateway.stripe_client.v1.checkout.sessions
+
+
+def get_stripe_checkout_session_id(order) -> str | None:
+    """Return the ID of the CheckoutSession recorded for the order, if any."""
+
+    session_transaction = order.transactions.filter(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+    ).first()
+
+    return session_transaction.data.get("id") if session_transaction else None
+
+
+def expire_stripe_checkout_session(order) -> bool:
+    """
+    Expire the order's CheckoutSession, so its payment page can't be used.
+
+    Stripe only expires open sessions, so if the expire call is refused the
+    session is retrieved to see why. Expiring a session makes Stripe send the
+    checkout.session.expired webhook, which cancels the order.
+
+    Args:
+    - order (Order): the Stripe order
+    Returns:
+    - bool: False if the session was already completed (so the learner has
+      paid, or is paying), True otherwise
+    """
+
+    session_id = get_stripe_checkout_session_id(order)
+
+    if not session_id:
+        return True
+
+    sessions = _get_stripe_checkout_session_v1()
+
+    try:
+        sessions.expire(session_id)
+    except stripe.InvalidRequestError:
+        if (
+            sessions.retrieve(session_id).status
+            == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
+        ):
+            return False
+    else:
+        log.info(
+            "Expired CheckoutSession %s for order %s",
+            session_id,
+            order.reference_number,
+        )
+
+    return True
+
+
+def supersede_open_stripe_checkouts(basket) -> bool:
+    """
+    Expire the CheckoutSessions of the basket user's earlier Stripe orders.
+
+    Checking out again (e.g. from another tab) replaces any checkout that's
+    still in flight, so only the newest payment page can be used. Orders older
+    than a CheckoutSession's lifetime are skipped; Stripe has expired those.
+
+    A Stripe error is logged and doesn't stop checkout: the session can't be
+    paid on while Stripe can't be reached either.
+
+    Returns:
+    - bool: False if an earlier order for something in the basket has already
+      been paid (or is being paid) - the learner shouldn't check out again
+    """
+
+    orders = (
+        Order.objects.filter(
+            purchaser=basket.user,
+            state=OrderStatus.PENDING,
+            gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+            created_on__gte=now_in_utc() - STRIPE_CHECKOUT_SESSION_LIFETIME,
+        )
+        .prefetch_related("lines")
+        .order_by("created_on")
+    )
+
+    if not orders:
+        return True
+
+    basket_products = {
+        (product.content_type_id, product.object_id)
+        for product in basket.get_products()
+    }
+    can_check_out = True
+
+    for order in orders:
+        try:
+            expired = expire_stripe_checkout_session(order)
+        except stripe.StripeError:
+            log.exception(
+                "Couldn't expire the CheckoutSession for order %s",
+                order.reference_number,
+            )
+            continue
+
+        if not expired and any(
+            (line.purchased_content_type_id, line.purchased_object_id)
+            in basket_products
+            for line in order.lines.all()
+        ):
+            log.info(
+                "Not checking out user %s again: order %s is already being paid",
+                basket.user.id,
+                order.reference_number,
+            )
+            can_check_out = False
+
+    return can_check_out
 
 
 def process_stripe_checkout_session_status(checkout_session: dict | str):

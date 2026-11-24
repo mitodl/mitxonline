@@ -1,9 +1,11 @@
 import pytest
 import reversion
 
-from ecommerce.factories import ProductFactory
+from ecommerce.factories import OrderFactory, ProductFactory
+from ecommerce.models import OrderStatus
 from ecommerce.serializers.serializers_test import create_order_receipt
 from ecommerce.tasks import (
+    expire_cancelled_stripe_checkout,
     perform_cull_anonymous_baskets,
     perform_cull_stale_pending_orders,
     perform_downgrade_from_order,
@@ -108,3 +110,18 @@ def test_delayed_downgrade_user(mocker, user):
     )
     perform_downgrade_from_order.delay(order_id=1)
     downgrade_learner_mock.assert_called()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", [OrderStatus.PENDING, OrderStatus.CANCELED])
+def test_expire_cancelled_stripe_checkout(mocker, state):
+    """The task expires the session of an order that's still pending."""
+    mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
+    order = OrderFactory.create(state=state)
+
+    expire_cancelled_stripe_checkout(order.id)
+
+    if state == OrderStatus.PENDING:
+        mock_expire.assert_called_once_with(order)
+    else:
+        mock_expire.assert_not_called()

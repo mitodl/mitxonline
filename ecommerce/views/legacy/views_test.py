@@ -13,7 +13,10 @@ from django.test import Client, RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.utils.datetime import now_in_utc
 from mitol.payment_gateway.api import PaymentGateway
-from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from rest_framework import status
 from rest_framework.test import APIClient
 from reversion.models import Version
@@ -2285,10 +2288,32 @@ def test_checkout_result_success_ignores_other_users_orders(
     )
 
 
-def test_checkout_result_cancel_redirects_to_cart(user, user_client):
-    """The cancel handler redirects to the cart with the cancelled message."""
+@pytest.mark.parametrize(
+    ("own_order", "state", "gateway_type", "expect_expire"),
+    [
+        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, True),
+        (False, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, False),
+        (True, OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_STRIPE, False),
+        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_CYBERSOURCE, False),
+    ],
+)
+def test_checkout_result_cancel_redirects_to_cart(  # noqa: PLR0913
+    mocker, user, user_client, own_order, state, gateway_type, expect_expire
+):
+    """
+    The cancel handler redirects to the cart with the cancelled message, and
+    queues expiring the checkout session of the user's pending Stripe order.
+    The order itself is left for the webhook.
+    """
 
-    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+    mock_expire = mocker.patch(
+        "ecommerce.views.legacy.expire_cancelled_stripe_checkout.delay"
+    )
+    order = OrderFactory.create(
+        purchaser=user if own_order else UserFactory.create(),
+        state=state,
+        gateway_type=gateway_type,
+    )
 
     resp = user_client.get(
         reverse(
@@ -2303,4 +2328,28 @@ def test_checkout_result_cancel_redirects_to_cart(user, user_client):
         {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
     )
     order.refresh_from_db()
-    assert order.state == OrderStatus.PENDING
+    assert order.state == state
+    if expect_expire:
+        mock_expire.assert_called_once_with(order.id)
+    else:
+        mock_expire.assert_not_called()
+
+
+def test_checkout_interstitial_payment_in_progress(mocker, user_client):
+    """A learner who's already paying for the basket is sent to the dashboard."""
+
+    mocker.patch(
+        "ecommerce.api.generate_checkout_payload",
+        return_value={
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+        },
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+    )
