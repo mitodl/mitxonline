@@ -46,6 +46,8 @@ from ecommerce.constants import (
     REDEMPTION_TYPES,
     REFERENCE_NUMBER_PREFIX,
     REFUND_WINDOW_DAYS,
+    STRIPE_OBJECT_CHECKOUT_SESSION,
+    STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
     TRANSACTION_TYPES,
@@ -1003,10 +1005,26 @@ class OrderFlow:
         if reason:
             transaction_payload["reason"] = reason
 
-        return self.order.transactions.get_or_create(
+        order_transaction, created = self.order.transactions.get_or_create(
             transaction_id=transaction_payload["transaction_id"],
             defaults=transaction_payload,
         )
+
+        if (
+            not created
+            and order_transaction.reason
+            == STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+            and payment_data.get("object") == STRIPE_OBJECT_CHECKOUT_SESSION
+        ):
+            # The order is being fulfilled from its CheckoutSession (by the
+            # pending or stale order checks) rather than the webhook event.
+            # That's the session logged at checkout, so it has the same ID.
+            # Keep the paid copy: it has the PaymentIntent or PaymentRecord
+            # that refunds are matched on, and the one from checkout doesn't.
+            order_transaction.data = payment_data
+            order_transaction.save(update_fields=["data", "updated_on"])
+
+        return order_transaction, created
 
     def create_enrollments(self):
         """Create enrollments using the process_transaction_line hook."""
