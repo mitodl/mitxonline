@@ -20,9 +20,9 @@ from django.http import Http404, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.functional import cached_property
+from django.utils.functional import cached_property, lazy
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
+from django.utils.safestring import SafeString, mark_safe
 from django.utils.text import slugify
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
@@ -328,16 +328,23 @@ class CourseProgramChildPage(Page):
         raise Http404
 
 
-# CMS page (ResourcePage) with example descriptions and criteria, mitodl/hq#13681.
-VC_EXAMPLES_URL = "/credential-examples/"
+def vc_help_text(text):
+    """
+    Help text ending with a link to the credential examples page (mitodl/hq#13681).
 
-# Opens in a new tab so an author doesn't lose unsaved CMS edits.
-VC_EXAMPLES_LINK = format_html(
-    '<a href="{}" target="_blank" rel="noopener noreferrer" '
-    'style="display:inline-block;margin-top:0.75rem">'
-    "View examples of well-written credential descriptions and criteria</a>.",
-    VC_EXAMPLES_URL,
-)
+    The link opens in a new tab so an author doesn't lose unsaved CMS edits. It is
+    resolved at render time because URLs aren't loaded when this module imports.
+    """
+    return lazy(
+        lambda: format_html(
+            '{} <a href="{}" target="_blank" rel="noopener noreferrer" '
+            'style="display:inline-block;margin-top:0.75rem">'
+            "View examples of well-written credential descriptions and criteria</a>.",
+            text,
+            reverse("cms_credential_examples"),
+        ),
+        SafeString,
+    )()
 
 
 class GenerateWithAIFieldPanel(FieldPanel):
@@ -483,13 +490,12 @@ class CertificatePage(CourseProgramChildPage):
                     widget=Textarea,
                     # Panel-level so the link doesn't need a migration; this
                     # overrides the model field's help_text, which is left as is.
-                    help_text=format_html(
+                    help_text=vc_help_text(
                         "1-2 sentences describing the course or program. This "
                         "language serves as a template applied to the credential "
                         "for every learner who completes the course and earns a "
                         "certificate, so it should not include a specific "
-                        "learner's name. {}",
-                        VC_EXAMPLES_LINK,
+                        "learner's name."
                     ),
                 ),
                 # Set on the panel, not the field: panel help text carries
@@ -499,18 +505,19 @@ class CertificatePage(CourseProgramChildPage):
                     "verifiable_credential_criteria",
                     metadata_field="criteria",
                     widget=Textarea,
-                    help_text=mark_safe(
-                        "Describe what the learner did in order to earn the "
-                        "credential. This should be a bulleted list, in plain "
-                        "text or markdown, with each item beginning with an "
-                        "action verb -- for example: <strong>Described</strong> "
-                        "how machine learning models are trained, or "
-                        "<strong>Distinguished</strong> between symbolic and "
-                        "modern machine learning. If it is not supplied, no "
-                        "verifiable credential will be provisioned for those "
-                        "certificates. "
-                    )
-                    + VC_EXAMPLES_LINK,
+                    help_text=vc_help_text(
+                        mark_safe(
+                            "Describe what the learner did in order to earn the "
+                            "credential. This should be a bulleted list, in plain "
+                            "text or markdown, with each item beginning with an "
+                            "action verb -- for example: <strong>Described</strong> "
+                            "how machine learning models are trained, or "
+                            "<strong>Distinguished</strong> between symbolic and "
+                            "modern machine learning. If it is not supplied, no "
+                            "verifiable credential will be provisioned for those "
+                            "certificates."
+                        )
+                    ),
                 ),
             ],
             heading="Verifiable Credential",

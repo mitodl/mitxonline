@@ -6,7 +6,7 @@ from django.urls import path
 from wagtail import hooks
 from wagtail.admin.api.views import PagesAdminAPIViewSet
 
-from cms.views import credential_metadata
+from cms.views import credential_examples, credential_metadata
 
 DEFAULT_ORDER = (
     "{prefix}coursepage__course__readable_id".format(prefix=""),
@@ -56,11 +56,16 @@ def configure_admin_api_default_order(router):
 
 @hooks.register("register_admin_urls")
 def register_credential_metadata_url():
-    """Mount the endpoint behind the CertificatePage "Generate with AI" buttons"""
+    """Mount the CertificatePage credential endpoints: "Generate with AI" and the examples page"""
     return [
         path(
             "credential-metadata/<int:parent_page_id>/",
             credential_metadata,
             name="cms_credential_metadata",
+        ),
+        path(
+            "credential-examples/",
+            credential_examples,
+            name="cms_credential_examples",
         ),
     ]
