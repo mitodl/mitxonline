@@ -397,6 +397,11 @@ def _get_latest_manual_approval(user) -> ExportComplianceLog | None:
     )
 
 
+def _is_unexpired(approval: ExportComplianceLog | None) -> bool:
+    """Return True if this manual approval exists and still covers new enrollments."""
+    return approval is not None and approval.approval_expires_on > now_in_utc()
+
+
 def get_active_manual_approval(user) -> ExportComplianceLog | None:
     """
     Return the user's newest manual approval if it hasn't expired yet.
@@ -406,9 +411,7 @@ def get_active_manual_approval(user) -> ExportComplianceLog | None:
     after it was approved.
     """
     approval = _get_latest_manual_approval(user)
-    if approval is None or approval.approval_expires_on <= now_in_utc():
-        return None
-    return approval
+    return approval if _is_unexpired(approval) else None
 
 
 def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
@@ -419,27 +422,26 @@ def get_latest_export_compliance_log(user, run) -> ExportComplianceLog | None:
     the most recent log that either matches the given courseware object, was
     created within the last 24 hours (regardless of courseware object), or
     represents a prior failed check for this user (regardless of age or
-    courseware object), if any. Once an approval has expired, only checks
-    recorded after it expired are reused, so the learner is screened again.
+    courseware object), if any.
+
+    Once the user's newest approval has expired, only checks recorded after
+    it expired are considered. Older ones, including a prior failed check,
+    are no longer reused, so the learner is screened again.
     """
     approval = _get_latest_manual_approval(user)
-    if approval is not None and approval.approval_expires_on > now_in_utc():
+    if _is_unexpired(approval):
         return approval
 
     cutoff = now_in_utc() - RECENT_EXPORT_COMPLIANCE_CHECK_WINDOW
-    logs = (
-        ExportComplianceLog.objects.filter(user=user)
-        .filter(
-            Q(
-                courseware_content_type=ContentType.objects.get_for_model(run),
-                courseware_object_id=run.id,
-            )
-            | Q(created_on__gte=cutoff)
-            | ~Q(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
+    logs = ExportComplianceLog.objects.filter(user=user).filter(
+        Q(
+            courseware_content_type=ContentType.objects.get_for_model(run),
+            courseware_object_id=run.id,
         )
-        # Only an unexpired approval (handled above) may stand in for a check.
-        .exclude(decision=ExportComplianceDecision.MANUALLY_APPROVED)
+        | Q(created_on__gte=cutoff)
+        | ~Q(decision__in=ExportComplianceLog.ACCEPTED_DECISIONS)
     )
+    # An expired approval was created before it expired, so this also drops it.
     if approval is not None:
         logs = logs.filter(created_on__gte=approval.approval_expires_on)
     return logs.order_by("-created_on").first()

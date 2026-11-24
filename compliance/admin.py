@@ -1,6 +1,7 @@
 """Admin for the compliance app"""
 
 from django.contrib import admin, messages
+from django.contrib.admin.utils import display_for_value
 from django.core.exceptions import ValidationError
 from django_object_actions import DjangoObjectActions, action
 from mitol.common.admin import TimestampedModelAdmin
@@ -95,7 +96,10 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
     @admin.display(description="Approval expires on")
     def approval_expires_on(self, obj):
         """Show when a manual approval stops covering new enrollments."""
-        return obj.approval_expires_on
+        # Format it like the model's other datetime fields on the change page.
+        return display_for_value(
+            obj.approval_expires_on, self.get_empty_value_display()
+        )
 
     def get_change_actions(self, request, object_id, form_url):
         """Hide the approve button from staff who can't change logs."""

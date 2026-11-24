@@ -1,6 +1,7 @@
 """Tests for compliance admin views"""
 
 import pytest
+from django.contrib.admin.utils import display_for_value
 from django.contrib.auth.models import Permission
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
@@ -40,7 +41,10 @@ def test_mark_manually_approved_action(client, admin_user):
     assert any(
         expires_on in str(message) for message in get_messages(response.wsgi_request)
     )
-    assert expires_on in response.content.decode()
+    # The change page formats it like the other datetime fields, not raw.
+    content = response.content.decode()
+    assert display_for_value(log_entry.approval_expires_on, "-") in content
+    assert str(log_entry.approval_expires_on) not in content
 
 
 def test_mark_manually_approved_action_rejects_get(client, admin_user):

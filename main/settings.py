@@ -1252,6 +1252,10 @@ EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = get_int(
         "in any course run or program without a new CyberSource check."
     ),
 )
+if EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS < 1:
+    raise ImproperlyConfigured(
+        "EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS must be at least 1"  # noqa: EM101
+    )
 
 # mitol-django-common
 MITOL_COMMON_USER_FACTORY = "users.factories.UserFactory"

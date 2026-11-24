@@ -753,6 +753,8 @@ def _approved_log(user, courseware_object, approved_on):
         (0, 0, True),
         (11, 0, True),
         (12, 1, True),
+        # Expires at exactly this instant: no longer active.
+        (12, 0, False),
         (12, -1, False),
         (24, 0, False),
     ],

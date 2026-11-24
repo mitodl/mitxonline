@@ -186,3 +186,16 @@ def test_bump_my_version_format(settings):
     assert re.fullmatch(version_pattern, settings.VERSION) or re.fullmatch(
         semver_pattern, settings.VERSION
     ), f'VERSION "{settings.VERSION}" does not match calver or semver format'
+
+
+@pytest.mark.parametrize("months", ["0", "-1"])
+def test_export_compliance_manual_approval_months_minimum(settings_sandbox, months):
+    """An approval period under one month is rejected at startup"""
+    with pytest.raises(ImproperlyConfigured):
+        settings_sandbox.patch({"EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS": months})
+
+    # Restore a valid value so the sandbox's teardown reload succeeds.
+    settings_vars = settings_sandbox.patch(
+        {"EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS": "1"}
+    )
+    assert settings_vars["EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS"] == 1
