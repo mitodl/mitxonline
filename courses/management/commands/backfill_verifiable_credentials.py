@@ -93,7 +93,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):  # noqa: ARG002
         # These are either the readable IDs of a program or the IDs of course runs to process
-        ids = options["ids"].split(",")
+        ids = [i for i in options["ids"].split(",") if i]
         force = options["force"]
         sleep = options["sleep"]
         execute = options["execute"]

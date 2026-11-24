@@ -153,6 +153,27 @@ def test_dry_run_changes_nothing(signer, make_certificate, mock_certificate_page
     assert "Backfilled" not in out.getvalue()
 
 
+def test_requires_ids_or_uuid(signer, make_certificate, mock_certificate_page):
+    """Without --ids or --uuid the command reports an error and processes nothing"""
+    mock_certificate_page()
+    certificate = make_certificate(with_credential=False)
+    out = StringIO()
+
+    call_command(
+        "backfill_verifiable_credentials",
+        "--type",
+        "program",
+        "--execute",
+        stdout=out,
+        stderr=out,
+    )
+
+    signer.assert_not_called()
+    certificate.refresh_from_db()
+    assert certificate.verifiable_credential is None
+    assert "You must provide either --ids or --uuid" in out.getvalue()
+
+
 @pytest.fixture
 def program_selection(mock_certificate_page):
     """Certificates for the program being backfilled, plus ones that must be left alone"""
