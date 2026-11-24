@@ -677,33 +677,38 @@ def test_pending_order_from_same_product_is_fresh():
     assert first_order.reference_number != second_order.reference_number
 
 
-def test_duplicate_basket_products_create_one_order_line(basket):
-    """A repeated basket item for one purchasable object is charged only once."""
+# A basket can't hold the same product twice (and a purchasable object has one
+# product), so these give _create_with_data the repeats directly.
+
+
+def test_duplicate_order_products_create_one_order_line(user):
+    """A repeated product for one purchasable object is charged only once."""
     with reversion.create_revision():
         product = ProductFactory.create(price=Decimal("100.00"))
-    BasketItemFactory.create(basket=basket, product=product)
-    BasketItemFactory.create(basket=basket, product=product)
 
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder._create_with_data(  # noqa: SLF001
+        PendingOrder, [(product, None), (product, None)], user
+    )
 
     assert order.lines.count() == 1
     assert order.total_price_paid == Decimal("100.00")
 
 
-def test_duplicate_basket_products_with_conflicting_contracts_are_rejected(basket):
-    """Duplicate basket entries must agree on their contract."""
+def test_duplicate_order_products_with_conflicting_contracts_are_rejected(user):
+    """Repeated products must agree on their contract."""
     product = ProductFactory.create()
-    BasketItemFactory.create(
-        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
-    )
-    BasketItemFactory.create(
-        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
-    )
 
     with pytest.raises(ValidationError, match="conflicting contracts"):
-        PendingOrder.create_from_basket(basket)
+        PendingOrder._create_with_data(  # noqa: SLF001
+            PendingOrder,
+            [
+                (product, ContractPageFactory.create()),
+                (product, ContractPageFactory.create()),
+            ],
+            user,
+        )
 
-    assert not Order.objects.filter(purchaser=basket.user).exists()
+    assert not Order.objects.filter(purchaser=user).exists()
 
 
 def test_pending_order_with_bad_product_versions(basket):
@@ -2338,3 +2343,12 @@ def test_pending_order_copies_location(settings, user, from_basket):
         assert order.location_source == GEOLOCATION_TYPE_NONE
         assert order.user_locations == []
         assert order.location_determined_on is None
+
+
+def test_basket_item_unique_per_basket_and_product():
+    """A basket can't hold two rows for the same product."""
+
+    item = BasketItemFactory.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        BasketItem.objects.create(basket=item.basket, product=item.product)

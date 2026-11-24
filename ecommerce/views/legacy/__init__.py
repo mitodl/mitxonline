@@ -87,7 +87,7 @@ from ecommerce.serializers import (
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
 )
-from ecommerce.views.utils import AttachDiscountProductMixin
+from ecommerce.views.utils import AddBasketItemMixin, AttachDiscountProductMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
@@ -273,7 +273,11 @@ class BasketViewSet(
     ]
 )
 class BasketItemViewSet(
-    NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
+    NestedViewSetMixin,
+    AddBasketItemMixin,
+    ListCreateAPIView,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
 ):
     """API view set for BasketItem"""
 
@@ -295,16 +299,6 @@ class BasketItemViewSet(
         return Response(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
-
-    def perform_create(self, serializer):
-        """Add the item through the basket API, so the basket hooks run."""
-
-        item, _ = api.add_product_to_basket(
-            self.request,
-            serializer.validated_data["basket"],
-            serializer.validated_data["product"],
-        )
-        serializer.instance = item
 
 
 @extend_schema(

@@ -96,7 +96,7 @@ from ecommerce.serializers.v0 import (
     requests,
 )
 from ecommerce.tasks import process_refund_request
-from ecommerce.views.utils import AttachDiscountProductMixin
+from ecommerce.views.utils import AddBasketItemMixin, AttachDiscountProductMixin
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -126,7 +126,7 @@ User = get_user_model()
         ),
     ],
 )
-class BasketItemViewSet(ModelViewSet):
+class BasketItemViewSet(AddBasketItemMixin, ModelViewSet):
     """ViewSet for handling BasketItem operations."""
 
     permission_classes = (IsAuthenticated,)
@@ -148,14 +148,10 @@ class BasketItemViewSet(ModelViewSet):
         The basket comes from the request body, so check it's the caller's.
         """
 
-        basket = serializer.validated_data["basket"]
-        if basket.user_id != self.request.user.id:
+        if serializer.validated_data["basket"].user_id != self.request.user.id:
             raise NotFound
 
-        item, _ = add_product_to_basket(
-            self.request, basket, serializer.validated_data["product"]
-        )
-        serializer.instance = item
+        super().perform_create(serializer)
 
     def perform_update(self, serializer):
         """

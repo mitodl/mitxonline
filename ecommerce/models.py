@@ -400,6 +400,15 @@ class BasketItem(TimestampedModel):
         "b2b.ContractPage", on_delete=models.DO_NOTHING, related_name="+", null=True
     )
 
+    class Meta:
+        constraints = [
+            # add_product_to_basket finds an existing item by these; a second
+            # row for the same product would make that lookup fail.
+            models.UniqueConstraint(
+                fields=["basket", "product"], name="unique_basket_product"
+            ),
+        ]
+
     @cached_property
     def discounted_price(self):
         """Return the price of the product with discounts"""

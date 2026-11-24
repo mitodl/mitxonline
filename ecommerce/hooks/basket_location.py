@@ -24,8 +24,17 @@ class BasketLocation:
         # import here to keep the plugin manager import light.
         from location.api import determine_user_location  # noqa: PLC0415
 
+        # The location can't change within a request, so a request that adds
+        # several products locates the basket once. Keyed by user too, since
+        # claiming a basket gives it one (and so a profile to look at).
+        located = request.__dict__.setdefault("_located_baskets", set())
+        key = (basket.pk, request.user.pk)
+        if key in located:
+            return
+
         basket.set_location(determine_user_location(request))
         basket.save(update_fields=[*basket.LOCATION_FIELDS, "updated_on"])
+        located.add(key)
 
         log.debug(
             "Basket %s located in %s (%s)",
