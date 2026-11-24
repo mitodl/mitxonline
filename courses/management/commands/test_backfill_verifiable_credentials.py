@@ -5,6 +5,12 @@ from io import StringIO
 import pytest
 from django.core.management import call_command
 
+from courses.factories import (
+    CourseRunCertificateFactory,
+    ProgramCertificateFactory,
+    ProgramFactory,
+)
+
 pytestmark = [pytest.mark.django_db]
 
 
@@ -145,3 +151,74 @@ def test_dry_run_changes_nothing(signer, make_certificate, mock_certificate_page
     assert certificate.verifiable_credential.credential_data["old"] is True
     assert "DRY RUN" in out.getvalue()
     assert "Backfilled" not in out.getvalue()
+
+
+@pytest.fixture
+def program_selection(mock_certificate_page):
+    """Certificates for the program being backfilled, plus ones that must be left alone"""
+    mock_certificate_page()
+    program = ProgramFactory.create()
+    return {
+        "program": program,
+        "targets": ProgramCertificateFactory.create_batch(2, program=program),
+        "others": [
+            ProgramCertificateFactory.create(),
+            CourseRunCertificateFactory.create(),
+        ],
+    }
+
+
+def _run_by_program(readable_id, *extra_args):
+    out = StringIO()
+    call_command(
+        "backfill_verifiable_credentials",
+        "--type",
+        "program",
+        "--ids",
+        readable_id,
+        *extra_args,
+        stdout=out,
+        stderr=out,
+    )
+    return out.getvalue()
+
+
+def test_program_ids_backfills_only_that_programs_certificates(
+    signer, program_selection
+):
+    """--type program --ids processes every certificate of the named program and no others"""
+    _run_by_program(program_selection["program"].readable_id, "--execute")
+
+    for certificate in program_selection["targets"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential.credential_data["proof"]
+    for certificate in program_selection["others"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
+    assert signer.call_count == len(program_selection["targets"])
+
+
+def test_program_ids_dry_run_changes_nothing(signer, program_selection):
+    """Without --execute the program selection is only listed"""
+    output = _run_by_program(program_selection["program"].readable_id)
+
+    signer.assert_not_called()
+    for certificate in program_selection["targets"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
+        assert f"DRY RUN -- Would backfill certificate {certificate}" in output
+    assert "Backfilled" not in output
+
+
+def test_program_ids_with_no_matching_program_processes_nothing(
+    signer, program_selection
+):
+    """An unknown program readable id selects no certificates"""
+    output = _run_by_program("program-v1:does+not+exist", "--execute")
+
+    signer.assert_not_called()
+    assert "Backfilled" not in output
+    assert "DRY RUN" not in output
+    for certificate in program_selection["targets"] + program_selection["others"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
