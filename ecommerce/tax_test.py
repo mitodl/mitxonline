@@ -70,6 +70,20 @@ def test_calculate_tax_uses_saved_rate():
     assert Decimal(result.tax_rate_version.field_dict["tax_rate"]) == result.rate
 
 
+def test_calculate_tax_locale_rate_changed_after_read():
+    """A rate from get_tax_rate_for_locale that's changed and saved is taxed at its new value."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    locale_rate = get_tax_rate_for_locale("IN")
+    locale_rate.tax_rate = Decimal(20)
+    locale_rate.save()
+
+    result = calculate_tax(Decimal("100.00"), locale_rate)
+
+    assert result.rate == Decimal(20)
+    assert result.tax_rate_version == tax_rate.current_version
+
+
 def test_calculate_tax_in_open_revision():
     """A rate whose version isn't saved yet can't be used, so no wrong version is pinned."""
 

@@ -133,15 +133,28 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
     Args:
     - amount (Decimal): the amount to tax
     - tax_rate (TaxRate|None): the rate to apply; None means no tax. A saved
-      rate is re-read along with its newest version ID, unless it already
-      carries one from get_tax_rate_for_locale, so the rate applied is the
-      one the version records.
+      rate is re-read along with its newest version ID, so the rate applied is
+      the one the version records, even if the instance passed in is stale.
 
     Returns:
     - CalculatedTax: the rate applied, the tax, and the total
 
     Raises:
     - TaxRateVersionError: if the saved rate has no saved version matching it
+    """
+
+    if tax_rate is not None and tax_rate.pk is not None:
+        tax_rate = _with_version_id(TaxRate.all_objects).get(pk=tax_rate.pk)
+
+    return _calculate_tax(amount, tax_rate)
+
+
+def _calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
+    """
+    Calculate the tax owed on an amount at a rate read with _with_version_id.
+
+    The rate isn't re-read, so it must be fresh from that query: a saved rate's
+    latest_version_id is trusted to be its newest version as of that read.
     """
 
     # str() first so a float doesn't carry its binary error into the result.
@@ -159,11 +172,8 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
 
     tax_rate_version = None
     if tax_rate.pk is not None:
-        if not hasattr(tax_rate, "latest_version_id"):
-            tax_rate = _with_version_id(TaxRate.all_objects).get(pk=tax_rate.pk)
-
         # Versions are never changed once written, so loading this one in a
-        # separate statement can't disagree with the row read above.
+        # separate statement can't disagree with the row read with its ID.
         if tax_rate.latest_version_id is not None:
             tax_rate_version = Version.objects.get(pk=tax_rate.latest_version_id)
 
@@ -218,7 +228,8 @@ def calculate_tax_for_locale(
     - TaxRateVersionError: if the rate has no saved version matching it
     """
 
-    return calculate_tax(amount, get_tax_rate_for_locale(country_code))
+    # The rate was just read with its version ID, so it needn't be re-read.
+    return _calculate_tax(amount, get_tax_rate_for_locale(country_code))
 
 
 def get_product(product_id: int | str) -> Product:
