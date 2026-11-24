@@ -51,6 +51,16 @@ class TaxRecordSerializer(TaxLineSerializer):
     calculated_on = serializers.DateTimeField(read_only=True)
 
 
+# A money total, for the schema and to render one as the API's decimal string
+# ("18.00"). Method fields return what they're given as is, and a bare Decimal
+# would go out as a JSON number.
+MONEY_FIELD = serializers.DecimalField(max_digits=20, decimal_places=2)
+
+
+def _tax_total(tax_records) -> Decimal:
+    return sum((tax.tax_amount for tax in tax_records), Decimal("0.00"))
+
+
 # Tax totals for a basket. Expects the serializer to have get_discounted_price.
 # Reads basket_items and their taxes through .all(), so a prefetch serves it.
 class BasketTaxFieldsMixin(serializers.Serializer):
@@ -61,18 +71,17 @@ class BasketTaxFieldsMixin(serializers.Serializer):
     def _tax_records(self, instance):
         return instance.get_tax_records()
 
-    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
-    def get_tax_amount(self, instance) -> Decimal:
+    @extend_schema_field(MONEY_FIELD)
+    def get_tax_amount(self, instance) -> str:
         """Get the total tax on the basket."""
-        return sum(
-            (tax.tax_amount for tax in self._tax_records(instance)), Decimal("0.00")
-        )
+        return MONEY_FIELD.to_representation(_tax_total(self._tax_records(instance)))
 
-    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
-    def get_grand_total(self, instance) -> Decimal:
+    @extend_schema_field(MONEY_FIELD)
+    def get_grand_total(self, instance) -> str:
         """Get the price after discounts, plus tax."""
-        return Decimal(self.get_discounted_price(instance)) + self.get_tax_amount(
-            instance
+        return MONEY_FIELD.to_representation(
+            Decimal(self.get_discounted_price(instance))
+            + _tax_total(self._tax_records(instance))
         )
 
     @extend_schema_field(TaxLineSerializer(many=True))
@@ -92,17 +101,17 @@ class OrderTaxFieldsMixin(serializers.Serializer):
     def _tax_records(self, instance):
         return instance.get_tax_records()
 
-    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
-    def get_tax_amount(self, instance) -> Decimal:
+    @extend_schema_field(MONEY_FIELD)
+    def get_tax_amount(self, instance) -> str:
         """Get the total tax charged on the order."""
-        return sum(
-            (tax.tax_amount for tax in self._tax_records(instance)), Decimal("0.00")
-        )
+        return MONEY_FIELD.to_representation(_tax_total(self._tax_records(instance)))
 
-    @extend_schema_field(serializers.DecimalField(max_digits=20, decimal_places=2))
-    def get_subtotal(self, instance) -> Decimal:
+    @extend_schema_field(MONEY_FIELD)
+    def get_subtotal(self, instance) -> str:
         """Get the order's price before tax."""
-        return Decimal(instance.total_price_paid) - self.get_tax_amount(instance)
+        return MONEY_FIELD.to_representation(
+            Decimal(instance.total_price_paid) - _tax_total(self._tax_records(instance))
+        )
 
     @extend_schema_field(TaxLineSerializer(many=True))
     def get_taxes(self, instance) -> list[dict]:

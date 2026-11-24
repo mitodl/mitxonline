@@ -3972,3 +3972,50 @@ def test_add_product_to_basket_locates_once_per_request(settings, user, mocker):
     assert basket.basket_items.count() == 3
     basket.refresh_from_db()
     assert basket.location_country_code == "IN"
+
+
+def test_recalculate_basket_tax_locks_basket(user, taxed_locale, mocker):
+    """Replacing a basket's tax locks the basket first, so writers take turns."""
+
+    basket = _located_basket(user)
+    BasketItemFactory.create(basket=basket)
+    select_for_update = mocker.spy(Basket.objects, "select_for_update")
+
+    recalculate_basket_tax(basket)
+
+    select_for_update.assert_called_once()
+
+
+def test_generate_checkout_payload_locks_basket_through_order_creation(
+    mocker, user, taxed_locale
+):
+    """Checkout takes the basket lock before re-taxing, and creates the order under it."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create(price=Decimal("100.00"))
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    mocker.patch(
+        "ecommerce.api.PaymentGateway.start_payment",
+        return_value={"payload": mocker.MagicMock()},
+    )
+    events = []
+    create_from_basket = PendingOrder.create_from_basket
+
+    def record_lock(_basket):
+        events.append("lock")
+
+    def record_create(*args, **kwargs):
+        events.append("create")
+        return create_from_basket(*args, **kwargs)
+
+    lock = mocker.patch("ecommerce.api.lock_basket", side_effect=record_lock)
+    mocker.patch.object(PendingOrder, "create_from_basket", side_effect=record_create)
+
+    generate_checkout_payload(
+        authed_request(user), gateway_type=MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+    )
+
+    assert events[0] == "lock"
+    assert "create" in events
+    lock.assert_any_call(basket)

@@ -48,7 +48,7 @@ type Props = {
   totalPrice: number,
   discountedPrice: number,
   taxes: Array<Tax>,
-  grandTotal: number,
+  grandTotal: ?string,
   discounts: Array<Discount>,
   isLoading: boolean,
   applyDiscountCode: (code: string) => Promise<any>,

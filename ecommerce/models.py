@@ -242,6 +242,19 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         return Version.objects.get_for_object(self).first()
 
 
+class TaxedItemMixin:
+    """
+    The tax total for a basket item or order line, from its tax records
+    (its "taxes" relation). Prefetch "taxes" when reading many of these.
+    """
+
+    @property
+    def tax_amount(self) -> Decimal:
+        """Return the total tax charged on this item or line."""
+
+        return sum((tax.tax_amount for tax in self.taxes.all()), Decimal("0.00"))
+
+
 class Basket(TimestampedModel, UserLocationModel):
     """Represents a User's basket, and where we placed the user when they filled it."""
 
@@ -396,7 +409,7 @@ class Basket(TimestampedModel, UserLocationModel):
         ]
 
 
-class BasketItem(TimestampedModel):
+class BasketItem(TaxedItemMixin, TimestampedModel):
     """Represents one or more products in a user's basket."""
 
     product = models.ForeignKey(
@@ -456,12 +469,6 @@ class BasketItem(TimestampedModel):
     def base_price(self):
         """Returns the total price of the basket item without discounts."""
         return self.product.price * self.quantity
-
-    @property
-    def tax_amount(self) -> Decimal:
-        """Return the total tax charged on this item."""
-
-        return sum((tax.tax_amount for tax in self.taxes.all()), Decimal("0.00"))
 
 
 PROGRAM_PRODUCTS_ONLY_ERROR = (
@@ -1746,7 +1753,7 @@ def b2b_order_exists() -> Exists:
     )
 
 
-class Line(TimestampedModel):
+class Line(TaxedItemMixin, TimestampedModel):
     """A line in an Order."""
 
     valid_purchasable_objects = valid_purchasable_objects_list()
@@ -1817,12 +1824,6 @@ class Line(TimestampedModel):
             total += calculated.tax_amount
 
         return total
-
-    @property
-    def tax_amount(self) -> Decimal:
-        """Return the total tax charged on this line."""
-
-        return sum((tax.tax_amount for tax in self.taxes.all()), Decimal("0.00"))
 
     @property
     def item_description(self):

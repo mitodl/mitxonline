@@ -76,6 +76,32 @@ def test_mail_api_receipt_generation(  # noqa: PLR0913
 
 @pytest.mark.skip_nplusone_check
 @responses.activate
+def test_mail_api_receipt_includes_tax(  # noqa: PLR0913
+    settings,
+    mocker,
+    user,
+    products,
+    user_client,
+    taxed_locale,
+    django_capture_on_commit_callbacks,
+):
+    """The receipt shows the tax, and its order total includes it."""
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "mock_api_token"  # noqa: S105
+    mock_send_message = mocker.patch("mitol.mail.api.send_message")
+    responses.get("https://fonts.googleapis.com/css")
+
+    with django_capture_on_commit_callbacks(execute=True):
+        order = create_order_receipt(mocker, user, products, user_client)
+
+    tax = sum(line.tax_amount for line in order.lines.all())
+    assert tax > 0
+    html = mock_send_message.call_args[0][0].alternatives[0][0]
+    assert f"Tax:</strong> ${tax:.2f}" in html
+    assert f"Order Total:</strong> ${order.total_price_paid:.2f}" in html
+
+
+@pytest.mark.skip_nplusone_check
+@responses.activate
 def test_mail_api_refund_email_generation(  # noqa: PLR0913
     settings, mocker, user, products, user_client, django_capture_on_commit_callbacks
 ):

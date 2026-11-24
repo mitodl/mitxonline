@@ -310,11 +310,15 @@ def generate_checkout_payload(  # noqa: PLR0913
     # Run the basket hooks once more: this records where the user is as they
     # check out, and works out the tax again on the final prices (pre-flight
     # can change the basket's discounts).
+    # Hold the basket lock from here until the order is created, so another
+    # request can't re-tax the basket while its tax is copied into the order.
     checkout_update = BasketUpdate(operation=BASKET_UPDATE_CHECKOUT)
-    run_basket_pre_update_hooks(request, basket, checkout_update)
-    run_basket_post_update_hooks(request, basket, checkout_update)
+    with transaction.atomic():
+        lock_basket(basket)
+        run_basket_pre_update_hooks(request, basket, checkout_update)
+        run_basket_post_update_hooks(request, basket, checkout_update)
 
-    order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
+        order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
     ip = get_client_ip(request)[0]
@@ -721,6 +725,20 @@ def add_product_to_basket(
     return item, created
 
 
+def lock_basket(basket: Basket):
+    """
+    Lock the basket's row until the end of the current transaction.
+
+    Serializes changes to what's derived from the basket (such as its tax), so
+    concurrent requests for the same basket take turns. Must be called inside
+    a transaction; taking the lock again in the same transaction is a no-op.
+    """
+
+    Basket.objects.select_for_update().filter(pk=basket.pk).values_list(
+        "pk", flat=True
+    ).first()
+
+
 def recalculate_basket_tax(basket: Basket):
     """
     Work out the tax on each item in the basket, replacing what was there.
@@ -739,6 +757,10 @@ def recalculate_basket_tax(basket: Basket):
     version = tax_rate.current_version if tax_rate else None
 
     with transaction.atomic():
+        # Two requests replacing the same basket's tax at once could each
+        # delete and then insert, leaving both sets; checkout would copy both
+        # into the order. Every tax writer takes the basket lock first.
+        lock_basket(basket)
         BasketItemTax.objects.filter(basket_item__basket=basket).delete()
 
         if version is None:

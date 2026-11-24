@@ -2634,8 +2634,9 @@ def test_basket_response_includes_tax(user, user_client, taxed_locale):
 
     data = resp.json()
     assert Decimal(data["discounted_price"]) == Decimal("100.00")
-    assert Decimal(data["tax_amount"]) == Decimal("18.00")
-    assert Decimal(data["grand_total"]) == Decimal("118.00")
+    # Decimal strings, as the schema says, not JSON numbers.
+    assert data["tax_amount"] == "18.00"
+    assert data["grand_total"] == "118.00"
     assert len(data["taxes"]) == 1
     assert data["taxes"][0]["tax_rate_name"] == "VAT"
     assert Decimal(data["taxes"][0]["rate"]) == Decimal(18)

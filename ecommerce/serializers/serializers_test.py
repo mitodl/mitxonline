@@ -641,8 +641,9 @@ def test_order_serializers_include_tax(user, taxed_locale):
     ]
     for module in (v0_serializers, ecommerce_serializers):
         order_data = module.OrderSerializer(order).data
-        assert Decimal(order_data["subtotal"]) == Decimal("100.00")
-        assert Decimal(order_data["tax_amount"]) == Decimal("18.00")
+        # Totals are decimal strings, as the schema says, not JSON numbers.
+        assert order_data["subtotal"] == "100.00"
+        assert order_data["tax_amount"] == "18.00"
         assert Decimal(order_data["total_price_paid"]) == Decimal("118.00")
         assert [dict(tax) for tax in order_data["taxes"]] == expected_taxes
         # The order serializers' lines are receipt lines.
@@ -654,7 +655,7 @@ def test_order_serializers_include_tax(user, taxed_locale):
         assert line["taxes"][0]["tax_rate_name"] == "VAT"
 
         receipt = module.OrderReceiptSerializer(order).data
-        assert Decimal(receipt["subtotal"]) == Decimal("100.00")
-        assert Decimal(receipt["tax_amount"]) == Decimal("18.00")
+        assert receipt["subtotal"] == "100.00"
+        assert receipt["tax_amount"] == "18.00"
         assert [dict(tax) for tax in receipt["taxes"]] == expected_taxes
         assert receipt["lines"][0]["tax_paid"] == "18.00"

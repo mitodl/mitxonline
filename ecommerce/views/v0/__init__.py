@@ -1123,7 +1123,12 @@ class OrderReceiptView(RetrieveAPIView):
 
     def get_queryset(self):
         """Return only the user's orders"""
-        return Order.objects.filter(purchaser=self.request.user).all()
+        return (
+            Order.objects.filter(purchaser=self.request.user)
+            # Read by the serializer's tax fields.
+            .prefetch_related("lines__taxes")
+            .all()
+        )
 
 
 class ReceiptByRunView(LoginRequiredMixin, View):

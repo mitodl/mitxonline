@@ -36,6 +36,9 @@ def send_ecommerce_order_receipt(order_record):
     receipt = data.get("receipt")
     country = pycountry.countries.get(alpha_2=purchaser.get("country"))
     recipient = purchaser.get("email")
+    # The lines' total_paid is before tax; the order's tax is charged on top.
+    tax_amount = Decimal(data.get("tax_amount") or 0)
+    order_total = sum((Decimal(line["total_paid"]) for line in lines), tax_amount)
 
     try:
         with get_message_sender(OrderReceiptMessage) as sender:
@@ -45,10 +48,8 @@ def send_ecommerce_order_receipt(order_record):
                     "coupon": coupon,
                     "content_title": lines[0].get("content_title") if lines else None,
                     "lines": lines,
-                    "order_total": format(
-                        sum(float(line["total_paid"]) for line in lines),
-                        ".2f",
-                    ),
+                    "order_total": format(order_total, ".2f"),
+                    "tax_amount": format(tax_amount, ".2f") if tax_amount else None,
                     "order": {
                         "reference_number": order.get("reference_number"),
                         "created_on": parser.parse(order.get("created_on")),
