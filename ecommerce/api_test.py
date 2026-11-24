@@ -3336,6 +3336,54 @@ def test_find_order_for_stripe_payment_record(data_shape):
     assert find_order_for_stripe_payment_record("pr_test_nomatch") is None
 
 
+@pytest.mark.parametrize(
+    ("paid_session_payment", "find_order", "payment_id"),
+    [
+        (
+            {"payment_intent": None, "payment_record": STRIPE_TEST_PAYMENT_RECORD_ID},
+            find_order_for_stripe_payment_record,
+            STRIPE_TEST_PAYMENT_RECORD_ID,
+        ),
+        (
+            {"payment_intent": {"id": STRIPE_TEST_PAYMENT_INTENT_ID}},
+            find_order_for_stripe_payment_intent,
+            STRIPE_TEST_PAYMENT_INTENT_ID,
+        ),
+    ],
+)
+def test_stripe_order_fulfilled_from_session_can_be_found_for_refund(
+    paid_session_payment, find_order, payment_id
+):
+    """
+    The pending and stale order checks fulfill an order with its CheckoutSession,
+    which has the same ID as the session logged at checkout. The paid session
+    should replace that one, since only it has the PaymentIntent or
+    PaymentRecord that refunds are matched on.
+    """
+
+    order = OrderFactory.create(
+        state=OrderStatus.PENDING,
+        gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        total_price_paid=Decimal("10.00"),
+    )
+    session = {
+        "id": "cs_test_fulfilled_from_session",
+        "object": STRIPE_OBJECT_CHECKOUT_SESSION,
+    }
+    order.get_object_flow().create_transaction(
+        {**session, "payment_intent": None},
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+    )
+    assert find_order(payment_id) is None
+
+    PendingOrder.objects.get(pk=order.id).get_object_flow().fulfill(
+        {**session, **paid_session_payment}
+    )
+
+    assert find_order(payment_id) == order
+    assert order.transactions.count() == 1
+
+
 def test_find_order_for_stripe_payment_intent_no_match():
     """None should be returned if nothing matches the PaymentIntent."""
 
