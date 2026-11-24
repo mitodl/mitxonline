@@ -2,6 +2,8 @@ import random
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
+from types import SimpleNamespace
 
 import pytest
 import reversion
@@ -2352,3 +2354,33 @@ def test_basket_item_unique_per_basket_and_product():
 
     with pytest.raises(IntegrityError), transaction.atomic():
         BasketItem.objects.create(basket=item.basket, product=item.product)
+
+
+def _basket_row(row_id, quantity=1, contract_id=None):
+    return SimpleNamespace(id=row_id, quantity=quantity, b2b_contract_id=contract_id)
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected_keep", "expected_quantity", "expected_deletes"),
+    [
+        # Same contract (or none): fold into the oldest row, largest quantity.
+        ([(1, 1, None), (2, 3, None)], 1, 3, [2]),
+        ([(1, 2, 7), (2, 1, 7), (3, 1, 7)], 1, 2, [2, 3]),
+        # Different contracts, or a contract and none: remove them all.
+        ([(1, 1, 7), (2, 1, 8)], None, None, [1, 2]),
+        ([(1, 1, None), (2, 1, 7)], None, None, [1, 2]),
+    ],
+)
+def test_merge_duplicate_basket_items_plan(
+    rows, expected_keep, expected_quantity, expected_deletes
+):
+    """Duplicates merge only when they agree on their contract."""
+
+    migration = import_module("ecommerce.migrations.0061_merge_duplicate_basket_items")
+    items = [_basket_row(*row) for row in rows]
+
+    keep, quantity, delete_ids = migration.plan_merge(items)
+
+    assert (keep.id if keep else None) == expected_keep
+    assert quantity == expected_quantity
+    assert delete_ids == expected_deletes
