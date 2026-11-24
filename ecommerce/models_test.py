@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 import reversion
+from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
@@ -2384,3 +2385,48 @@ def test_merge_duplicate_basket_items_plan(
     assert (keep.id if keep else None) == expected_keep
     assert quantity == expected_quantity
     assert delete_ids == expected_deletes
+
+
+def test_merge_duplicate_basket_items_migration(caplog):
+    """The migration merges agreeing duplicates and removes conflicting ones."""
+
+    migration = import_module("ecommerce.migrations.0061_merge_duplicate_basket_items")
+
+    # Duplicates can't be made with the constraint in place. Dropping it here is
+    # undone when the test's transaction rolls back.
+    with connection.schema_editor() as editor:
+        editor.remove_constraint(
+            BasketItem,
+            next(
+                constraint
+                for constraint in BasketItem._meta.constraints  # noqa: SLF001
+                if constraint.name == "unique_basket_product"
+            ),
+        )
+
+    contract, other_contract = ContractPageFactory.create_batch(2)
+    agreeing = BasketItemFactory.create(quantity=1, b2b_contract=contract)
+    BasketItemFactory.create(
+        basket=agreeing.basket,
+        product=agreeing.product,
+        quantity=3,
+        b2b_contract=contract,
+    )
+    conflicting = BasketItemFactory.create(
+        basket=agreeing.basket, b2b_contract=contract
+    )
+    BasketItemFactory.create(
+        basket=agreeing.basket,
+        product=conflicting.product,
+        b2b_contract=other_contract,
+    )
+    untouched = BasketItemFactory.create(basket=agreeing.basket)
+
+    migration.merge_duplicate_basket_items(django_apps, None)
+
+    remaining = BasketItem.objects.filter(basket=agreeing.basket)
+    assert set(remaining.values_list("id", flat=True)) == {agreeing.id, untouched.id}
+    agreeing.refresh_from_db()
+    assert agreeing.quantity == 3
+    assert agreeing.b2b_contract == contract
+    assert f"Removing product {conflicting.product.id}" in caplog.text
