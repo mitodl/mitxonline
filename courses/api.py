@@ -2653,14 +2653,24 @@ def get_certificate_page(
 
 
 def create_verifiable_credential(
-    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
-):
+    certificate: ProgramCertificate | CourseRunCertificate,
+    *,
+    raise_on_error=False,
+    replace_existing=False,
+) -> VerifiableCredential | None:
     """
-    Create a verifiable credential for the given course run certificate.
+    Create a verifiable credential for the given course run or program certificate.
 
     Args:
-        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+        certificate (CourseRunCertificate | ProgramCertificate): The certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
+        replace_existing (bool): If True, replace the certificate's existing verifiable credential. The new
+            credential is signed first, and the old one is only deleted in the same transaction that saves the
+            new one, so a failure leaves the existing credential in place.
+
+    Returns:
+        VerifiableCredential | None: The new credential, or None if nothing was created (the certificate page
+        isn't eligible, or an error was logged and not re-raised).
     """
 
     try:
@@ -2670,17 +2680,24 @@ def create_verifiable_credential(
         certificate_page = get_certificate_page(certificate)
 
         if not should_provision_verifiable_credential(certificate_page):
-            return
+            return None
         payload = get_verifiable_credentials_payload(certificate, certificate_page)
 
         # Call the signing service to create the new credential
         credential = request_verifiable_credential(payload)
 
-        verifiable_credential = VerifiableCredential.objects.create(
-            uuid=credential["id"], credential_data=credential
-        )
-        certificate.verifiable_credential = verifiable_credential
-        certificate.save()
+        with transaction.atomic():
+            if replace_existing and certificate.verifiable_credential_id:
+                # The credential's uuid is its primary key and comes from the certificate uuid, so the old
+                # row has to be deleted before the new one is created.
+                VerifiableCredential.objects.filter(
+                    pk=certificate.verifiable_credential_id
+                ).delete()
+            verifiable_credential = VerifiableCredential.objects.create(
+                uuid=credential["id"], credential_data=credential
+            )
+            certificate.verifiable_credential = verifiable_credential
+            certificate.save()
     except Exception:
         # We don't want to block certificate creation if VC creation fails, so we swallow and log all errors to sentry
         # We can revisit this later once we've ironed out some of the intended behavior around the json payload
@@ -2690,6 +2707,8 @@ def create_verifiable_credential(
         )
         if raise_on_error:
             raise
+        return None
+    return verifiable_credential
 
 
 def summarize_verifiable_credential_certificate_statuses(
