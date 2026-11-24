@@ -695,32 +695,36 @@ def add_product_to_basket(
     - tuple[BasketItem, bool]: the item, and whether it was newly created
     """
 
-    run_basket_pre_update_hooks(
-        request,
-        basket,
-        BasketUpdate(operation=BASKET_UPDATE_ADD_ITEM, product=product),
-    )
-
     defaults = {}
     if quantity is not None:
         defaults["quantity"] = quantity
     if b2b_contract is not None:
         defaults["b2b_contract"] = b2b_contract
 
-    item, created = BasketItem.objects.update_or_create(
-        basket=basket,
-        product=product,
-        defaults=defaults,
-        create_defaults={"quantity": 1, **defaults},
-    )
+    # Concurrent adds to the same basket take turns, hooks and all.
+    with transaction.atomic():
+        lock_basket(basket)
 
-    run_basket_post_update_hooks(
-        request,
-        basket,
-        BasketUpdate(
-            operation=BASKET_UPDATE_ADD_ITEM, product=product, basket_item=item
-        ),
-    )
+        run_basket_pre_update_hooks(
+            request,
+            basket,
+            BasketUpdate(operation=BASKET_UPDATE_ADD_ITEM, product=product),
+        )
+
+        item, created = BasketItem.objects.update_or_create(
+            basket=basket,
+            product=product,
+            defaults=defaults,
+            create_defaults={"quantity": 1, **defaults},
+        )
+
+        run_basket_post_update_hooks(
+            request,
+            basket,
+            BasketUpdate(
+                operation=BASKET_UPDATE_ADD_ITEM, product=product, basket_item=item
+            ),
+        )
 
     return item, created
 
@@ -753,14 +757,17 @@ def recalculate_basket_tax(basket: Basket):
     - basket (Basket): the basket to tax
     """
 
-    tax_rate = get_tax_rate_for_locations(basket.user_locations)
-    version = tax_rate.current_version if tax_rate else None
-
     with transaction.atomic():
         # Two requests replacing the same basket's tax at once could each
         # delete and then insert, leaving both sets; checkout would copy both
         # into the order. Every tax writer takes the basket lock first.
         lock_basket(basket)
+
+        # Read the rate under the lock, so a rate change made while this
+        # request waited for it is the one used.
+        tax_rate = get_tax_rate_for_locations(basket.user_locations)
+        version = tax_rate.current_version if tax_rate else None
+
         BasketItemTax.objects.filter(basket_item__basket=basket).delete()
 
         if version is None:

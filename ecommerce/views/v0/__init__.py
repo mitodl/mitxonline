@@ -160,6 +160,11 @@ class BasketItemViewSet(AddBasketItemMixin, ModelViewSet):
         Those are the only fields an update could change, and either would
         change a basket's contents without the basket API (and so without its
         ownership check and hooks). Add a new item instead.
+
+        So an update changes nothing the basket hooks care about (such as the
+        price that's taxed), and doesn't run them. If BasketItemSerializer
+        gains a writable field that does (quantity, say), make that change
+        through the basket API so the hooks run.
         """
 
         item = serializer.instance

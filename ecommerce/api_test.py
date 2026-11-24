@@ -4019,3 +4019,45 @@ def test_generate_checkout_payload_locks_basket_through_order_creation(
     assert events[0] == "lock"
     assert "create" in events
     lock.assert_any_call(basket)
+
+
+def test_recalculate_basket_tax_reads_rate_under_lock(user, taxed_locale, mocker):
+    """A rate change made while waiting for the basket lock is the one used."""
+
+    basket = _located_basket(user)
+    item = BasketItemFactory.create(
+        basket=basket, product=ProductFactory.create(price=Decimal("100.00"))
+    )
+
+    def change_rate_while_waiting(_basket):
+        taxed_locale.tax_rate = Decimal(20)
+        taxed_locale.save()
+
+    mocker.patch("ecommerce.api.lock_basket", side_effect=change_rate_while_waiting)
+
+    recalculate_basket_tax(basket)
+
+    tax = item.taxes.get()
+    assert tax.rate == Decimal(20)
+    assert tax.tax_amount == Decimal("20.00")
+
+
+def test_add_product_to_basket_locks_basket(user, mocker):
+    """Adding a product takes the basket lock before the hooks run."""
+
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+    events = []
+    mocker.patch(
+        "ecommerce.api.lock_basket",
+        side_effect=lambda _basket: events.append("lock"),
+    )
+    mocker.patch(
+        "ecommerce.api.run_basket_pre_update_hooks",
+        side_effect=lambda *_args: events.append("pre"),
+    )
+
+    add_product_to_basket(request, basket, ProductFactory.create())
+
+    assert events[:2] == ["lock", "pre"]
