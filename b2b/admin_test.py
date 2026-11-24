@@ -4,14 +4,16 @@ from datetime import UTC, datetime
 
 import pytest
 from django.contrib import admin as django_admin
+from django.urls import reverse
 
 from b2b.admin import DiscountContractAttachmentRedemptionAdmin
-from b2b.factories import ContractPageFactory
+from b2b.factories import ContractPageFactory, UserOrganizationFactory
 from b2b.models import (
     EMAIL_STATUS_DELIVERED,
     DiscountContractAttachmentRedemption,
 )
 from ecommerce.factories import DiscountFactory
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -73,3 +75,17 @@ def test_backfill_email_events_action(
     assert redemption.email_status_event_timestamp == event_timestamp
     assert redemption_without_message_id.email_status == ""
     assert redemption_without_message_id.email_status_event_timestamp is None
+
+
+def test_user_organization_change_form_does_not_list_every_user(client, admin_user):
+    """The change form must not render a <select> holding every User."""
+    membership = UserOrganizationFactory.create()
+    bystander = UserFactory.create()
+    client.force_login(admin_user)
+
+    response = client.get(
+        reverse("admin:b2b_userorganization_change", args=[membership.id])
+    )
+
+    assert response.status_code == 200
+    assert bystander.email not in response.content.decode()
