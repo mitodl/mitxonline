@@ -1261,6 +1261,11 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_BASKET_EMPTY},
             )
+        if "checkout_unavailable" in checkout_payload:
+            return redirect_with_user_message(
+                reverse("cart"),
+                {"type": USER_MSG_TYPE_PAYMENT_ERROR},
+            )
         if "payment_in_progress" in checkout_payload:
             return redirect_with_user_message(
                 reverse("user-dashboard"),

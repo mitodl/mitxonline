@@ -1,7 +1,5 @@
 """Constants for ecommerce."""
 
-from datetime import timedelta
-
 from mitol.payment_gateway.api import ProcessorResponse
 from mitol.payment_gateway.constants import (
     MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
@@ -242,9 +240,6 @@ STRIPE_PAYMENT_STATUSES_GOOD = [STRIPE_PAYMENT_STATUS_NPR, STRIPE_PAYMENT_STATUS
 STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE = "complete"
 STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED = "expired"
 STRIPE_CHECKOUT_SESSION_STATUS_OPEN = "open"
-
-# How long a CheckoutSession stays open when we don't set expires_at.
-STRIPE_CHECKOUT_SESSION_LIFETIME = timedelta(hours=24)
 
 STRIPE_PAYMENT_INTENT_STATUS_PROCESSING = "processing"
 STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED = "succeeded"

@@ -53,7 +53,6 @@ from ecommerce.constants import (
     REDEMPTION_TYPE_ONE_TIME_PER_USER,
     REDEMPTION_TYPE_UNLIMITED,
     REFUND_SUCCESS_STATES,
-    STRIPE_CHECKOUT_SESSION_LIFETIME,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
     STRIPE_EVENTS_CHECKOUT_SESSION,
@@ -67,6 +66,7 @@ from ecommerce.constants import (
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
     STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
     STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
     STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
     STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
@@ -113,6 +113,7 @@ from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
 )
 from main.plugin_manager import get_plugin_manager
@@ -303,11 +304,8 @@ def generate_checkout_payload(  # noqa: PLR0913
     if preflight_error:
         return preflight_error
 
-    if not supersede_open_stripe_checkouts(basket):
-        return {
-            "payment_in_progress": True,
-            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
-        }
+    if supersede_error := supersede_open_stripe_checkouts(basket):
+        return supersede_error
 
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
@@ -2207,14 +2205,14 @@ def expire_stripe_checkout_session(order) -> bool:
     Expire the order's CheckoutSession, so its payment page can't be used.
 
     Stripe only expires open sessions, so if the expire call is refused the
-    session is retrieved to see why. Expiring a session makes Stripe send the
-    checkout.session.expired webhook, which cancels the order.
+    session's payment is checked instead. Expiring a session makes Stripe send
+    the checkout.session.expired webhook, which cancels the order.
 
     Args:
     - order (Order): the Stripe order
     Returns:
-    - bool: False if the session was already completed (so the learner has
-      paid, or is paying), True otherwise
+    - bool: False if the session's payment succeeded or may still succeed,
+      True if the session can no longer be paid
     """
 
     session_id = get_stripe_checkout_session_id(order)
@@ -2222,40 +2220,39 @@ def expire_stripe_checkout_session(order) -> bool:
     if not session_id:
         return True
 
-    sessions = _get_stripe_checkout_session_v1()
-
     try:
-        sessions.expire(session_id)
+        _get_stripe_checkout_session_v1().expire(session_id)
     except stripe.InvalidRequestError:
-        if (
-            sessions.retrieve(session_id).status
-            == STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE
-        ):
-            return False
-    else:
-        log.info(
-            "Expired CheckoutSession %s for order %s",
-            session_id,
-            order.reference_number,
+        session = process_stripe_checkout_session_status(session_id)
+
+        # A failed payment needs a new payment method, which a completed
+        # session won't take, so the learner has to check out again.
+        return session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED or (
+            session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION
+            and session["action_reason"]
+            == STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD
         )
+
+    log.info(
+        "Expired CheckoutSession %s for order %s",
+        session_id,
+        order.reference_number,
+    )
 
     return True
 
 
-def supersede_open_stripe_checkouts(basket) -> bool:
+def supersede_open_stripe_checkouts(basket) -> dict | None:
     """
     Expire the CheckoutSessions of the basket user's earlier Stripe orders.
 
     Checking out again (e.g. from another tab) replaces any checkout that's
-    still in flight, so only the newest payment page can be used. Orders older
-    than a CheckoutSession's lifetime are skipped; Stripe has expired those.
-
-    A Stripe error is logged and doesn't stop checkout: the session can't be
-    paid on while Stripe can't be reached either.
+    still in flight, so only the newest payment page can be used.
 
     Returns:
-    - bool: False if an earlier order for something in the basket has already
-      been paid (or is being paid) - the learner shouldn't check out again
+    - None if the learner can check out, otherwise the error payload: either
+      an earlier order for something in the basket has been paid (or is being
+      paid), or Stripe couldn't confirm an earlier session can't be paid
     """
 
     orders = (
@@ -2263,20 +2260,19 @@ def supersede_open_stripe_checkouts(basket) -> bool:
             purchaser=basket.user,
             state=OrderStatus.PENDING,
             gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
-            created_on__gte=now_in_utc() - STRIPE_CHECKOUT_SESSION_LIFETIME,
         )
         .prefetch_related("lines")
         .order_by("created_on")
     )
 
     if not orders:
-        return True
+        return None
 
     basket_products = {
         (product.content_type_id, product.object_id)
         for product in basket.get_products()
     }
-    can_check_out = True
+    error = None
 
     for order in orders:
         try:
@@ -2286,7 +2282,10 @@ def supersede_open_stripe_checkouts(basket) -> bool:
                 "Couldn't expire the CheckoutSession for order %s",
                 order.reference_number,
             )
-            continue
+            return {
+                "checkout_unavailable": True,
+                "error": USER_MSG_TYPE_PAYMENT_ERROR,
+            }
 
         if not expired and any(
             (line.purchased_content_type_id, line.purchased_object_id)
@@ -2298,9 +2297,12 @@ def supersede_open_stripe_checkouts(basket) -> bool:
                 basket.user.id,
                 order.reference_number,
             )
-            can_check_out = False
+            error = {
+                "payment_in_progress": True,
+                "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            }
 
-    return can_check_out
+    return error
 
 
 def process_stripe_checkout_session_status(checkout_session: dict | str):

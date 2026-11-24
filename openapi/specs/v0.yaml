@@ -4965,6 +4965,7 @@ components:
             * `basket-empty` - basket-empty
             * `profile-incomplete` - profile-incomplete
             * `payment-pending-processing` - payment-pending-processing
+            * `payment-error` - payment-error
         missing_fields:
           type: array
           items:
@@ -5938,6 +5939,7 @@ components:
       - basket-empty
       - profile-incomplete
       - payment-pending-processing
+      - payment-error
       type: string
       description: |-
         * `enroll-blocked` - enroll-blocked
@@ -5949,6 +5951,7 @@ components:
         * `basket-empty` - basket-empty
         * `profile-incomplete` - profile-incomplete
         * `payment-pending-processing` - payment-pending-processing
+        * `payment-error` - payment-error
       x-enum-descriptions:
       - enroll-blocked
       - enroll-duplicated
@@ -5959,6 +5962,7 @@ components:
       - basket-empty
       - profile-incomplete
       - payment-pending-processing
+      - payment-error
     ExpiredEnrollmentCode:
       type: object
       description: An unused enrollment code taken out of a contract.

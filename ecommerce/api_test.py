@@ -170,6 +170,7 @@ from flexiblepricing.factories import (
     approve_flexible_price,
 )
 from main.constants import (
+    USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
@@ -3608,31 +3609,52 @@ def _create_stripe_checkout_order(user, product, session_id="cs_test_open"):
 
 
 @pytest.mark.parametrize(
-    ("expire_refused", "session_status", "expected"),
+    ("session_status", "action_reason", "expected"),
     [
-        (False, None, True),
-        (True, STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED, True),
-        (True, STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE, False),
+        # Expired: the call goes through
+        (None, None, True),
+        # Refused: the session already expired, or its payment was cancelled
+        (STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED, None, True),
+        # Refused: the payment failed and needs a new payment method
+        (
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
+            True,
+        ),
+        # Refused: the payment went through or is still in flight
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PAID, None, False),
+        (STRIPE_OVERALL_CHECKOUT_STATUS_PENDING, None, False),
+        (
+            STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
+            STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
+            False,
+        ),
     ],
 )
 def test_expire_stripe_checkout_session(  # noqa: PLR0913
-    mocker, user, products, expire_refused, session_status, expected
+    mocker, user, products, session_status, action_reason, expected
 ):
     """
-    The order's CheckoutSession is expired. If Stripe refuses, the session is
-    checked, and only a completed one counts as not expired.
+    The order's CheckoutSession is expired. If Stripe refuses, the session's
+    payment is checked, and only one that can't succeed counts as expired.
     """
 
     mock_client = mocker.patch("ecommerce.api._get_stripe_checkout_session_v1")()
-    if expire_refused:
+    mock_status = mocker.patch(
+        "ecommerce.api.process_stripe_checkout_session_status",
+        return_value={"status": session_status, "action_reason": action_reason},
+    )
+    if session_status:
         mock_client.expire.side_effect = InvalidRequestError("not open", None)
-    mock_client.retrieve.return_value.status = session_status
     order = _create_stripe_checkout_order(user, products[0])
 
     assert expire_stripe_checkout_session(order) is expected
 
     mock_client.expire.assert_called_once_with("cs_test_open")
-    assert mock_client.retrieve.called is expire_refused
+    if session_status:
+        mock_status.assert_called_once_with("cs_test_open")
+    else:
+        mock_status.assert_not_called()
 
 
 def test_expire_stripe_checkout_session_no_session(mocker, user):
@@ -3647,20 +3669,27 @@ def test_expire_stripe_checkout_session_no_session(mocker, user):
     mock_get_client.assert_not_called()
 
 
+PAYMENT_IN_PROGRESS = {
+    "payment_in_progress": True,
+    "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+}
+
+
 @pytest.mark.parametrize(
-    ("already_paid", "same_product", "can_check_out"),
+    ("already_paid", "same_product", "expected"),
     [
-        (False, True, True),
-        (True, True, False),
-        (True, False, True),
+        (False, True, None),
+        (True, True, PAYMENT_IN_PROGRESS),
+        (True, False, None),
     ],
 )
 def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
-    mocker, user, products, already_paid, same_product, can_check_out
+    mocker, user, products, already_paid, same_product, expected
 ):
     """
-    Earlier in-flight Stripe orders have their sessions expired. Checkout is
-    only refused when one of them is already paid for something in the basket.
+    Earlier in-flight Stripe orders have their sessions expired, however old
+    they are. Checkout is only refused when one of them is already paid for
+    something in the basket.
     """
 
     mock_expire = mocker.patch(
@@ -3670,16 +3699,17 @@ def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
     order = _create_stripe_checkout_order(
         user, products[0] if same_product else products[1]
     )
+    # A delayed webhook can leave a paid order pending past a session's lifetime.
+    Order.objects.filter(pk=order.pk).update(
+        created_on=now_in_utc() - timedelta(days=3)
+    )
 
-    assert supersede_open_stripe_checkouts(basket) is can_check_out
+    assert supersede_open_stripe_checkouts(basket) == expected
     mock_expire.assert_called_once_with(order)
 
 
 def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, products):
-    """
-    Orders that aren't in-flight Stripe checkouts for this user, or are older
-    than a session can live, are left alone.
-    """
+    """Orders that aren't pending Stripe checkouts for this user are left alone."""
 
     mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
     basket = create_basket(user, products[:1])
@@ -3695,44 +3725,45 @@ def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, produc
         state=OrderStatus.CANCELED,
         gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
     )
-    old_order = _create_stripe_checkout_order(user, products[0], "cs_test_old")
-    Order.objects.filter(pk=old_order.pk).update(
-        created_on=now_in_utc() - timedelta(hours=25)
-    )
 
-    assert supersede_open_stripe_checkouts(basket) is True
+    assert supersede_open_stripe_checkouts(basket) is None
     mock_expire.assert_not_called()
 
 
 def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):
-    """A Stripe error is logged, and the rest of the orders are still expired."""
+    """
+    If Stripe can't confirm an earlier session can't be paid, checkout is
+    refused with an error the learner can retry.
+    """
 
     mock_expire = mocker.patch(
         "ecommerce.api.expire_stripe_checkout_session",
-        side_effect=[APIConnectionError("Stripe is down"), True],
+        side_effect=APIConnectionError("Stripe is down"),
     )
     mock_log = mocker.patch("ecommerce.api.log")
     basket = create_basket(user, products[:1])
-    first = _create_stripe_checkout_order(user, products[0], "cs_first")
-    second = _create_stripe_checkout_order(user, products[0], "cs_second")
+    order = _create_stripe_checkout_order(user, products[1])
 
-    assert supersede_open_stripe_checkouts(basket) is True
-    assert mock_expire.call_args_list == [mocker.call(first), mocker.call(second)]
+    assert supersede_open_stripe_checkouts(basket) == {
+        "checkout_unavailable": True,
+        "error": USER_MSG_TYPE_PAYMENT_ERROR,
+    }
+    mock_expire.assert_called_once_with(order)
     mock_log.exception.assert_called_once()
 
 
-@pytest.mark.parametrize("can_check_out", [True, False])
+@pytest.mark.parametrize("supersede_error", [None, PAYMENT_IN_PROGRESS])
 def test_generate_checkout_payload_supersedes_checkouts(
-    mocker, user, products, can_check_out
+    mocker, user, products, supersede_error
 ):
     """
     Checkout supersedes earlier checkouts first, and stops without an order
-    if the learner's already paying for the basket.
+    if that returns an error.
     """
 
     basket = create_basket(user, products)
     mock_supersede = mocker.patch(
-        "ecommerce.api.supersede_open_stripe_checkouts", return_value=can_check_out
+        "ecommerce.api.supersede_open_stripe_checkouts", return_value=supersede_error
     )
     mocker.patch(
         "ecommerce.api.PaymentGateway.start_payment",
@@ -3745,9 +3776,8 @@ def test_generate_checkout_payload_supersedes_checkouts(
     )
 
     mock_supersede.assert_called_once_with(basket)
-    assert PendingOrder.objects.filter(purchaser=user).exists() is can_check_out
-    if not can_check_out:
-        assert payload == {
-            "payment_in_progress": True,
-            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
-        }
+    assert PendingOrder.objects.filter(purchaser=user).exists() is (
+        supersede_error is None
+    )
+    if supersede_error:
+        assert payload == supersede_error

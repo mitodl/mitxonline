@@ -44,6 +44,7 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
@@ -1267,6 +1268,7 @@ class CheckoutPayloadSerializer(serializers.Serializer):
             USER_MSG_TYPE_BASKET_EMPTY,
             USER_MSG_TYPE_PROFILE_INCOMPLETE,
             USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            USER_MSG_TYPE_PAYMENT_ERROR,
         ),
     )
     missing_fields = serializers.ListField(

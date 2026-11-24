@@ -85,6 +85,7 @@ from main.constants import (
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
@@ -2335,21 +2336,34 @@ def test_checkout_result_cancel_redirects_to_cart(  # noqa: PLR0913
         mock_expire.assert_not_called()
 
 
-def test_checkout_interstitial_payment_in_progress(mocker, user_client):
-    """A learner who's already paying for the basket is sent to the dashboard."""
+@pytest.mark.parametrize(
+    ("result_key", "msg_type", "redirect_to"),
+    [
+        (
+            "payment_in_progress",
+            USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            "user-dashboard",
+        ),
+        ("checkout_unavailable", USER_MSG_TYPE_PAYMENT_ERROR, "cart"),
+    ],
+)
+def test_checkout_interstitial_superseding_refused(
+    mocker, user_client, result_key, msg_type, redirect_to
+):
+    """
+    A learner who's already paying for the basket is sent to the dashboard;
+    one whose earlier checkout couldn't be checked goes back to the cart.
+    """
 
     mocker.patch(
         "ecommerce.api.generate_checkout_payload",
-        return_value={
-            "payment_in_progress": True,
-            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
-        },
+        return_value={result_key: True, "error": msg_type},
     )
 
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse("user-dashboard")
+    assert resp.url == reverse(redirect_to)
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING}
+        {"type": msg_type}
     )
