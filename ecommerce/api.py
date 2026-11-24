@@ -817,6 +817,11 @@ def claim_anonymous_basket(request):
     if anonymous_id is None:
         return None
 
+    # The hooks run inside the claim's transaction, so a pre-update hook that
+    # refuses the claim leaves both baskets (and the session) as they were.
+    # Now that there's a user, the hooks may learn more (their profile).
+    update = BasketUpdate(operation=BASKET_UPDATE_CLAIM)
+
     with transaction.atomic():
         try:
             anon_basket = Basket.objects.select_for_update().get(
@@ -825,18 +830,17 @@ def claim_anonymous_basket(request):
         except Basket.DoesNotExist:
             return None
 
+        run_basket_pre_update_hooks(request, anon_basket, update)
+
         Basket.objects.filter(user=request.user).exclude(pk=anon_basket.pk).delete()
 
         anon_basket.user = request.user
         anon_basket.anonymous_id = None
         anon_basket.save(update_fields=["user", "anonymous_id"])
 
-    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
+        run_basket_post_update_hooks(request, anon_basket, update)
 
-    # Now that there's a user, there may be more to learn (their profile).
-    update = BasketUpdate(operation=BASKET_UPDATE_CLAIM)
-    run_basket_pre_update_hooks(request, anon_basket, update)
-    run_basket_post_update_hooks(request, anon_basket, update)
+    del request.session[ANONYMOUS_BASKET_SESSION_KEY]
 
     apply_user_discounts(anon_basket)
 

@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("ecommerce", "0060_add_user_location_to_basket_and_order"),
+        ("ecommerce", "0062_basketitem_unique_basket_product"),
         ("reversion", "0002_add_index_on_version_for_content_type_and_db"),
     ]
 

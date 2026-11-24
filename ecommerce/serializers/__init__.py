@@ -357,6 +357,10 @@ class BasketItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.BasketItem
+        # Adding a product that's already in the basket is fine: the views add
+        # through add_product_to_basket, which updates the existing item. So
+        # drop the validator DRF builds from the (basket, product) constraint.
+        validators = []
         fields = [
             "basket",
             "product",
