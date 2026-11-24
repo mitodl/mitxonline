@@ -5,11 +5,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core import signing
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
@@ -43,6 +44,7 @@ from ecommerce.constants import (
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
     CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_CANCEL_SIGNING_SALT,
     CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
     CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
@@ -166,9 +168,33 @@ def get_checkout_cancel_url(gateway_type, reference_number=None):
         msg = f"Gateway {gateway_type} has no cancel route mapped"
         raise ValidationError(msg)
 
-    return _get_checkout_return_url(
+    url = _get_checkout_return_url(
         CHECKOUT_CANCEL_ROUTE_MAP, gateway_type, reference_number
     )
+
+    if gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+        # Cancelling expires the session, so only the URL Stripe was given can
+        # do it, not a link to the (guessable) reference number.
+        url = f"{url}?{urlencode({'token': sign_checkout_cancel(reference_number)})}"
+
+    return url
+
+
+def sign_checkout_cancel(reference_number):
+    """Return the token that lets the Stripe cancel URL cancel this order."""
+
+    return signing.Signer(salt=CHECKOUT_CANCEL_SIGNING_SALT).sign(reference_number)
+
+
+def is_checkout_cancel_signed(reference_number, token) -> bool:
+    """Check the token from a Stripe cancel URL is for this order."""
+
+    try:
+        unsigned = signing.Signer(salt=CHECKOUT_CANCEL_SIGNING_SALT).unsign(token or "")
+    except signing.BadSignature:
+        return False
+
+    return unsigned == reference_number
 
 
 def validate_basket_steps_for_b2b(basket):
@@ -304,9 +330,6 @@ def generate_checkout_payload(  # noqa: PLR0913
     if preflight_error:
         return preflight_error
 
-    if supersede_error := supersede_open_stripe_checkouts(basket):
-        return supersede_error
-
     order = PendingOrder.create_from_basket(basket, gateway_type=gateway_type)
     total_price = 0
 
@@ -349,6 +372,12 @@ def generate_checkout_payload(  # noqa: PLR0913
             "order": order,
             "order_id": order.id,
         }
+
+    # A free order (fulfilled above) opens no payment page, so it leaves the
+    # learner's open ones alone.
+    if supersede_error := supersede_open_stripe_checkouts(order):
+        order.get_object_flow().cancel()
+        return supersede_error
 
     payload = PaymentGateway.start_payment(
         gateway_type,
@@ -1269,25 +1298,9 @@ def _retrieve_pending_stripe_orders(orders):
     # later in event processing.
 
     for order in orders:
-        checkout_session_transactions = order.transactions.filter(
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
-        )
+        checkout_session_id = get_stripe_checkout_session_id(order)
 
-        if not checkout_session_transactions.exists():
-            log.info(
-                "Order %s (ref %s) has no apparent CheckoutSession logged.",
-                order.id,
-                order.reference_number,
-            )
-            continue
-
-        session_transaction = checkout_session_transactions.first()
-        checkout_session_id = session_transaction.data.get("id")
-
-        if (
-            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
-            or not checkout_session_id
-        ):
+        if not checkout_session_id:
             log.info(
                 "Order %s (ref %s) has no apparent CheckoutSession logged.",
                 order.id,
@@ -2242,67 +2255,83 @@ def expire_stripe_checkout_session(order) -> bool:
     return True
 
 
-def supersede_open_stripe_checkouts(basket) -> dict | None:
+def supersede_open_stripe_checkouts(order) -> dict | None:
     """
-    Expire the CheckoutSessions of the basket user's earlier Stripe orders.
+    Expire the CheckoutSessions of the purchaser's earlier Stripe orders.
 
     Checking out again (e.g. from another tab) replaces any checkout that's
     still in flight, so only the newest payment page can be used.
 
+    Args:
+    - order (Order): the new order, which is left alone
     Returns:
     - None if the learner can check out, otherwise the error payload: either
-      an earlier order for something in the basket has been paid (or is being
+      an earlier order for something in this one has been paid (or is being
       paid), or Stripe couldn't confirm an earlier session can't be paid
     """
 
-    orders = (
+    earlier_orders = (
         Order.objects.filter(
-            purchaser=basket.user,
+            purchaser=order.purchaser,
             state=OrderStatus.PENDING,
             gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
         )
+        .exclude(pk=order.pk)
         .prefetch_related("lines")
         .order_by("created_on")
     )
 
-    if not orders:
+    if not earlier_orders:
         return None
 
-    basket_products = {
-        (product.content_type_id, product.object_id)
-        for product in basket.get_products()
+    products = {
+        (line.purchased_content_type_id, line.purchased_object_id)
+        for line in order.lines.all()
     }
-    error = None
+    paid_order = None
+    unavailable = False
 
-    for order in orders:
+    for earlier_order in earlier_orders:
         try:
-            expired = expire_stripe_checkout_session(order)
+            expired = expire_stripe_checkout_session(earlier_order)
         except stripe.StripeError:
             log.exception(
                 "Couldn't expire the CheckoutSession for order %s",
-                order.reference_number,
+                earlier_order.reference_number,
             )
-            return {
-                "checkout_unavailable": True,
-                "error": USER_MSG_TYPE_PAYMENT_ERROR,
-            }
+            unavailable = True
+            continue
 
-        if not expired and any(
-            (line.purchased_content_type_id, line.purchased_object_id)
-            in basket_products
-            for line in order.lines.all()
+        if (
+            not expired
+            and not paid_order
+            and any(
+                (line.purchased_content_type_id, line.purchased_object_id) in products
+                for line in earlier_order.lines.all()
+            )
         ):
             log.info(
                 "Not checking out user %s again: order %s is already being paid",
-                basket.user.id,
-                order.reference_number,
+                order.purchaser_id,
+                earlier_order.reference_number,
             )
-            error = {
-                "payment_in_progress": True,
-                "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
-            }
+            paid_order = earlier_order
 
-    return error
+    # Telling the learner a payment is going through beats a retryable error.
+    if paid_order:
+        return {
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            "order": paid_order,
+        }
+
+    if unavailable:
+        return {
+            "checkout_unavailable": True,
+            "error": USER_MSG_TYPE_PAYMENT_ERROR,
+        }
+
+    return None
 
 
 def process_stripe_checkout_session_status(checkout_session: dict | str):

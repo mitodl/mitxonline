@@ -1,5 +1,7 @@
 import pytest
 import reversion
+import stripe
+from celery.exceptions import Retry
 
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
@@ -125,3 +127,18 @@ def test_expire_cancelled_stripe_checkout(mocker, state):
         mock_expire.assert_called_once_with(order)
     else:
         mock_expire.assert_not_called()
+
+
+@pytest.mark.django_db
+def test_expire_cancelled_stripe_checkout_retries(mocker):
+    """A Stripe error retries the task, so the cancelled page doesn't stay payable."""
+    mock_expire = mocker.patch(
+        "ecommerce.api.expire_stripe_checkout_session",
+        side_effect=stripe.APIConnectionError("Stripe is down"),
+    )
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+
+    with pytest.raises(Retry):
+        expire_cancelled_stripe_checkout.apply(args=[order.id])
+
+    mock_expire.assert_called_once_with(order)

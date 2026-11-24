@@ -1,4 +1,6 @@
 # ruff: noqa: PLC0415
+import stripe
+
 from main.celery import app
 
 
@@ -111,7 +113,12 @@ def process_refund_request(refund_request_id):
     )
 
 
-@app.task(acks_late=True)
+@app.task(
+    acks_late=True,
+    autoretry_for=(stripe.StripeError,),
+    retry_backoff=True,
+    max_retries=3,
+)
 def expire_cancelled_stripe_checkout(order_id):
     """
     Expire the CheckoutSession of a Stripe order the learner cancelled, so the

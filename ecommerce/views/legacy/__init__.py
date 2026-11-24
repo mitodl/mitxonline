@@ -952,6 +952,8 @@ class CheckoutResultCancelView(LoginRequiredMixin, View):
     This queues expiring the order's checkout session, so the payment page
     can't still be used (e.g. from another tab), and redirects the user back to
     the cart. The order is cancelled by the webhook once the session expires.
+    Only the signed cancel URL given to Stripe expires the session, so a link
+    from elsewhere can't cancel the learner's checkout.
     """
 
     def get(self, request, reference_number):
@@ -964,7 +966,9 @@ class CheckoutResultCancelView(LoginRequiredMixin, View):
             gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
         ).first()
 
-        if order:
+        if order and api.is_checkout_cancel_signed(
+            reference_number, request.GET.get("token")
+        ):
             expire_cancelled_stripe_checkout.delay(order.id)
 
         return redirect_with_user_message(
@@ -1267,10 +1271,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
                 {"type": USER_MSG_TYPE_PAYMENT_ERROR},
             )
         if "payment_in_progress" in checkout_payload:
-            return redirect_with_user_message(
-                reverse("user-dashboard"),
-                {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING},
-            )
+            paid_order = checkout_payload["order"]
+            return _learn_dashboard_redirect(paid_order, order_status=paid_order.state)
 
         if checkout_payload["method"] == "GET":
             # GET method means we redirect the learner

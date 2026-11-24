@@ -199,6 +199,9 @@ CHECKOUT_CANCEL_ROUTE_MAP = {
     MITOL_PAYMENT_GATEWAY_STRIPE: CHECKOUT_RESULT_CANCEL_ROUTE,
 }
 
+# Signs the order reference number in the Stripe cancel URL.
+CHECKOUT_CANCEL_SIGNING_SALT = "ecommerce.stripe-checkout-cancel"
+
 STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION = "Initial CheckoutSession"
 
 STRIPE_OBJECT_CHECKOUT_SESSION = "checkout.session"

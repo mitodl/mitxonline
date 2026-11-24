@@ -38,6 +38,7 @@ from courses.models import (
     ProgramEnrollment,
 )
 from ecommerce import api
+from ecommerce.api import sign_checkout_cancel
 from ecommerce.constants import (
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
@@ -2290,21 +2291,23 @@ def test_checkout_result_success_ignores_other_users_orders(
 
 
 @pytest.mark.parametrize(
-    ("own_order", "state", "gateway_type", "expect_expire"),
+    ("own_order", "state", "gateway_type", "signed", "expect_expire"),
     [
-        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, True),
-        (False, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, False),
-        (True, OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_STRIPE, False),
-        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_CYBERSOURCE, False),
+        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, True, True),
+        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, False, False),
+        (False, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_STRIPE, True, False),
+        (True, OrderStatus.CANCELED, MITOL_PAYMENT_GATEWAY_STRIPE, True, False),
+        (True, OrderStatus.PENDING, MITOL_PAYMENT_GATEWAY_CYBERSOURCE, True, False),
     ],
 )
 def test_checkout_result_cancel_redirects_to_cart(  # noqa: PLR0913
-    mocker, user, user_client, own_order, state, gateway_type, expect_expire
+    mocker, user, user_client, own_order, state, gateway_type, signed, expect_expire
 ):
     """
     The cancel handler redirects to the cart with the cancelled message, and
-    queues expiring the checkout session of the user's pending Stripe order.
-    The order itself is left for the webhook.
+    queues expiring the checkout session of the user's pending Stripe order,
+    but only from the signed URL given to Stripe. The order itself is left for
+    the webhook.
     """
 
     mock_expire = mocker.patch(
@@ -2320,7 +2323,8 @@ def test_checkout_result_cancel_redirects_to_cart(  # noqa: PLR0913
         reverse(
             "checkout-result-cancel",
             kwargs={"reference_number": order.reference_number},
-        )
+        ),
+        {"token": sign_checkout_cancel(order.reference_number) if signed else "x"},
     )
 
     assert resp.status_code == 302
@@ -2336,34 +2340,47 @@ def test_checkout_result_cancel_redirects_to_cart(  # noqa: PLR0913
         mock_expire.assert_not_called()
 
 
-@pytest.mark.parametrize(
-    ("result_key", "msg_type", "redirect_to"),
-    [
-        (
-            "payment_in_progress",
-            USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
-            "user-dashboard",
-        ),
-        ("checkout_unavailable", USER_MSG_TYPE_PAYMENT_ERROR, "cart"),
-    ],
-)
-def test_checkout_interstitial_superseding_refused(
-    mocker, user_client, result_key, msg_type, redirect_to
-):
+def test_checkout_interstitial_payment_in_progress(mocker, user, user_client):
     """
-    A learner who's already paying for the basket is sent to the dashboard;
-    one whose earlier checkout couldn't be checked goes back to the cart.
+    A learner who's already paying for the basket is sent to the Learn
+    dashboard with that order's status, since Learn can't read our message
+    cookie.
     """
 
+    order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
     mocker.patch(
         "ecommerce.api.generate_checkout_payload",
-        return_value={result_key: True, "error": msg_type},
+        return_value={
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            "order": order,
+        },
     )
 
     resp = user_client.get(reverse("checkout_interstitial_page"))
 
     assert resp.status_code == 302
-    assert resp.url == reverse(redirect_to)
+    assert resp.url == (
+        f"{settings.MIT_LEARN_DASHBOARD_URL}"
+        f"?order_status={OrderStatus.PENDING}&order_id={order.id}"
+    )
+
+
+def test_checkout_interstitial_checkout_unavailable(mocker, user_client):
+    """A learner whose earlier checkout couldn't be checked goes back to the cart."""
+
+    mocker.patch(
+        "ecommerce.api.generate_checkout_payload",
+        return_value={
+            "checkout_unavailable": True,
+            "error": USER_MSG_TYPE_PAYMENT_ERROR,
+        },
+    )
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
-        {"type": msg_type}
+        {"type": USER_MSG_TYPE_PAYMENT_ERROR}
     )
