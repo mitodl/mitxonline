@@ -39,7 +39,7 @@ from main.env import get_float
 from main.sentry import init_sentry
 from openapi.settings_spectacular import open_spectacular_settings
 
-VERSION = "2026.11.4.1"
+VERSION = "2026.11.24.1"
 
 log = logging.getLogger()
 
@@ -67,11 +67,23 @@ SENTRY_LOG_LEVEL = get_string(
 )
 SENTRY_TRACES_SAMPLE_RATE = get_float("SENTRY_TRACES_SAMPLE_RATE", 0)
 SENTRY_PROFILES_SAMPLE_RATE = get_float("SENTRY_PROFILES_SAMPLE_RATE", 0)
+SENTRY_USER_HASH_KEY = get_string(
+    name="SENTRY_USER_HASH_KEY",
+    default="",
+    description=(
+        "HMAC key for the hashed user id sent to Sentry in place of the user. "
+        "Rotating it makes every user look new to Sentry. Empty sends no user."
+    ),
+)
 init_sentry(
     dsn=SENTRY_DSN,
     environment=ENVIRONMENT,
     version=VERSION,
-    send_default_pii=True,
+    # Off: on, the SDK sends the user's email, username and IP, and every
+    # cookie but Django's session and CSRF cookies. SENTRY_USER_HASH_KEY
+    # restores user counts without the identity.
+    collect_user_info=False,
+    user_hash_key=SENTRY_USER_HASH_KEY,
     log_level=SENTRY_LOG_LEVEL,
     heroku_app_name=HEROKU_APP_NAME,
     traces_sample_rate=SENTRY_TRACES_SAMPLE_RATE,
@@ -269,6 +281,7 @@ INSTALLED_APPS = (
     "sheets",
     "compliance",
     "openedx",
+    "location",
     # must be after "users" to pick up custom user model
     "ecommerce",
     "flexiblepricing",
@@ -286,6 +299,7 @@ INSTALLED_APPS = (
     "mitol.olposthog.apps.OlPosthog",
     "mitol.scim.apps.ScimApp",
     # "mitol.oauth_toolkit_extensions.apps.OAuthToolkitExtensionsApp",
+    "mitol.geoip.apps.GeoIPApp",
     "viewflow",
     "openapi",
     "drf_spectacular",
@@ -298,6 +312,9 @@ INSTALLED_APPS = (
 #     INSTALLED_APPS += ("localdev.seed",)  # noqa: ERA001
 
 MIDDLEWARE = (
+    # Outermost, so an error raised in any later middleware can still be
+    # attributed to the user once AuthenticationMiddleware has set one.
+    "main.sentry.SentryUserHashMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -305,6 +322,9 @@ MIDDLEWARE = (
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "mitol.apigateway.middleware.ApisixUserMiddleware",
     "main.middleware.AnonymousBasketHandoffMiddleware",
+    # After ApisixUserMiddleware, so request.user is the gateway's view of who
+    # is calling rather than a stale Django session (hq#12763).
+    "main.middleware.BasketOwnerHandoffMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "main.middleware.HostBasedCSRFMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -500,6 +520,21 @@ KEYCLOAK_ADMIN_CLIENT_SECRET = get_string(
     description="The client secret for the admin client.",
 )
 
+KEYCLOAK_MEMBERSHIP_CLIENT_ID = get_string(
+    name="KEYCLOAK_MEMBERSHIP_CLIENT_ID",
+    default=None,
+    description=(
+        "The client ID of the service account that adds users to Keycloak "
+        "organizations during enrollment."
+    ),
+)
+
+KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = get_string(
+    name="KEYCLOAK_MEMBERSHIP_CLIENT_SECRET",
+    default=None,
+    description="The client secret for KEYCLOAK_MEMBERSHIP_CLIENT_ID.",
+)
+
 KEYCLOAK_ADMIN_CLIENT_SCOPES = get_string(
     name="KEYCLOAK_ADMIN_CLIENT_SCOPES",
     default=None,
@@ -662,12 +697,6 @@ MIT_LEARN_FROM_EMAIL = get_string(
     description="From email address for outgoing application emails",
 )
 
-MIT_LEARN_REPLY_TO_EMAIL = get_string(
-    name="MIT_LEARN_REPLY_TO_EMAIL",
-    default=MIT_LEARN_FROM_EMAIL,
-    description="Reply-to email address for UAI enrollment emails (defaults to MIT_LEARN_FROM_EMAIL)",
-)
-
 MIT_LEARN_BASE_URL = get_string(
     name="MIT_LEARN_BASE_URL",
     default=f"https://{ENV_TO_LEARN_HOSTNAME_MAP.get(ENVIRONMENT, 'learn.mit.edu')}",
@@ -686,7 +715,7 @@ MIT_LEARN_API_BASE_URL = get_string(
 MIT_LEARN_DASHBOARD_URL = get_string(
     name="MIT_LEARN_DASHBOARD_URL",
     default=f"{MIT_LEARN_BASE_URL}/dashboard",
-    description="Dashboard URL for UAI enrollment emails",
+    description="MIT Learn dashboard URL, used for email links and /dashboard/ redirects",
 )
 
 MIT_LEARN_TERMS_URL = get_string(
@@ -989,14 +1018,6 @@ REPAIR_OPENEDX_USERS_FREQUENCY = get_int(
 )
 REPAIR_OPENEDX_USERS_OFFSET = int(REPAIR_OPENEDX_USERS_FREQUENCY / 2)
 
-REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ = get_int(
-    name="REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ",
-    default=180,
-    description="How many seconds between refreshing featured items for the homepage cache",
-)
-
-REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET = int(REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ / 2)
-
 KEYCLOAK_ORG_SYNC_FREQUENCY = get_int(
     name="KEYCLOAK_ORG_SYNC_FREQUENCY",
     default=86400,
@@ -1059,13 +1080,6 @@ CELERY_BEAT_SCHEDULE = {
             day_of_week=CRON_COURSE_CERTIFICATES_DAYS,
             day_of_month="*",
             month_of_year="*",
-        ),
-    },
-    "refresh-featured-homepage-items": {
-        "task": "cms.tasks.refresh_featured_homepage_items",
-        "schedule": OffsettingSchedule(
-            run_every=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_FREQ),
-            offset=timedelta(seconds=REFRESH_FEATURED_HOMEPAGE_ITEMS_OFFSET),
         ),
     },
     "sync-keycloak": {
@@ -1506,19 +1520,6 @@ HUBSPOT_TASK_DELAY = get_int(
     description="Number of milliseconds to wait between consecutive Hubspot calls",
 )
 
-# HomePage Hubspot Form Settings
-HUBSPOT_HOME_PAGE_FORM_GUID = get_string(
-    name="HUBSPOT_HOME_PAGE_FORM_GUID",
-    default="",
-    description="Hubspot ID for the home page contact form",
-)
-
-HUBSPOT_PORTAL_ID = get_string(
-    name="HUBSPOT_PORTAL_ID",
-    default="",
-    description="Hubspot Portal ID",
-)
-
 UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN = get_string(
     name="UAI_MITOL_HUBSPOT_API_PRIVATE_TOKEN",
     default=None,
@@ -1565,24 +1566,9 @@ MITOL_APIGATEWAY_USERINFO_MODEL_MAP = {
     },
 }
 
-MITOL_APIGATEWAY_USERINFO_ID_SEARCH_FIELD = "global_id"
-
-# Set to True to create users that we see but aren't aware of.
-# Set to False if you're managing that elsewhere (like with social-auth).
-MITOL_APIGATEWAY_USERINFO_CREATE = get_bool(
-    name="MITOL_APIGATEWAY_USERINFO_CREATE",
-    default=True,
-    description="Create users that we see but aren't aware of",
-)
-
-# Set to True to update users we've seen before. If you set this to False, make
-# sure there's a backchannel way to update the user data (SCIM, etc) or user
-# info will fall out of sync with the IdP pretty quickly.
-MITOL_APIGATEWAY_USERINFO_UPDATE = get_bool(
-    name="MITOL_APIGATEWAY_USERINFO_UPDATE",
-    default=True,
-    description="Update users we've seen before",
-)
+# MITOL_APIGATEWAY_USERINFO_CREATE (default True) and
+# MITOL_APIGATEWAY_USERINFO_UPDATE (default False) are read from the environment
+# by mitol.apigateway.settings. Declaring them here again raises at import.
 
 # URL configuation
 
@@ -1643,6 +1629,15 @@ DISABLE_USER_REPAIR_TASK = get_bool(
     description="Disable the task so it no-ops",
 )
 
+EDX_MIGRATION_WAREHOUSE = get_string(
+    name="EDX_MIGRATION_WAREHOUSE",
+    default="trino",
+    description=(
+        "Which data platform warehouse migrate_edx_data reads from: trino "
+        "(TRINO_* settings) or starrocks (STARROCKS_* settings)"
+    ),
+)
+
 TRINO_HOST = get_string(
     name="TRINO_HOST",
     default=None,
@@ -1673,6 +1668,30 @@ TRINO_PASSWORD = get_string(
     description="Password for Trino authentication",
 )
 
+STARROCKS_HOST = get_string(
+    name="STARROCKS_HOST",
+    default=None,
+    description="Host of the data platform's StarRocks FE, read by migrate_edx_data",
+)
+
+STARROCKS_PORT = get_int(
+    name="STARROCKS_PORT",
+    default=9030,
+    description="MySQL protocol port of the data platform's StarRocks FE",
+)
+
+STARROCKS_USER = get_string(
+    name="STARROCKS_USER",
+    default=None,
+    description="Username for StarRocks authentication",
+)
+
+STARROCKS_PASSWORD = get_string(
+    name="STARROCKS_PASSWORD",
+    default=None,
+    description="Password for StarRocks authentication",
+)
+
 VERIFIABLE_CREDENTIAL_SIGNER_URL = get_string(
     name="VERIFIABLE_CREDENTIAL_SIGNER_URL",
     default="",
@@ -1697,5 +1716,39 @@ MIT_LEARN_ATTACH_URL = get_string(
     description="The URL to use for generating contract attachment URLs for B2B.",
 )
 
+B2B_IDP_LOGIN_CLIENT_ID = get_string(
+    name="B2B_IDP_LOGIN_CLIENT_ID",
+    default=None,
+    description=(
+        "The Keycloak client ID used in the login link for a B2B identity"
+        " provider. It is the client of the app partner learners land in."
+    ),
+)
+
+B2B_IDP_LOGIN_REDIRECT_URI = get_string(
+    name="B2B_IDP_LOGIN_REDIRECT_URI",
+    default=None,
+    description=(
+        "Where Keycloak sends the browser after a login through a B2B identity"
+        " provider's login link. It is the API gateway login URL of the app"
+        " partner learners land in, and a valid redirect URI of"
+        " B2B_IDP_LOGIN_CLIENT_ID."
+    ),
+)
+
 if ECOMMERCE_DEFAULT_PAYMENT_GATEWAY == "None":  # noqa: F405
     ECOMMERCE_DEFAULT_PAYMENT_GATEWAY = MITOL_PAYMENT_GATEWAY_CYBERSOURCE
+
+# User location settings
+
+LOCATION_FORCE_COUNTRY = get_string(
+    name="LOCATION_FORCE_COUNTRY",
+    default="",
+    description="Force the system to resolve a user's location to this country code.",
+)
+
+LOCATION_FORCE_PROFILE_COUNTRY = get_bool(
+    name="LOCATION_FORCE_PROFILE_COUNTRY",
+    default=False,
+    description="Force the system to always resolve a user's location to the country set in their profile.",
+)

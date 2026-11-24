@@ -182,9 +182,11 @@ export interface IOrganizationIdentityProvider {
     metadata_source: string;
     metadata_artifact: Record<string, string> | null;
     metadata_fetched_at: string | null;
+    pulumi_managed: boolean;
     created_on: string;
     updated_on: string;
     service_provider: IServiceProviderDetails;
+    login_url: string | null;
 }
 
 // The detail route also reads the attribute mappers back from Keycloak.
@@ -199,6 +201,7 @@ export interface IProvisionedOrganization {
     org_key: string;
     org_key_prefix: string;
     description: string;
+    logo: string | null;
     slug: string;
     sso_organization_id: string | null;
     domains: string[] | null;
@@ -234,11 +237,16 @@ export interface IProvisionedContract {
     // Rich text, stored as HTML.
     description: string;
     welcome_message: string;
+    // Rich text, stored as HTML.
+    welcome_message_extra: string;
     contract_start: string | null;
     contract_end: string | null;
     active: boolean;
     max_learners: number | null;
     enrollment_fixed_price: string | null;
+    // Older contracts can store no sheet as null rather than blank.
+    google_sheet_target: string | null;
+    google_sheet_target_tab: string;
     programs: IContractProgram[];
 }
 

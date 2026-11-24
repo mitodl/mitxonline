@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import operator
 import re
 import time
 from collections import Counter, defaultdict, namedtuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
+from enum import StrEnum
+from functools import reduce
 from traceback import format_exc
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 from urllib.parse import urlparse
 
 import requests
@@ -68,6 +71,7 @@ from courses.models import (
     Department,
     EnrollmentMode,
     PaidCourseRun,
+    PaidProgram,
     PartnerSchool,
     Program,
     ProgramCertificate,
@@ -75,7 +79,11 @@ from courses.models import (
     ProgramRequirement,
     VerifiableCredential,
 )
-from courses.requirement_tree import is_requirement_tree_satisfied
+from courses.requirement_tree import (
+    RequirementResult,
+    explain_requirement_tree,
+    is_requirement_tree_satisfied,
+)
 from courses.serializers.base import get_thumbnail_url
 from courses.tasks import subscribe_edx_course_emails
 from courses.utils import (
@@ -247,7 +255,8 @@ def create_run_enrollments(  # noqa: C901, PLR0913
             Refund downgrade callers and support-initiated deferrals only —
             never bypass for new enrollments.
         skip_enrollment_emails (bool): If True, don't send the learner the
-            enrollment confirmation email. Operator-run management commands only.
+            enrollment confirmation email. For operator-run management commands
+            and downgrades only.
 
     Returns:
         (list of CourseRunEnrollment, bool): A list of enrollment objects that were successfully
@@ -377,7 +386,11 @@ def create_run_enrollments(  # noqa: C901, PLR0913
 
 
 def create_program_enrollments(
-    user, programs, *, enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE
+    user,
+    programs,
+    *,
+    enrollment_mode=EDX_DEFAULT_ENROLLMENT_MODE,
+    skip_export_compliance_check=False,
 ):
     """
     Creates local records of a user's enrollment in programs
@@ -388,13 +401,16 @@ def create_program_enrollments(
 
     Kwargs:
         enrollment_mode (str): The mode the enrollment should be in
+        skip_export_compliance_check (bool): Skip the export compliance check
+            (e.g. when downgrading an existing enrollment, not creating access)
 
     Returns:
         list of ProgramEnrollment: A list of enrollment objects that were successfully created
     """
     successful_enrollments = []
     for program in programs:
-        _verify_exports_compliance_for_enrollment(user, program)
+        if not skip_export_compliance_check:
+            _verify_exports_compliance_for_enrollment(user, program)
 
         try:
             enrollment, created = ProgramEnrollment.all_objects.get_or_create(
@@ -669,14 +685,18 @@ def downgrade_learner(enrollment):
     Downgrades given enrollment from verified to audit.
     """
 
-    # Forcing the enrollment here - if the refund comes after the end date
+    # Forcing the enrollment here - if the downgrade comes after the end date
     # for the course for whatever reason, we still want to revert the mode.
+    # Downgrading only reduces access, so neither the country block nor the
+    # export compliance screening applies, and no enrollment email is sent.
     return create_run_enrollments(
         user=enrollment.user,
         runs=[enrollment.run],
         keep_failed_enrollments=True,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_compliance_check=True,
         skip_country_block_check=True,
+        skip_enrollment_emails=True,
     )
 
 
@@ -761,13 +781,17 @@ def undo_program_course_run_verification(enrollment):
 def downgrade_program_enrollment_and_verified_runs(user, program):
     """
     Downgrade a user's ProgramEnrollment to audit, and downgrade the
-    program's course-run enrollments that are verified only because of the
-    program purchase.
+    course-run enrollments (including those in nested programs) that are
+    verified only because of the program purchase. Programs and runs with no
+    audit track are unenrolled instead of downgraded.
 
     A course run's verified enrollment is left alone (not downgraded) if
     either:
     - it's a B2B-provisioned run (has a b2b_contracts entry) - governed by
-      its contract, not this payment, or
+      its contract, not this payment,
+    - its course belongs to another program (this program's tree or an
+      ancestor/sibling) that the learner has a fulfilled PaidProgram for, so
+      the learner is still entitled to it, or
     - the learner has a separate PaidCourseRun for it backed by a fulfilled
       order that isn't attributable to this program purchase - either a
       genuine, independent purchase of that specific run (total_price_paid
@@ -804,46 +828,90 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
         and program_enrollment.active
         and program_enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
     ):
-        downgraded_program_enrollments = create_program_enrollments(
-            user, [program], enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+        downgraded_program_enrollment = _downgrade_or_deactivate_program_enrollment(
+            user, program
         )
-        downgraded_program_enrollment = first_or_none(downgraded_program_enrollments)
-        if downgraded_program_enrollment is not None:
-            # create_program_enrollments has no change_status kwarg, so tag
-            # the refund onto the enrollment directly - active stays True,
-            # this is audit-trail/reporting only (e.g. HubSpot sync), not a
-            # deactivation.
-            downgraded_program_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
-            downgraded_program_enrollment.save_and_log(None)
 
-    verified_run_enrollments = CourseRunEnrollment.get_program_run_enrollments(
-        user=user, program=program
-    ).filter(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, b2b_contract__isnull=True)
+    # Programs nested in this one (at any depth) carry verified enrollments
+    # because of this purchase too; handle them the same way.
+    program_tree_ids = Program.expand_nested_program_ids([program.id])
+    nested_program_ids = program_tree_ids - {program.id}
+    nested_enrollments = ProgramEnrollment.objects.filter(
+        user=user,
+        program_id__in=nested_program_ids,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract__isnull=True,
+    ).select_related("program")
+    for nested_enrollment in nested_enrollments:
+        # Leave a nested program alone if the learner bought it separately.
+        # The order being refunded is no longer fulfilled, so it doesn't count.
+        if PaidProgram.fulfilled_paid_program_exists(user, nested_enrollment.program):
+            continue
+        _downgrade_or_deactivate_program_enrollment(user, nested_enrollment.program)
 
-    eligible_runs = []
+    verified_run_enrollments = CourseRunEnrollment.objects.filter(
+        user=user,
+        run__course__in=program.courses_qset_recursive,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        b2b_contract__isnull=True,
+    ).select_related("run")
+
+    # Zero-value orders for runs in nested programs redeem a discount named
+    # after the nested program, so match every program in the tree.
+    program_prefix_filter = reduce(
+        operator.or_,
+        (
+            Q(
+                order__discounts__redeemed_discount__discount_code__startswith=readable_id
+            )
+            for readable_id in Program.objects.filter(
+                id__in=program_tree_ids
+            ).values_list("readable_id", flat=True)
+        ),
+    )
+
+    # Courses another fulfilled program purchase still covers, e.g. a nested
+    # program bought separately or a parent program that also contains the run.
+    # The refunded order is already out of FULFILLED state, so it isn't counted.
+    covered_course_ids = set()
+    for paid_program in PaidProgram.objects.filter(
+        user=user, order__state=OrderStatus.FULFILLED
+    ).select_related("program"):
+        covered_course_ids.update(
+            paid_program.program.courses_qset_recursive.values_list("id", flat=True)
+        )
+
+    audit_runs = []
     for run_enrollment in verified_run_enrollments:
         run = run_enrollment.run
+        if run.course_id in covered_course_ids:
+            continue
         if (
             PaidCourseRun.objects.filter(
                 user=user,
                 course_run=run,
                 order__state=OrderStatus.FULFILLED,
             )
-            .exclude(
-                order__total_price_paid=0,
-                order__discounts__redeemed_discount__discount_code__startswith=program.readable_id,
-            )
+            .exclude(program_prefix_filter, order__total_price_paid=0)
             .exists()
         ):
             continue
-        eligible_runs.append(run)
+        if run.has_free_audit:
+            audit_runs.append(run)
+        else:
+            # No audit track to fall back to, so the learner is unenrolled.
+            deactivate_run_enrollment(
+                run_enrollment,
+                ENROLL_CHANGE_STATUS_REFUNDED,
+                keep_failed_enrollments=True,
+            )
 
-    if not eligible_runs:
+    if not audit_runs:
         return downgraded_program_enrollment, []
 
     downgraded_run_enrollments, _ = create_run_enrollments(
         user,
-        eligible_runs,
+        audit_runs,
         mode=EDX_ENROLLMENT_AUDIT_MODE,
         change_status=ENROLL_CHANGE_STATUS_REFUNDED,
         keep_failed_enrollments=True,
@@ -851,6 +919,42 @@ def downgrade_program_enrollment_and_verified_runs(user, program):
     )
 
     return downgraded_program_enrollment, downgraded_run_enrollments
+
+
+def _downgrade_or_deactivate_program_enrollment(user, program):
+    """
+    Move a user's verified ProgramEnrollment back to audit, or deactivate it
+    if the program has no audit track.
+
+    Returns:
+        ProgramEnrollment | None: the downgraded enrollment, or None if it was
+        deactivated (or there was nothing to change)
+    """
+    if not program.has_free_audit:
+        enrollment = ProgramEnrollment.objects.filter(
+            user=user,
+            program=program,
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        ).first()
+        if enrollment is not None:
+            enrollment.deactivate_and_save(ENROLL_CHANGE_STATUS_REFUNDED, no_user=True)
+        return None
+
+    downgraded_enrollments = create_program_enrollments(
+        user,
+        [program],
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        skip_export_compliance_check=True,
+    )
+    downgraded_enrollment = first_or_none(downgraded_enrollments)
+    if downgraded_enrollment is not None:
+        # create_program_enrollments has no change_status kwarg, so tag
+        # the refund onto the enrollment directly - active stays True,
+        # this is audit-trail/reporting only (e.g. HubSpot sync), not a
+        # deactivation.
+        downgraded_enrollment.change_status = ENROLL_CHANGE_STATUS_REFUNDED
+        downgraded_enrollment.save_and_log(None)
+    return downgraded_enrollment
 
 
 def deactivate_run_enrollment(
@@ -1546,22 +1650,30 @@ def process_course_run_grade_certificate(
                 course.readable_id,
             )
             return None, False, False
-        course_page = course.course_page
-        if not course_page or not course_page.certificate_page:
-            # course_page.certificate_page is a plain (uncached) property, so
-            # this re-checks live status on every call instead of trusting
-            # the Course.certificate_page cached_property, which would go
-            # stale across a batch that reuses the same Course/CourseRun
-            # object for many users (e.g. the certificate generation cron).
+        # get_certificate_page_revision() re-checks live status on every call
+        # instead of trusting the Course.certificate_page cached_property,
+        # which would go stale across a batch that reuses the same
+        # Course/CourseRun object for many users (e.g. the certificate
+        # generation cron).
+        certificate_page_revision = course.get_certificate_page_revision()
+        if not certificate_page_revision:
+            # certificate_page_revision is non-nullable, so a certificate can
+            # only be created once the certificate page has a saved revision
+            # to point to - a live page alone isn't enough.
             log.warning(
-                "Skipping certificate creation for user=%s run=%s: no live certificate page",
+                "Skipping certificate creation for user=%s run=%s: no live, "
+                "revisioned certificate page",
                 user.id,
                 course_run.courseware_id,
             )
             return None, False, False
         try:
+            # Pass the revision checked above rather than letting save()
+            # look it up again, so the check and the write can't disagree.
             certificate, created = CourseRunCertificate.objects.get_or_create(
-                user=user, course_run=course_run
+                user=user,
+                course_run=course_run,
+                defaults={"certificate_page_revision": certificate_page_revision},
             )
             if created and not defer_hubspot_sync:
                 sync_hubspot_user(user)
@@ -1569,9 +1681,26 @@ def process_course_run_grade_certificate(
                 create_verifiable_credential(certificate)
             return certificate, created, False  # noqa: TRY300
         except IntegrityError:
-            log.warning(
-                f"IntegrityError caught processing certificate for {course_run.courseware_id} for user {user} - certificate was likely already revoked."  # noqa: G004
-            )
+            # The expected case: a certificate already exists but the default
+            # manager hides it (revoked, or issue_date in the future), so
+            # get_or_create tried to insert a duplicate. Anything else (e.g. a
+            # NOT NULL or FK violation) is unexpected and logged as an error.
+            if CourseRunCertificate.all_objects.filter(
+                user=user, course_run=course_run
+            ).exists():
+                log.warning(
+                    "IntegrityError caught processing certificate for %s for "
+                    "user %s - an existing certificate is revoked or not yet "
+                    "issued.",
+                    course_run.courseware_id,
+                    user,
+                )
+            else:
+                log.exception(
+                    "IntegrityError creating certificate for user=%s run=%s",
+                    user.id,
+                    course_run.courseware_id,
+                )
     return None, False, False
 
 
@@ -1803,6 +1932,31 @@ def _has_earned_program_cert(user, program):
         program (programs.models.Program): program where the user is enrolled.
     """
 
+    passed_course_ids = _program_passed_course_ids(user, program)
+
+    def _has_earned_required_program(required_program):
+        # A required program with a paid mode counts through its own
+        # certificate; otherwise it counts when the learner would have earned one.
+        if _counts_through_program_certificate(required_program):
+            return ProgramCertificate.all_objects.filter(
+                user=user, program=required_program, is_revoked=False
+            ).exists()
+        return _has_earned_program_cert(user, required_program)
+
+    return is_requirement_tree_satisfied(
+        program,
+        course_satisfied=passed_course_ids.__contains__,
+        program_satisfied=_has_earned_required_program,
+    )
+
+
+def _program_passed_course_ids(user, program):
+    """
+    Return the ids of the program's courses that count as passed toward its
+    certificate: the user, actively enrolled in a non-variant run of the course
+    with no change status, holds an unrevoked certificate for that run or a
+    passing grade in it when it doesn't offer the verified mode.
+    """
     user_courseruns = (
         CourseRun.objects.filter(
             enrollments__user=user,
@@ -1825,25 +1979,165 @@ def _has_earned_program_cert(user, program):
         courseruns__grades__user=user,
         courseruns__grades__passed=True,
     )
-    passed_course_ids = {
+    return {
         *cert_courses.values_list("id", flat=True),
         *grade_courses.values_list("id", flat=True),
     }
 
-    def _has_earned_required_program(required_program):
-        # A required program with a paid mode counts through its own
-        # certificate; otherwise it counts when the learner would have earned one.
-        if required_program.enrollment_modes.filter(requires_payment=True).exists():
-            return ProgramCertificate.all_objects.filter(
-                user=user, program=required_program, is_revoked=False
-            ).exists()
-        return _has_earned_program_cert(user, required_program)
 
-    return is_requirement_tree_satisfied(
-        program,
-        course_satisfied=passed_course_ids.__contains__,
-        program_satisfied=_has_earned_required_program,
+def _counts_through_program_certificate(required_program):
+    """Whether a required program counts through its own certificate (it has a paid mode)."""
+    return required_program.enrollment_modes.filter(requires_payment=True).exists()
+
+
+def _is_variant_run(run):
+    return bool(run.variant_industry or run.variant_length)
+
+
+def _is_source_run(run):
+    # CourseRun.objects (used by _program_passed_course_ids) leaves these out.
+    return run.is_source_run or run.run_tag == "SOURCE"
+
+
+def _course_gap_reason(user, course):  # noqa: C901
+    """
+    Explain why a course doesn't count toward a program certificate for the
+    user, using the same rules as _program_passed_course_ids.
+    """
+    enrollments = list(
+        CourseRunEnrollment.all_objects.filter(user=user, run__course=course)
+        .select_related("run")
+        .order_by("run__start_date", "run__id")
     )
+    if not enrollments:
+        return "not enrolled in any run"
+
+    reasons = []
+    counting_runs = []
+    for enrollment in enrollments:
+        run_id = enrollment.run.courseware_id
+        if _is_source_run(enrollment.run):
+            reasons.append(f"{run_id} is a source run, which doesn't count")
+        elif _is_variant_run(enrollment.run):
+            reasons.append(f"{run_id} is a variant run, which doesn't count")
+        elif enrollment.change_status:
+            state = "active" if enrollment.active else "inactive"
+            reasons.append(
+                f'enrollment in {run_id} is marked "{enrollment.change_status}" '
+                f"({state}), so it doesn't count"
+            )
+        elif not enrollment.active:
+            reasons.append(f"enrollment in {run_id} is inactive")
+        else:
+            counting_runs.append(enrollment.run)
+
+    if counting_runs:
+        certificates = {
+            certificate.course_run_id: certificate
+            for certificate in CourseRunCertificate.all_objects.filter(
+                user=user, course_run__in=counting_runs
+            )
+        }
+        passed_run_ids = set(
+            CourseRunGrade.objects.filter(
+                user=user, course_run__in=counting_runs, passed=True
+            ).values_list("course_run_id", flat=True)
+        )
+        verified_run_ids = set(
+            CourseRun.all_objects.filter(
+                id__in=[run.id for run in counting_runs],
+                enrollment_modes__mode_slug=EDX_ENROLLMENT_VERIFIED_MODE,
+            ).values_list("id", flat=True)
+        )
+        for run in counting_runs:
+            certificate = certificates.get(run.id)
+            if certificate is not None and certificate.is_revoked:
+                reasons.append(f"certificate in {run.courseware_id} is revoked")
+            elif run.id in passed_run_ids and run.id in verified_run_ids:
+                reasons.append(
+                    f"passed {run.courseware_id}, but it offers the verified track, "
+                    "so a course certificate is needed"
+                )
+            else:
+                reasons.append(
+                    f"enrolled in {run.courseware_id} with no course certificate "
+                    "or passing grade"
+                )
+    return "; ".join(reasons)
+
+
+def explain_program_requirements(user, program) -> RequirementResult | None:
+    """
+    Show how the user stands against each node of the program's requirement
+    tree, with the reason each unmet course or program isn't met.
+
+    Its overall result matches _has_earned_program_cert.
+
+    Returns:
+        RequirementResult | None: None when the program has no requirements.
+    """
+    passed_course_ids = _program_passed_course_ids(user, program)
+
+    def _explain_leaf(node):
+        if node.is_course:
+            course = node.course
+            label = f"{course.readable_id} {course.title}"
+            if node.course_id in passed_course_ids:
+                return RequirementResult(label=label, satisfied=True)
+            return RequirementResult(
+                label=label,
+                satisfied=False,
+                detail=_course_gap_reason(user, course),
+            )
+
+        required_program = node.required_program
+        label = f"Program {required_program.readable_id} {required_program.title}"
+        if _counts_through_program_certificate(required_program):
+            certificate = ProgramCertificate.all_objects.filter(
+                user=user, program=required_program
+            ).first()
+            if certificate is not None and not certificate.is_revoked:
+                return RequirementResult(label=label, satisfied=True)
+            detail = (
+                "program certificate is revoked"
+                if certificate is not None
+                else "no program certificate"
+            )
+            return RequirementResult(label=label, satisfied=False, detail=detail)
+
+        nested = explain_program_requirements(user, required_program)
+        if nested is None:
+            return RequirementResult(
+                label=label, satisfied=False, detail="has no requirements set up"
+            )
+        return RequirementResult(
+            label=label,
+            satisfied=nested.satisfied,
+            detail=nested.detail,
+            children=nested.children,
+        )
+
+    return explain_requirement_tree(program, explain_leaf=_explain_leaf)
+
+
+class ProgramCertificateSkipReason(StrEnum):
+    """Why generate_program_certificate didn't return a certificate."""
+
+    NO_VERIFIED_ENROLLMENT = "no verified enrollment in the program"
+    REQUIREMENTS_NOT_MET = "program requirements are not met"
+    CERTIFICATES_DISABLED = "certificates are disabled for this program"
+    NO_CERTIFICATE_PAGE = (
+        "the program has no live certificate page with a saved revision"
+    )
+    SAVE_FAILED = "the certificate could not be saved (see the logs)"
+
+
+class ProgramCertificateResult(NamedTuple):
+    """The outcome of generate_program_certificate_with_result."""
+
+    certificate: ProgramCertificate | None
+    created: bool
+    skip_reason: ProgramCertificateSkipReason | None = None
 
 
 def generate_program_certificate(user, program, force_create=False):  # noqa: FBT002
@@ -1862,6 +2156,22 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         ProgramCertificate (or None if one was not found or created) paired
         with a boolean indicating whether the certificate was newly created.
     """
+    certificate, created, _ = generate_program_certificate_with_result(
+        user, program, force_create=force_create
+    )
+    return certificate, created
+
+
+def generate_program_certificate_with_result(user, program, force_create=False):  # noqa: FBT002, PLR0911
+    """
+    Same as generate_program_certificate, but also says why no certificate was
+    returned.
+
+    Returns:
+        ProgramCertificateResult: the certificate (or None), whether it was
+        newly created, and a ProgramCertificateSkipReason when the certificate
+        is None.
+    """
     from hubspot_sync.task_helpers import sync_hubspot_user  # noqa: PLC0415
 
     if (
@@ -1875,19 +2185,24 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             user,
             program,
         )
-        return (
+        return ProgramCertificateResult(
             None,
-            False,
+            created=False,
+            skip_reason=ProgramCertificateSkipReason.NO_VERIFIED_ENROLLMENT,
         )
 
     existing_cert = ProgramCertificate.all_objects.filter(
         user=user, program=program
     ).first()
     if existing_cert:
-        return existing_cert, False
+        return ProgramCertificateResult(existing_cert, created=False)
 
     if not force_create and not _has_earned_program_cert(user, program):
-        return None, False
+        return ProgramCertificateResult(
+            None,
+            created=False,
+            skip_reason=ProgramCertificateSkipReason.REQUIREMENTS_NOT_MET,
+        )
 
     if program.certificates_disabled:
         log.warning(
@@ -1896,26 +2211,53 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
             user.id,
             program.readable_id,
         )
-        return None, False
-    program_page = program.program_page
-    if not program_page or not program_page.certificate_page:
-        # program_page.certificate_page is a plain (uncached) property, so
-        # this re-checks live status on every call instead of trusting the
-        # Program.certificate_page cached_property, which would go stale
-        # across a batch that reuses the same Program object for many users
-        # (e.g. manage_program_certificates bulk mode).
+        return ProgramCertificateResult(
+            None,
+            created=False,
+            skip_reason=ProgramCertificateSkipReason.CERTIFICATES_DISABLED,
+        )
+    # get_certificate_page_revision() re-checks live status on every call
+    # instead of trusting the Program.certificate_page cached_property, which
+    # would go stale across a batch that reuses the same Program object for
+    # many users (e.g. manage_program_certificates bulk mode).
+    certificate_page_revision = program.get_certificate_page_revision()
+    if not certificate_page_revision:
+        # certificate_page_revision is non-nullable, so a certificate can
+        # only be created once the certificate page has a saved revision to
+        # point to - a live page alone isn't enough.
         log.warning(
             "Skipping program certificate creation for user=%s program=%s: "
-            "no live certificate page",
+            "no live, revisioned certificate page",
             user.id,
             program.readable_id,
         )
-        return None, False
+        return ProgramCertificateResult(
+            None,
+            created=False,
+            skip_reason=ProgramCertificateSkipReason.NO_CERTIFICATE_PAGE,
+        )
 
-    program_cert, created = ProgramCertificate.all_objects.get_or_create(
-        user=user,
-        program=program,
-    )
+    # This also runs from a transaction.on_commit() callback (see
+    # courses/signals.py), where an uncaught error would surface in whatever
+    # request or task created the course run certificate - so handle it here,
+    # as process_course_run_grade_certificate does.
+    try:
+        # Pass the revision checked above rather than letting save() look it
+        # up again, so the check and the write can't disagree.
+        program_cert, created = ProgramCertificate.all_objects.get_or_create(
+            user=user,
+            program=program,
+            defaults={"certificate_page_revision": certificate_page_revision},
+        )
+    except IntegrityError:
+        log.exception(
+            "IntegrityError creating program certificate for user=%s program=%s",
+            user.id,
+            program.readable_id,
+        )
+        return ProgramCertificateResult(
+            None, created=False, skip_reason=ProgramCertificateSkipReason.SAVE_FAILED
+        )
     if created:
         log.info(
             "Program certificate for [%s] in program [%s] is created.",
@@ -1926,7 +2268,7 @@ def generate_program_certificate(user, program, force_create=False):  # noqa: FB
         if not program_cert.verifiable_credential_id:
             create_verifiable_credential(program_cert)
 
-    return program_cert, created
+    return ProgramCertificateResult(program_cert, created)
 
 
 def generate_multiple_programs_certificate(user, programs):
@@ -2512,14 +2854,24 @@ def get_certificate_page(
 
 
 def create_verifiable_credential(
-    certificate: ProgramCertificate | CourseRunCertificate, *, raise_on_error=False
-):
+    certificate: ProgramCertificate | CourseRunCertificate,
+    *,
+    raise_on_error=False,
+    replace_existing=False,
+) -> VerifiableCredential | None:
     """
-    Create a verifiable credential for the given course run certificate.
+    Create a verifiable credential for the given course run or program certificate.
 
     Args:
-        certificate (CourseRunCertificate): The course run certificate for which to create the verifiable credential.
+        certificate (CourseRunCertificate | ProgramCertificate): The certificate for which to create the verifiable credential.
         raise_on_error (bool): If True, will re-raise any exceptions encountered during VC creation.
+        replace_existing (bool): If True, replace the certificate's existing verifiable credential. The new
+            credential is signed first, and the old one is only deleted in the same transaction that saves the
+            new one, so a failure leaves the existing credential in place.
+
+    Returns:
+        VerifiableCredential | None: The new credential, or None if nothing was created (the certificate page
+        isn't eligible, or an error was logged and not re-raised).
     """
 
     try:
@@ -2529,17 +2881,24 @@ def create_verifiable_credential(
         certificate_page = get_certificate_page(certificate)
 
         if not should_provision_verifiable_credential(certificate_page):
-            return
+            return None
         payload = get_verifiable_credentials_payload(certificate, certificate_page)
 
         # Call the signing service to create the new credential
         credential = request_verifiable_credential(payload)
 
-        verifiable_credential = VerifiableCredential.objects.create(
-            uuid=credential["id"], credential_data=credential
-        )
-        certificate.verifiable_credential = verifiable_credential
-        certificate.save()
+        with transaction.atomic():
+            if replace_existing and certificate.verifiable_credential_id:
+                # The credential's uuid is its primary key and comes from the certificate uuid, so the old
+                # row has to be deleted before the new one is created.
+                VerifiableCredential.objects.filter(
+                    pk=certificate.verifiable_credential_id
+                ).delete()
+            verifiable_credential = VerifiableCredential.objects.create(
+                uuid=credential["id"], credential_data=credential
+            )
+            certificate.verifiable_credential = verifiable_credential
+            certificate.save()
     except Exception:
         # We don't want to block certificate creation if VC creation fails, so we swallow and log all errors to sentry
         # We can revisit this later once we've ironed out some of the intended behavior around the json payload
@@ -2549,6 +2908,8 @@ def create_verifiable_credential(
         )
         if raise_on_error:
             raise
+        return None
+    return verifiable_credential
 
 
 def summarize_verifiable_credential_certificate_statuses(

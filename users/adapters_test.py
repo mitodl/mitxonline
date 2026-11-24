@@ -1,9 +1,17 @@
+import json
+import logging
+
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+from mitol.scim.adapters import lock_free_adapter
+from mitol.scim.constants import SchemaURI
 from mitol.scim.requests import InMemoryHttpRequest
 
 from users.adapters import (
     EDX_SYNC_ATTRS,
     EDX_UNSYNCED_ATTRS,
+    ExternalIdRebindError,
     LearnUserAdapter,
 )
 from users.factories import UserFactory
@@ -22,7 +30,7 @@ def _adapter(user):
 def test_attr_map_has_no_orm_style_double_underscore_paths():
     """ATTR_MAP values are consumed via a plain setattr() by both
     django_scim's (django_scim.adapters.SCIMUser.handle_replace) and mitol's
-    (mitol.scim.adapters.UserAdapter._handle_resplace_nested_path) PATCH
+    (mitol.scim.adapters.UserAdapter._handle_replace_nested_path) PATCH
     add/replace dispatch - neither walks a "__" double-underscore path into
     a related object. A mapped value containing "__" (e.g. the
     "legal_address__first_name" this PR removed) would silently set a
@@ -33,6 +41,34 @@ def test_attr_map_has_no_orm_style_double_underscore_paths():
     """
     for target in LearnUserAdapter.ATTR_MAP.values():
         assert "__" not in target
+
+
+def test_lock_free_adapter_reads_without_locking():
+    """mitol.scim's read views build the adapter through lock_free_adapter(),
+    which passes lock_user=False, and must not take a row lock
+    """
+    user = UserFactory.create()
+
+    with CaptureQueriesContext(connection) as queries:
+        data = lock_free_adapter(LearnUserAdapter)(
+            user, InMemoryHttpRequest.stub()
+        ).to_dict()
+
+    assert data["userName"] == user.username
+    assert not [q for q in queries if "FOR UPDATE" in q["sql"]]
+
+
+def test_null_full_name_replace_keeps_the_name():
+    """scim-for-keycloak sends a removed fullName as a replace with null; name
+    is NOT NULL, so the stored value stays instead of the save failing
+    """
+    user = UserFactory.create(name="Joe Smith")
+    adapter = LearnUserAdapter(user)
+
+    adapter.handle_replace(adapter.split_path("fullName"), None, {"op": "replace"})
+
+    user.refresh_from_db()
+    assert user.name == "Joe Smith"
 
 
 def test_learn_user_adapter_to_dict_uses_legal_address_name():
@@ -117,7 +153,7 @@ def test_learn_user_adapter_from_dict_writes_legal_address():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": "New", "familyName": "Name"},
         }
     )
@@ -144,7 +180,7 @@ def test_learn_user_adapter_from_dict_explicit_null_name_does_not_blank_out():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": None, "familyName": None},
         }
     )
@@ -171,7 +207,7 @@ def test_learn_user_adapter_from_dict_blank_name_does_not_blank_out():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
             "name": {"givenName": "", "familyName": "   "},
         }
     )
@@ -195,7 +231,7 @@ def test_learn_user_adapter_blank_fields():
         {
             "active": True,
             "userName": "jsmith",
-            "externalId": "1",
+            "externalId": user.global_id,
         }
     )
     adapter.save()
@@ -232,7 +268,7 @@ def _unchanged_payload(user, **overrides):
     return {
         "active": user.is_active,
         "userName": user.username,
-        "externalId": user.scim_external_id or "1",
+        "externalId": user.global_id,
         "fullName": user.name,
         **overrides,
     }
@@ -467,3 +503,88 @@ def test_scim_save_survives_broker_failure(mocker, caplog):
     user.refresh_from_db()
     assert user.name == "Joseph Smith"
     assert "Failed to queue edX profile update" in caplog.text
+
+
+def _put_external_id(user, external_id):
+    """Run a full from_dict() for the user with the given externalId"""
+    adapter = LearnUserAdapter(user)
+    adapter.from_dict(
+        {"active": True, "userName": user.username, "externalId": external_id}
+    )
+    adapter.save()
+
+
+def test_from_dict_refuses_rebinding_global_id():
+    """A PUT can't move a user to a different Keycloak identity"""
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    with pytest.raises(ExternalIdRebindError):
+        _put_external_id(user, "keycloak-2")
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+
+
+def test_put_rebind_returns_its_own_409(client, caplog):
+    """The refusal reaches Keycloak with its detail and scimType, and isn't
+    logged at ERROR (which Sentry would turn into an event per retry), because
+    mitol.scim's views redact and log every IntegrityError
+    """
+    client.force_login(UserFactory.create(is_staff=True))
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    response = client.put(
+        f"/scim/v2/Users/{user.id}",
+        data=json.dumps(
+            {
+                "schemas": [SchemaURI.USER],
+                "userName": user.username,
+                "externalId": "keycloak-2",
+                "emails": [{"value": user.email, "primary": True}],
+            }
+        ),
+        content_type="application/scim+json",
+    )
+
+    body = response.json()
+    assert response.status_code == 409
+    assert body.get("scimType") == "mutability"
+    assert "externalId does not match" in body["detail"]
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+    user.refresh_from_db()
+    assert user.global_id == "keycloak-1"
+
+
+@pytest.mark.parametrize("global_id", ["", "keycloak-1"])
+def test_from_dict_binds_matching_or_unset_global_id(global_id):
+    """A PUT with the user's own id, or to a user with no id yet, applies"""
+    user = UserFactory.create(global_id=global_id)
+
+    _put_external_id(user, "keycloak-1")
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+
+
+@pytest.mark.parametrize("external_id", [None, ""])
+def test_from_dict_without_external_id_keeps_global_id(external_id):
+    """A PUT with no externalId can't unbind a user, so a later PUT can't rebind"""
+    user = UserFactory.create(global_id="keycloak-1", scim_external_id="keycloak-1")
+
+    _put_external_id(user, external_id)
+
+    user.refresh_from_db()
+    assert (user.global_id, user.scim_external_id) == ("keycloak-1", "keycloak-1")
+    with pytest.raises(ExternalIdRebindError):
+        _put_external_id(user, "keycloak-2")
+
+
+def test_from_dict_without_external_id_stores_null_global_id():
+    """An unbound user gets NULL, not "", which the unique column would collide on"""
+    UserFactory.create(global_id="")
+    user = UserFactory.create(global_id=None)
+
+    _put_external_id(user, None)
+
+    user.refresh_from_db()
+    assert user.global_id is None

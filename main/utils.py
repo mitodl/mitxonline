@@ -13,7 +13,8 @@ import redis_lock
 from django.conf import settings
 from django.core.cache import caches
 from django.core.serializers import serialize
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpRequest, HttpResponsePermanentRedirect, HttpResponseRedirect
+from django.utils.cache import add_never_cache_headers
 from mitol.common.utils.urls import remove_password_from_url
 from rest_framework import status
 
@@ -45,6 +46,36 @@ def get_learn_product_url(product_type: str, readable_id: str) -> str:
     return f"{get_learn_base_url()}/{product_type}/{readable_id}"
 
 
+def learn_redirect(request: HttpRequest, url: str) -> HttpResponsePermanentRedirect:
+    """
+    Permanently redirect to an MIT Learn page that replaces an MITx Online one,
+    passing the query string through.
+
+    Browsers cache a 301 indefinitely unless told otherwise, so the response
+    carries never-cache headers.
+    """
+    if query_string := request.META.get("QUERY_STRING"):
+        url = f"{url}?{query_string}"
+    response = HttpResponsePermanentRedirect(url)
+    add_never_cache_headers(response)
+    return response
+
+
+def keycloak_realm_url() -> str:
+    """
+    Build the URL of the configured Keycloak realm.
+
+    Not urljoin: a leading slash there drops any path in KEYCLOAK_BASE_URL.
+
+    Returns:
+        str: KEYCLOAK_BASE_URL, path kept, then /realms/<KEYCLOAK_REALM_NAME>
+    """
+    return (
+        f"{settings.KEYCLOAK_BASE_URL.removesuffix('/')}"
+        f"/realms/{settings.KEYCLOAK_REALM_NAME}"
+    )
+
+
 def get_js_settings(request: HttpRequest):  # noqa: ARG001
     """
     Get the set of JS settings
@@ -69,7 +100,6 @@ def get_js_settings(request: HttpRequest):  # noqa: ARG001
         "posthog_api_host": settings.POSTHOG_API_HOST,
         "oidc_login_url": None,
         "api_gateway_enabled": not settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE,
-        "mit_learn_dashboard_url": settings.MIT_LEARN_DASHBOARD_URL,
         "mit_learn_terms_url": settings.MIT_LEARN_TERMS_URL,
         "mit_learn_privacy_url": settings.MIT_LEARN_PRIVACY_URL,
         "mit_learn_honor_code_url": settings.MIT_LEARN_HONOR_CODE_URL,

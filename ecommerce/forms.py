@@ -13,5 +13,5 @@ class AdminRefundOrderForm(forms.Form):
         label="Refund amount", help_text="The amount to be refunded", required=True
     )
     perform_unenrolls = forms.BooleanField(
-        label="Unenroll from the purchased course", required=False
+        label="Unenroll from the purchased course or program", required=False
     )

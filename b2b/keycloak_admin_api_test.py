@@ -13,6 +13,7 @@ from b2b.exceptions import KeycloakAdminImproperlyConfiguredError
 from b2b.factories import RealmRepresentationFactory
 from b2b.keycloak_admin_api import (
     KEYCLOAK_ADMIN_REQUEST_TIMEOUT_SECONDS,
+    MEMBERSHIP_CREDENTIALS,
     KeycloakAdminClient,
     KeycloakAdminModel,
     bootstrap_client,
@@ -273,6 +274,37 @@ def test_client_init_empty_client_secret(settings):
         KeycloakAdminClient()
 
 
+def test_client_init_membership_credentials(settings, mocker):
+    """The membership credentials authenticate as the membership client."""
+    _mocked_admin_client(settings, mocker)
+    settings.KEYCLOAK_ADMIN_CLIENT_ID = "admin-client"
+    settings.KEYCLOAK_ADMIN_CLIENT_SECRET = "admin-secret"  # noqa: S105
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_ID = "membership-client"
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = "membership-secret"  # noqa: S105
+    oauth_session = mocker.patch("b2b.keycloak_admin_api.OAuth2Session")
+
+    KeycloakAdminClient(credentials=MEMBERSHIP_CREDENTIALS)
+
+    kwargs = oauth_session.call_args.kwargs
+    assert kwargs["client_id"] == "membership-client"
+    assert kwargs["client_secret"] == "membership-secret"  # noqa: S105
+
+
+@pytest.mark.parametrize("missing", MEMBERSHIP_CREDENTIALS)
+def test_client_init_membership_credentials_missing(settings, mocker, missing):
+    """Missing membership credentials fail instead of using the admin pair."""
+    _mocked_admin_client(settings, mocker)
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_ID = FAKE.word()
+    settings.KEYCLOAK_MEMBERSHIP_CLIENT_SECRET = FAKE.word()
+    setattr(settings, missing, None)
+
+    with pytest.raises(
+        KeycloakAdminImproperlyConfiguredError,
+        match=rf"{missing} setting is not configured\.",
+    ):
+        KeycloakAdminClient(credentials=MEMBERSHIP_CREDENTIALS)
+
+
 def test_client_init_ssl_verification_handling(settings, mocker):
     """Test that SSL verification is handled correctly based on settings."""
     settings.KEYCLOAK_BASE_URL = FAKE.url()
@@ -361,10 +393,25 @@ def test_client_init_openid_configuration_request_failure(settings, mocker):
         KeycloakAdminClient()
 
 
-def test_client_init_base_url_processing(settings, mocker):
-    """Test that base URL is properly processed with admin path."""
-    base_url = "https://keycloak.example.com"
-    expected_admin_url = "https://keycloak.example.com/admin/realms/"
+@pytest.mark.parametrize(
+    ("base_url", "expected_admin_url"),
+    [
+        ("https://keycloak.example.com", "https://keycloak.example.com/admin/realms/"),
+        ("https://keycloak.example.com/", "https://keycloak.example.com/admin/realms/"),
+        (
+            "https://keycloak.example.com/auth",
+            "https://keycloak.example.com/auth/admin/realms/",
+        ),
+        (
+            "https://keycloak.example.com/auth/",
+            "https://keycloak.example.com/auth/admin/realms/",
+        ),
+    ],
+)
+def test_client_init_base_url_processing(
+    settings, mocker, base_url, expected_admin_url
+):
+    """The admin URL keeps any path in the base URL."""
 
     settings.KEYCLOAK_BASE_URL = base_url
     settings.KEYCLOAK_REALM_NAME = FAKE.word()
@@ -389,6 +436,9 @@ def test_client_init_base_url_processing(settings, mocker):
     client = KeycloakAdminClient()
 
     assert client.base_url == expected_admin_url
+    assert client.realmify_url("organizations") == (
+        f"{expected_admin_url}{settings.KEYCLOAK_REALM_NAME}/organizations"
+    )
 
 
 def test_client_init_oauth_session_configuration(settings, mocker):

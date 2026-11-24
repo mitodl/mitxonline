@@ -50,6 +50,15 @@ def _verified_mode(expiration_datetime, *, is_explicit=True):
     )
 
 
+def _in_visit_order(runs):
+    """Return the runs in the order the command visits them."""
+    return list(
+        CourseRun.objects.filter(pk__in=[run.pk for run in runs]).order_by(
+            "courseware_id"
+        )
+    )
+
+
 def _run_command(*, expect_failure=False, **kwargs):
     """
     Run the command and return its CSV rows (without the header) and stderr.
@@ -182,18 +191,6 @@ def test_fix_leaves_unfixable_runs_alone(mock_verified_mode, status_offsets):
     assert rows[0]["fixed"] == ""
 
 
-def _in_command_order(runs):
-    """
-    Order runs the way the command does, in the database. Python's sort can
-    disagree with a locale-collated Postgres when ids differ at a hyphen.
-    """
-    return list(
-        CourseRun.objects.filter(pk__in=[run.pk for run in runs]).order_by(
-            "courseware_id"
-        )
-    )
-
-
 def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     CourseRun.save() runs clean(), which can reject a run for reasons unrelated
@@ -201,7 +198,7 @@ def test_fix_continues_past_a_run_that_fails_validation(mock_verified_mode):
     """
     now = now_in_utc().replace(microsecond=0)
     edx_deadline = now + timedelta(days=30)
-    broken, valid = _in_command_order(
+    broken, valid = _in_visit_order(
         CourseRunFactory.create_batch(2, live=True, upgrade_deadline=None)
     )
     # An expiration date before the end date fails clean(). update() skips it,
@@ -270,7 +267,7 @@ def test_one_failure_does_not_stop_the_report(mock_verified_mode, fix):
     the end so a script can tell.
     """
     deadline = now_in_utc().replace(microsecond=0) + timedelta(days=10)
-    runs = _in_command_order(
+    runs = _in_visit_order(
         CourseRunFactory.create_batch(2, live=True, upgrade_deadline=deadline)
     )
     mock_verified_mode.side_effect = [HTTPError("boom"), _verified_mode(deadline)]

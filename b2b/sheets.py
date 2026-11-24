@@ -2,6 +2,7 @@
 
 import logging
 
+from django.db import transaction
 from django.db.models import Count
 from django.utils.functional import cached_property
 from mitol.google_sheets.api import get_authorized_pygsheets_client
@@ -209,7 +210,7 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
             row_idx += 1
 
-        Discount.objects.bulk_update(codes, {"b2b_sheet_location"})
+        self._save_locations(codes)
 
         return row_idx - self.row_one
 
@@ -286,6 +287,36 @@ class ContractEnrollmentCodesSheetHandler(SheetHandler):
 
             row_idx += 1
 
-        Discount.objects.bulk_update(codes, {"b2b_sheet_location"})
+        self._save_locations(codes)
 
         return row_idx - self.row_one
+
+    def _save_locations(self, codes):
+        """
+        Save where the codes are, unless the contract's sheet changed meanwhile.
+
+        Changing the sheet or tab clears the locations so the next run writes
+        the new sheet from scratch. Saving rows from the old sheet over that
+        would make it update the new sheet in place instead. The contract API
+        holds the contract's row while it clears them, so the lock orders this
+        check after that change, or the change after this save.
+        """
+
+        with transaction.atomic():
+            still_this_sheet = list(
+                ContractPage.objects.select_for_update(of=("self",))
+                .filter(
+                    pk=self.contract_page.pk,
+                    google_sheet_target=self.contract_page.google_sheet_target,
+                    google_sheet_target_tab=self.worksheet_name,
+                )
+                .values_list("pk", flat=True)
+            )
+            if not still_this_sheet:
+                log.info(
+                    "The Google Sheet for %s changed while it was being written; "
+                    "not saving the old sheet's code locations",
+                    self.contract_page,
+                )
+                return
+            Discount.objects.bulk_update(codes, {"b2b_sheet_location"})

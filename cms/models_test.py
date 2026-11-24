@@ -2,7 +2,6 @@
 
 import json
 import uuid
-from datetime import timedelta
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, quote_plus, urlparse
 
@@ -11,24 +10,19 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser, Group
 from django.contrib.sessions.middleware import SessionMiddleware
-from django.core.cache import caches
 from django.forms import ChoiceField
 from django.http import Http404, HttpResponse
 from django.test import RequestFactory
 from django.urls import resolve, reverse
 from mitol.common.factories import UserFactory
-from mitol.common.utils.datetime import now_in_utc
 from wagtail.models import Page
 
-from cms import utils as cms_utils
-from cms.api import create_featured_items
 from cms.constants import CMS_EDITORS_GROUP_NAME
 from cms.factories import (
     CertificatePageFactory,
     CourseIndexPageFactory,
     CoursePageFactory,
     FlexiblePricingFormFactory,
-    HomePageFactory,
     InstructorPageFactory,
     ProgramIndexPageFactory,
     ProgramPageFactory,
@@ -702,87 +696,82 @@ def test_flexible_pricing_request_form_context(flex_form_for_course):
         assert context["product"].id == product.id
     else:
         assert context["product"] is None
-    assert context["product_page"] == course_page.url
+    parent_product = parent_page.product
+    assert context["product_page"] == get_learn_product_url(
+        "courses" if flex_form_for_course else "programs", parent_product.readable_id
+    )
 
 
-def test_homepage_featured_products(settings, mocker):
-    now = now_in_utc()
-    future_date = now + timedelta(days=1)
-    past_date = now - timedelta(days=1)
-    further_future_date = future_date + timedelta(days=1)
-    further_past_date = past_date - timedelta(days=1)
-    furthest_future_date = further_future_date + timedelta(days=1)
-    redis_cache = caches["redis"]
-    # Ensure the key is empty since pytest doesn't clear the cache between tests
-    featured_courses = redis_cache.get(cms_utils.get_featured_items_cache_key())
-    if featured_courses is not None:
-        redis_cache.delete(cms_utils.get_featured_items_cache_key())
-    assert redis_cache.get(cms_utils.get_featured_items_cache_key()) is None
+def test_flex_pricing_form_is_branded_mit_learn(mocker, settings):
+    """
+    The form carries MIT Learn's title, header and footer instead of the
+    site-wide MITxOnline ones, whatever SITE_NAME is deployed as.
+    """
+    settings.SITE_NAME = "MITx Online"
+    settings.MIT_LEARN_BASE_URL = "https://learn.example.com"
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
+    course_page = CoursePageFactory.create(course__readable_id=FAKE_READABLE_ID)
+    flex_form = FlexiblePricingFormFactory(selected_course=course_page.course)
 
-    enrollable_future_course = CourseFactory.create(page=None, live=True)
-    enrollable_future_course_page = CoursePageFactory.create(
-        course=enrollable_future_course, live=True
-    )
-    enrollable_future_courserun = CourseRunFactory.create(
-        course=enrollable_future_course,
-        live=True,
-        start_date=future_date,
-        enrollment_start=further_past_date,
-        enrollment_end=further_future_date,
-        end_date=furthest_future_date,
-    )
-    create_featured_items()
-    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
-    hf = HomePageFactory.create()
-    assert hf.get_cached_featured_products == [
-        {
-            "title": enrollable_future_course_page.title,
-            "description": enrollable_future_course_page.description,
-            "feature_image": enrollable_future_course_page.feature_image,
-            "start_date": enrollable_future_courserun.start_date,
-            "url_path": get_learn_product_url(
-                "courses", enrollable_future_course.readable_id
-            ),
-            "is_program": enrollable_future_course_page.is_program_page,
-            "is_self_paced": False,
-            "program_type": None,
-        }
-    ]
-    # Remove the previous course from the potential courses to be featured, this will also test a course as unenrollable
-    enrollable_future_course.live = False
-    enrollable_future_course.save()
+    user = UserFactory.create(name="Pat Learner")
+    content = generate_flexible_pricing_response(
+        mocker, user, flex_form
+    ).rendered_content
 
-    enrollable_future_course_with_no_enrollment_end = CourseFactory.create(
-        page=None, live=True
+    assert f"<title>MIT Learn | {flex_form.title}</title>" in content
+    assert 'href="https://learn.example.com" class="logo-link"' in content
+    # The user menu has what MIT Learn's menu shows learners, and nothing else.
+    assert "Pat Learner" in content
+    assert '<a href="https://learn.example.com/dashboard">Dashboard</a>' in content
+    assert f'<a href="{reverse("logout")}">Log Out</a>' in content
+    assert "Order History" not in content
+    assert 'href="https://support.learn.mit.edu/"' in content
+    assert "mitxonline.zendesk.com" not in content
+    assert "mitxonline.mit.edu" not in content
+    # The site-wide React header (MITx Online logo) is not rendered.
+    assert '<div id="header">' not in content
+
+
+@pytest.mark.parametrize("is_program", [True, False])
+def test_flex_pricing_form_approved_links_to_mit_learn(mocker, settings, is_program):
+    """
+    Once approved, "Go to Dashboard" (program) and "Course details" (course
+    with nothing to buy) lead to MIT Learn.
+    """
+    settings.MIT_LEARN_BASE_URL = "https://learn.example.com"
+    settings.MIT_LEARN_DASHBOARD_URL = "https://learn.example.com/dashboard"
+    if is_program:
+        parent_page = ProgramPageFactory.create()
+        flex_form = FlexiblePricingFormFactory(
+            parent=parent_page, selected_program=parent_page.program
+        )
+        courseware = parent_page.program
+    else:
+        parent_page = CoursePageFactory.create()
+        flex_form = FlexiblePricingFormFactory(
+            parent=parent_page, selected_course=parent_page.course
+        )
+        courseware = parent_page.course
+    user = UserFactory.create()
+    FlexiblePrice.objects.create(
+        user=user,
+        cms_submission=FlexiblePricingRequestSubmission.objects.create(
+            form_data=json.dumps([]), page=flex_form, user=user
+        ),
+        status=FlexiblePriceStatus.APPROVED,
+        courseware_object=courseware,
+        tier=FlexiblePriceTierFactory.create(courseware_object=courseware),
     )
-    enrollable_future_course_with_no_enrollment_end_page = CoursePageFactory.create(
-        course=enrollable_future_course_with_no_enrollment_end, live=True
-    )
-    enrollable_future_courserun_with_no_enrollment_end = CourseRunFactory.create(
-        course=enrollable_future_course_with_no_enrollment_end,
-        live=True,
-        start_date=future_date,
-        enrollment_start=further_past_date,
-        enrollment_end=None,
-        end_date=furthest_future_date,
-    )
-    create_featured_items()
-    assert len(redis_cache.get(cms_utils.get_featured_items_cache_key())) == 1
-    hf = HomePageFactory.create()
-    assert hf.get_cached_featured_products == [
-        {
-            "title": enrollable_future_course_with_no_enrollment_end_page.title,
-            "description": enrollable_future_course_with_no_enrollment_end_page.description,
-            "feature_image": enrollable_future_course_with_no_enrollment_end_page.feature_image,
-            "start_date": enrollable_future_courserun_with_no_enrollment_end.start_date,
-            "url_path": get_learn_product_url(
-                "courses", enrollable_future_course_with_no_enrollment_end.readable_id
-            ),
-            "is_program": enrollable_future_course_with_no_enrollment_end_page.is_program_page,
-            "is_self_paced": False,
-            "program_type": None,
-        }
-    ]
+
+    content = generate_flexible_pricing_response(
+        mocker, user, flex_form
+    ).rendered_content
+
+    if is_program:
+        assert 'href="https://learn.example.com/dashboard" class="btn' in content
+    else:
+        expected = get_learn_product_url("courses", courseware.readable_id)
+        assert f'href="{expected}" class="btn' in content
 
 
 @pytest.fixture
@@ -1319,7 +1308,9 @@ def test_flexible_pricing_form_get_context_product_for_course():
     context = flex_form.get_context(request)
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_course_no_active_products():
@@ -1336,7 +1327,9 @@ def test_flexible_pricing_form_get_context_course_no_active_products():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_product_for_program():
@@ -1351,7 +1344,9 @@ def test_flexible_pricing_form_get_context_product_for_program():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == program_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "programs", program_page.program.readable_id
+    )
 
 
 def test_flexible_pricing_form_get_context_with_anonymous_user():
@@ -1495,7 +1490,9 @@ def test_fp_request_form_get_context_no_previous_submission():
     assert context["country_of_residence"] == "US"
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_with_previous_submission():
@@ -1534,7 +1531,9 @@ def test_fp_request_form_get_context_with_previous_submission():
     assert context["country_of_residence"] == "CA"
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_no_legal_address():
@@ -1557,7 +1556,9 @@ def test_fp_request_form_get_context_no_legal_address():
     assert context["country_of_residence"] == ""
 
     assert context["product"] == product
-    assert context["product_page"] == course_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "courses", course_page.course.readable_id
+    )
 
 
 def test_fp_request_form_get_context_program_page():
@@ -1573,7 +1574,9 @@ def test_fp_request_form_get_context_program_page():
     context = flex_form.get_context(request)
 
     assert context["product"] is None
-    assert context["product_page"] == program_page.url
+    assert context["product_page"] == get_learn_product_url(
+        "programs", program_page.program.readable_id
+    )
 
 
 def test_fp_request_form_get_context_absolute_last_submission():
@@ -1735,3 +1738,26 @@ def test_certificate_page_vc_panels_link_to_examples():
         assert f'href="{reverse("cms_credential_examples")}"' in help_text
         assert 'target="_blank"' in help_text
         assert "noopener" in help_text
+
+
+@pytest.mark.parametrize(
+    ("path", "expected_url"),
+    [
+        ("/", "https://learn.mit.test/c/unit/mitx"),
+        ("/?utm_source=x", "https://learn.mit.test/c/unit/mitx?utm_source=x"),
+    ],
+)
+def test_home_page_redirects_to_learn(
+    client, settings, configured_wagtail_home, path, expected_url
+):
+    """The site root sends visitors, and their query string, to MITx on MIT Learn"""
+    settings.MIT_LEARN_BASE_URL = "https://learn.mit.test"
+
+    response = client.get(path)
+
+    assert response.status_code == 301
+    assert response.url == expected_url
+    assert (
+        response["Cache-Control"]
+        == "max-age=0, no-cache, no-store, must-revalidate, private"
+    )

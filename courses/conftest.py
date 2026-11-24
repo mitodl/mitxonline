@@ -3,6 +3,7 @@
 from collections import defaultdict
 from math import ceil
 from typing import NamedTuple
+from unittest.mock import Mock
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -29,6 +30,7 @@ from courses.models import (
     ProgramEnrollment,
     ProgramRequirement,
     ProgramRequirementNodeType,
+    VerifiableCredential,
 )
 from variants.models import SupportedVariant
 
@@ -453,3 +455,41 @@ def user_with_enrollments_and_certificates(
         program_enrollments=program_enrollments,
         program_certificates=program_certificates,
     )
+
+
+@pytest.fixture
+def make_certificate():
+    """Factory for a course run certificate, optionally with a stored (old) verifiable credential"""
+
+    def _make(*, with_credential=True):
+        certificate = CourseRunCertificateFactory.create()
+        if with_credential:
+            certificate.verifiable_credential = VerifiableCredential.objects.create(
+                uuid=certificate.uuid,
+                credential_data={"id": f"urn:uuid:{certificate.uuid}", "old": True},
+            )
+            certificate.save()
+        return certificate
+
+    return _make
+
+
+@pytest.fixture
+def mock_certificate_page(mocker):
+    """Patch the certificate page lookup and payload so only credential storage logic is exercised"""
+
+    def _mock(*, eligible=True):
+        certificate_page = Mock()
+        certificate_page.verifiable_credential_criteria = (
+            "mock_credential_data" if eligible else ""
+        )
+        certificate_page.should_provision_verifiable_credential = eligible
+        mocker.patch("courses.api.get_certificate_page", return_value=certificate_page)
+        mocker.patch(
+            "courses.api.get_verifiable_credentials_payload",
+            side_effect=lambda certificate, _page: {
+                "id": f"urn:uuid:{certificate.uuid}"
+            },
+        )
+
+    return _mock

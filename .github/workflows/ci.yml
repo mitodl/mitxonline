@@ -234,22 +234,22 @@ jobs:
         run: yarn install --immutable
 
       - name: Lints
-        run: yarn workspaces foreach run lint
+        run: yarn workspaces foreach --all run lint
 
       - name: Code formatting
-        run: yarn workspaces foreach run fmt:check
+        run: yarn workspaces foreach --all run fmt:check
 
       - name: Flow
-        run: yarn workspaces foreach run flow
+        run: yarn workspaces foreach --all run flow
 
       - name: Tests
-        run: yarn workspaces foreach run test
+        run: yarn workspaces foreach --all run test
         env:
           NODE_ENV: development
 
       - name: Webpack production build
         run: |
-          yarn workspaces foreach run build --bail --mode production
+          yarn workspaces foreach --all run build --bail --mode production
         env:
           NODE_ENV: production
 

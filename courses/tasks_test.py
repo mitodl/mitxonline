@@ -11,13 +11,18 @@ from courses.factories import (
     LearnerProgramRecordShareFactory,
 )
 from courses.tasks import (
+    downgrade_enrollments,
     generate_course_certificates,
     generate_program_certificates,
     send_partner_school_email,
     subscribe_edx_course_emails,
     sync_courserun_upgrade_deadline,
 )
-from openedx.constants import UpgradeDeadlineSyncResult
+from openedx.constants import (
+    EDX_ENROLLMENT_AUDIT_MODE,
+    EDX_ENROLLMENT_VERIFIED_MODE,
+    UpgradeDeadlineSyncResult,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -199,3 +204,89 @@ def test_sync_courserun_upgrade_deadline_retries_read_timeouts(mocker):
 
     with pytest.raises(Retry):
         sync_courserun_upgrade_deadline.delay(run.id)
+
+
+def test_downgrade_enrollments(mocker):
+    """
+    Active verified enrollments are downgraded in edX and locally; inactive and
+    audit ones are skipped, and an edX failure doesn't stop the rest.
+    """
+    patched_edx_enroll = mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api")
+    verified = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    edx_failure = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, edx_enrollment_retry_count=99
+    )
+    inactive = CourseRunEnrollmentFactory.create(
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE, active=False
+    )
+    audit = CourseRunEnrollmentFactory.create(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+
+    def fail_for_one_user(user, runs, mode):
+        if user == edx_failure.user:
+            raise HTTPError
+
+    patched_edx_enroll.side_effect = fail_for_one_user
+
+    downgrade_enrollments.delay(
+        [e.id for e in (verified, edx_failure, inactive, audit)]
+    )
+
+    assert patched_edx_enroll.call_count == 2
+    verified.refresh_from_db()
+    assert verified.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    # edX failed: audit locally, flagged for the repair job with fresh retries
+    edx_failure.refresh_from_db()
+    assert edx_failure.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+    assert edx_failure.edx_enrolled is False
+    assert edx_failure.edx_enrollment_retry_count == 0
+    inactive.refresh_from_db()
+    assert inactive.active is False
+    assert inactive.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+def test_downgrade_enrollments_reports_failures(mocker):
+    """
+    A downgrade that raises, fails locally or fails in edX is reported as
+    failed without stopping the rest, and an unknown id is skipped.
+    """
+    raises, local_failure, edx_failure, succeeds = (
+        CourseRunEnrollmentFactory.create_batch(
+            4, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    )
+    results = {
+        raises.id: ValueError,
+        local_failure.id: ([], True),
+        edx_failure.id: ([edx_failure], False),
+        succeeds.id: ([succeeds], True),
+    }
+
+    def fake_downgrade(enrollment):
+        result = results[enrollment.id]
+        if result is ValueError:
+            raise result
+        return result
+
+    mocker.patch("courses.api.downgrade_learner", side_effect=fake_downgrade)
+    mock_log = mocker.patch("courses.tasks.log")
+
+    downgrade_enrollments.delay(
+        [raises.id, local_failure.id, edx_failure.id, succeeds.id, 0]
+    )
+
+    mock_log.exception.assert_called_once_with(
+        "Failed to downgrade enrollment %s", raises.id
+    )
+    mock_log.info.assert_called_once_with(
+        "Downgraded %d enrollment(s) from verified to audit, %d failed, %d skipped",
+        1,
+        3,
+        1,
+    )
+    mock_log.error.assert_called_once_with(
+        "Failed to downgrade enrollment(s) %s",
+        [raises.id, local_failure.id, edx_failure.id],
+    )

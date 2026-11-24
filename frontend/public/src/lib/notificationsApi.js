@@ -14,8 +14,7 @@ import {
   USER_MSG_TYPE_PAYMENT_CANCELLED,
   USER_MSG_TYPE_PAYMENT_ERROR,
   USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
-  USER_MSG_TYPE_PAYMENT_ACCEPTED,
-  USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE,
+  USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
   USER_MSG_TYPE_PAYMENT_REVIEW,
   USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
   USER_MSG_TYPE_DISCOUNT_INVALID,
@@ -105,17 +104,10 @@ export function parseStoredUserMessage(
     alertType = ALERT_TYPE_SUCCESS
     msgText = "Payment is pending review."
     break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED:
+  case USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING:
     alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the paid version of ${userMsgJson.run}.` :
-      null
-    break
-  case USER_MSG_TYPE_PAYMENT_ACCEPTED_NO_VALUE:
-    alertType = ALERT_TYPE_SUCCESS
-    msgText = userMsgJson.run ?
-      `Success! You are now enrolled for the certificate version of ${userMsgJson.run}.` :
-      null
+    msgText =
+        "Thank you! Your payment is being processed. Your enrollment will be updated once it is complete."
     break
   case USER_MSG_TYPE_DISCOUNT_INVALID:
     alertType = ALERT_TYPE_DANGER

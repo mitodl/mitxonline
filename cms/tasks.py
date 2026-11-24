@@ -3,9 +3,7 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from django.conf import settings
-from mitol.common.decorators import single_task
 
-from cms.api import create_featured_items
 from cms.models import Page
 from main.celery import app
 
@@ -171,15 +169,3 @@ def queue_fastly_surrogate_key_purge(surrogate_key, service_id=None):
 
     logger.info("Fastly surrogate key purge OK for %s: %s", surrogate_key, resp.text)
     return True
-
-
-@app.task
-@single_task(30)
-def refresh_featured_homepage_items():
-    """
-    Refresh the featured homepage items in the redis cache.
-    """
-    logger = logging.getLogger("refresh_featured_homepage_items__task")
-    logger.info("Refreshing featured homepage items...")
-    create_featured_items()
-    logger.info("Featured items refreshed")

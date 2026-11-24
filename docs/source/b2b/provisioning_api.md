@@ -8,12 +8,10 @@ staff-only.
 Most people will use it through the staff dashboard's B2B Organizations
 section, which covers organizations, onboarding state, IdPs, the change
 history and contracts. A contract's page there creates and edits the contract,
-adds and removes courseware, shows how far the edX clones and enrollment codes
-have got, and assigns and expires codes. Some things on a contract still need
-Wagtail or the API: `welcome_message_extra`, the Google Sheet target and the
-order of a contract's programs, which the contract routes don't carry, and
-variant sets, which have routes and no UI yet. Every other contract field is
-read-only on the Wagtail page, and contracts can't be created there. This
+adds, removes and orders courseware, shows how far the edX clones and
+enrollment codes have got, and assigns and expires codes. Variant sets have
+routes and no UI yet. The Wagtail contract page is read-only, and contracts
+can't be created there. This
 page is the reference for engineers working on the API or the UI, and for
 anyone who needs to know what a button in the dashboard actually does.
 
@@ -50,6 +48,56 @@ given) and returns 409 if the alias is taken.
 The organizations Pulumi already declares are still Pulumi's. Don't modify one
 of them through this API; the next `pulumi up` will revert the change.
 
+### Adopting the IdPs Pulumi created
+
+An organization's IdPs show in the staff dashboard only when they have an
+`OrganizationIdentityProvider` row, and only this API wrote those, so the IdPs
+Pulumi created were missing there. `manage.py adopt_keycloak_identity_providers
+[--dry-run] [--source ALIAS=URL_OR_PATH ...] [org_key ...]` records each IdP
+that Keycloak links to an organization here (read from
+`organizations/{id}/identity-providers`) and has no row yet. It doesn't write to
+Keycloak, it's audited as "Identity provider adopted", and recorded IdPs are
+skipped, so it is safe to re-run. A Keycloak error listing one organization's
+IdPs is reported and the run carries on with the rest. A run without org keys
+also lists the realm IdPs that no organization here links to; those aren't
+recorded. Org keys limit which organizations' IdPs are recorded, but every
+linked organization is still read, so an IdP Keycloak links to more than one
+organization is found and skipped: a row belongs to one organization, and
+deleting the IdP through it would remove it for the others. Pulumi links each
+IdP to one organization, so only a link added in the Keycloak console can
+cause this.
+
+An adopted IdP is recorded as follows:
+
+- `lifecycle_state` is `active` if Keycloak has it enabled and `disabled`
+  otherwise. Testing and active set the same Keycloak flags, and Pulumi only
+  declares IdPs partners sign in through.
+- `metadata_source` is a SAML IdP's `metadataDescriptorUrl`, or
+  `{issuer}/.well-known/openid-configuration` for an OIDC IdP. `--source` sets
+  it instead, as a URL or a file holding the metadata XML. Use it for a SAML IdP
+  Pulumi configured from inline XML (pass the saved copy from
+  `ol-infrastructure`'s `files/olapps/`), and for an OIDC IdP whose discovery
+  URL isn't under its issuer. An IdP with no source, or of another provider
+  type, is reported and skipped without failing the run.
+- `metadata_artifact` stays empty.
+- `pulumi_managed` is set.
+
+The provisioning API refuses to edit, refresh, transition or delete a
+`pulumi_managed` IdP (409), and the dashboard shows it as "Managed by Pulumi"
+with no actions. Pulumi would revert those changes on its next run, and a
+refresh is worse than reverted: it replaces settings Pulumi chose on purpose
+with whatever the partner's metadata says (e.g. turning off signed
+AuthnRequests a partner asked for), which can break logins until that run.
+Once an IdP has left Pulumi state, `manage.py release_pulumi_identity_providers
+ALIAS ...` clears the flag, audited as an IdP update, and the API can change it.
+
+Releasing doesn't make a refresh safe. A refresh still replaces every setting
+the partner's metadata covers, and with Pulumi gone nothing puts a deliberate
+override back. Before refreshing a released IdP, check its old `olapps.py`
+block for overrides such as `want_authn_requests_signed` (UKM) or
+`name_id_format` (NTUA). Keeping those through a refresh is still to do, and
+has to land before the Pulumi handover releases any IdP.
+
 ## Organizations
 
 ```
@@ -57,6 +105,8 @@ GET    /api/v0/b2b/provisioning/organizations/
 POST   /api/v0/b2b/provisioning/organizations/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/
+PUT    /api/v0/b2b/provisioning/organizations/{org_key}/logo/
+DELETE /api/v0/b2b/provisioning/organizations/{org_key}/logo/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/events/
 ```
@@ -100,6 +150,20 @@ configured. The list response doesn't make a Keycloak call per row, so those
 two fields are null there. The list filters on `q` (name or org key) and
 `onboarding_state`.
 
+### Logo
+
+`PUT .../logo/` takes a multipart body with one `logo` file, which must be an
+image Pillow can open (the same check the Wagtail form made). `DELETE
+.../logo/` clears it. Both return the organization with `logo` as a URL (or
+null), and both are audited.
+
+The logo is stored only in MITx Online, so these routes work for an
+organization with no Keycloak record and don't call Keycloak; `domains` and
+`redirect_url` are null in their responses, as in the list. A replaced file is
+left in storage because older Wagtail revisions still name it. Every field on
+the Wagtail organization page's content tab is read-only, logo included; the
+Promote tab still allows editing the slug.
+
 ### Onboarding state
 
 Each organization has one `OrganizationOnboarding` record answering "how far
@@ -115,7 +179,7 @@ start at `org_created`, and so do organizations the reconciler adopts.
 
 Every change made through the provisioning functions writes an
 `OrganizationProvisioningAudit` row in the same transaction: organization
-create and update, onboarding changes, and IdP create, update, transition,
+create and update, logo changes, onboarding changes, and IdP create, update, transition,
 metadata refresh and delete. Each row records who made the change and the data before
 and after it. `GET .../events/` returns them newest first.
 
@@ -257,8 +321,21 @@ Allowed transitions:
 | `disabled` | `testing`, `active` |
 
 There's no `draft` to `active` move. An IdP only goes live after someone has
-logged in through it. Nothing in MITx Online passes `kc_idp_hint` through to
-Keycloak yet, so testing an IdP still takes a hand-built login URL.
+logged in through it.
+
+Each IdP response includes `login_url`, a link that signs a user in through
+that IdP. Use it to test an IdP in `testing`, and give it to a partner whose
+learners can't be routed by email domain. The API gateway builds the normal
+login request and drops `kc_idp_hint`, so `/login/?kc_idp_hint=<alias>` doesn't
+work. The link goes to Keycloak's authorization endpoint with the hint, and
+Keycloak redirects to the gateway's login route once the user has a session.
+Open it in a private window when testing, because a browser that is already
+signed in to Keycloak is not sent to the IdP.
+
+`login_url` is `null` unless `B2B_IDP_LOGIN_CLIENT_ID` and
+`B2B_IDP_LOGIN_REDIRECT_URI` are set. `B2B_IDP_LOGIN_CLIENT_ID` is the Keycloak
+client the link uses, and `B2B_IDP_LOGIN_REDIRECT_URI` is the gateway login URL
+of the app partner learners land in.
 
 ## Contracts
 
@@ -269,6 +346,7 @@ GET    /api/v0/b2b/provisioning/organizations/{org_key}/contracts/{id}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/contracts/{id}/
 POST   .../contracts/{id}/courseware/
 POST   .../contracts/{id}/courseware/remove/
+POST   .../contracts/{id}/programs/order/
 GET    .../contracts/{id}/setup-status/
 POST   .../contracts/{id}/retry-setup/
 GET    .../contracts/{id}/codes/
@@ -285,8 +363,22 @@ These replace running `b2b_contract`, `b2b_courseware`, `b2b_codes` and
 `b2b/contracts.py`. The management commands still work.
 
 `POST` takes `name`, `membership_type` (required), `description`,
-`welcome_message`, `contract_start`, `contract_end`, `max_learners` and
-`enrollment_fixed_price`. `PATCH` takes the same fields plus `active`. A
+`welcome_message`, `welcome_message_extra`, `contract_start`, `contract_end`,
+`max_learners`, `enrollment_fixed_price`, `google_sheet_target` and
+`google_sheet_target_tab`. `PATCH` takes the same fields plus `active`.
+`google_sheet_target` is the sheet's `https://docs.google.com/spreadsheets/`
+URL, and blank (or `null`, stored as blank) means no sheet. A request that
+sets the sheet or the tab must leave a contract with a sheet a non-blank
+`google_sheet_target_tab`. After a `PATCH` to a contract that uses codes, the
+enrollment code check runs and then writes the codes to the sheet. While none
+of the contract's codes has a sheet location (`Discount.b2b_sheet_location`),
+every code is written out from the top of the tab
+(`ContractEnrollmentCodesSheetHandler.write_codes`, which overwrites the
+rows). That is the case for a contract never written to a sheet, and after a
+`PATCH` that changes the sheet or tab, which clears the locations. The write
+sets them, so a failed one is retried by the next code check. Otherwise each
+code is updated in its row, and a new one appended, so anything the customer
+added to the sheet stays. A
 contract that is inactive, ended or not yet started can still be read and
 edited here, and switched back on. It stays out of `user.b2b_contracts`,
 `run.b2b_contracts` and `organization.contracts`, which only return contracts
@@ -300,6 +392,22 @@ parts again. Adding the same courseware twice doesn't create a second run. A
 run that already belongs to another contract is skipped and stays where it is.
 A source run's ID is a 400 that names its course: contract runs are cloned from
 a source run, so the course is what gets added.
+
+Adding a program creates runs for each of its courses. A course with no source
+run to clone (none at all, or none for the contract's variant sets) is skipped,
+and the response's `courses_without_source_run` counts those courses. A course
+that a contract run key can't be built for is skipped the same way and counted
+in `courses_with_invalid_key`. That is a source run ID that isn't a valid
+course key, or an organization key that can't go in one, in which case every
+course is counted. The rest of the program is still added.
+Adding a single course with no usable source run or with an invalid key is a
+400. A contract with no variant sets has no usable source run for any course.
+
+`programs/order/` takes `programs`, the readable IDs of every one of the
+contract's programs in the order learners should see them. A list that leaves
+one out, repeats one or names one the contract doesn't have is a 400 and
+changes nothing, so an order built from a stale read of the contract is
+refused.
 
 `courseware/remove/` closes the removed runs to new enrollments. A run that
 already has enrolled learners stays linked to the contract so they keep access.
@@ -356,15 +464,16 @@ The contract routes save the page without a Wagtail revision. A revision
 holds the whole page as it was when it was saved, so `ContractPage` takes the
 fields these routes write (`ContractPage.PROVISIONED_FIELDS`) from the stored
 row whenever Wagtail loads or publishes one. Publishing an old revision
-therefore can't put back a contract's old name, dates, seat cap or price.
-The same goes for which programs a contract has: a publish keeps the stored
-program links and takes only their order from the revision, so a program
-added or removed on the Wagtail page is not saved, and one removed there moves
-to the end of the order. This holds for a live page. Wagtail saves the form of
-an unpublished contract page straight to the database, so there an added or
-removed program is saved, and an added one queues run creation.
+therefore can't put back a contract's old name, dates, seat cap, price or
+Google Sheet. The same goes for its programs and their order, which are taken
+from the stored rows too. Every field on the Wagtail contract page is
+read-only and the page has no programs panel (it lists them, in order). One
+gap is left: saving an unpublished contract page in Wagtail writes back the
+programs as they were when the editor loaded them, so a program linked or
+reordered through these routes during that one request is undone.
 
-`description` is Wagtail rich text. On the way in it is reduced to the markup
+`description` and `welcome_message_extra` are Wagtail rich text. On the way in
+each is reduced to the markup
 Wagtail's editor stores (paragraphs, headings, bold, italic, lists, links);
 anything else is stripped, including an image or media embedded through
 Wagtail's editor.
@@ -400,6 +509,8 @@ changes an existing `org_key`.
 
 - Pulumi handover. The per-organization resources Pulumi already declares
   need to be moved out of Pulumi state without deleting them from Keycloak.
+  Recording their IdPs here (see "Adopting the IdPs Pulumi created") is the
+  first step.
 - Orphaned organizations. As of April 2026, about 24 `OrganizationPage`
   records from before Keycloak was the source of truth had no
   `sso_organization_id` (mitodl/hq#10552). They need Keycloak organizations created and their
@@ -408,7 +519,4 @@ changes an existing `org_key`.
 - Where C2's partner invite token is stored. `OrganizationOnboarding` is the
   likely place, but it has no token field yet.
 - A test-login flow.
-- The contract fields the staff dashboard can't reach
-  (`welcome_message_extra`, `google_sheet_target`, `google_sheet_target_tab`,
-  program order) and a variant set editor. They are all the Wagtail contract
-  page is still needed for.
+- A variant set editor in the staff dashboard.

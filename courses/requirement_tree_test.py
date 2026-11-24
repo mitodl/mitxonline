@@ -3,8 +3,14 @@
 import pytest
 
 from courses.constants import PROGRAM_DISPLAY_MODE_COURSE
-from courses.factories import ProgramFactory
-from courses.requirement_tree import programs_requiring, validate_requirement_tree
+from courses.factories import CourseFactory, ProgramFactory
+from courses.requirement_tree import (
+    RequirementResult,
+    explain_requirement_tree,
+    is_requirement_tree_satisfied,
+    programs_requiring,
+    validate_requirement_tree,
+)
 
 
 def _course(course_id):
@@ -256,3 +262,114 @@ def test_programs_requiring_follows_required_programs():
         parent.id: parent.title,
         grandparent.id: grandparent.title,
     }
+
+
+def _add_group(parent, title, operator, value=None, node_type="operator"):
+    return parent.add_child(
+        node_type=node_type,
+        operator=operator,
+        operator_value=value,
+        title=title,
+    )
+
+
+@pytest.fixture
+def tracks_program():
+    """
+    A program needing course 1, at least 1 of courses 2 and 3, and one of two
+    tracks: course 4, or courses 5 and 6.
+    """
+    program = ProgramFactory.create()
+    courses = CourseFactory.create_batch(6)
+    root = program.requirements_root
+    core = _add_group(root, "Core", "all_of")
+    core.add_child(node_type="course", course=courses[0])
+    electives = _add_group(root, "Electives", "min_number_of", "1")
+    for course in courses[1:3]:
+        electives.add_child(node_type="course", course=course)
+    tracks = _add_group(root, "Tracks", "min_number_of", "1")
+    first = _add_group(tracks, "First", None, node_type="track")
+    _add_group(first, "Required", "all_of").add_child(
+        node_type="course", course=courses[3]
+    )
+    second = _add_group(tracks, "Second", None, node_type="track")
+    second_required = _add_group(second, "Required", "all_of")
+    for course in courses[4:]:
+        second_required.add_child(node_type="course", course=course)
+    return program, courses
+
+
+def _leaf_from(passed_course_ids):
+    def explain_leaf(node):
+        return RequirementResult(
+            label=f"course {node.course_id}",
+            satisfied=node.course_id in passed_course_ids,
+            detail="" if node.course_id in passed_course_ids else "not passed",
+        )
+
+    return explain_leaf
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "passed",
+    [
+        [],
+        [0],
+        [0, 1],
+        [0, 1, 3],
+        [0, 2, 4],
+        [0, 2, 4, 5],
+        [1, 2, 3, 4, 5],
+    ],
+)
+def test_explain_requirement_tree_agrees_with_is_satisfied(tracks_program, passed):
+    """explain_requirement_tree's overall result matches is_requirement_tree_satisfied"""
+    program, courses = tracks_program
+    passed_ids = {courses[index].id for index in passed}
+
+    result = explain_requirement_tree(program, explain_leaf=_leaf_from(passed_ids))
+
+    assert result.satisfied is is_requirement_tree_satisfied(
+        program,
+        course_satisfied=passed_ids.__contains__,
+        program_satisfied=lambda _: False,
+    )
+
+
+@pytest.mark.django_db
+def test_explain_requirement_tree_reports_every_unmet_item(tracks_program):
+    """Every group is evaluated, and each reports how many of its items are met"""
+    program, courses = tracks_program
+    passed_ids = {courses[0].id, courses[4].id}
+
+    result = explain_requirement_tree(program, explain_leaf=_leaf_from(passed_ids))
+
+    assert result.format_lines() == [
+        f"✗ {program.title} ({program.readable_id}): all 3 needed, 1 met",
+        '  ✓ "Core": all 1 needed, 1 met',
+        f"    ✓ course {courses[0].id}",
+        '  ✗ "Electives": at least 1 of 2 needed, 0 met',
+        f"    ✗ course {courses[1].id}: not passed",
+        f"    ✗ course {courses[2].id}: not passed",
+        '  ✗ "Tracks": at least 1 of 2 needed, 0 met',
+        '    ✗ Track "First": all 1 needed, 0 met',
+        '      ✗ "Required": all 1 needed, 0 met',
+        f"        ✗ course {courses[3].id}: not passed",
+        '    ✗ Track "Second": all 1 needed, 0 met',
+        '      ✗ "Required": all 2 needed, 1 met',
+        f"        ✓ course {courses[4].id}",
+        f"        ✗ course {courses[5].id}: not passed",
+    ]
+    assert [leaf.label for leaf in result.unmet_leaves()] == [
+        f"course {courses[index].id}" for index in (1, 2, 3, 5)
+    ]
+
+
+@pytest.mark.django_db
+def test_explain_requirement_tree_without_requirements():
+    """A program with no requirements root has nothing to explain"""
+    program = ProgramFactory.create()
+    program.all_requirements.all().delete()
+
+    assert explain_requirement_tree(program, explain_leaf=_leaf_from(set())) is None

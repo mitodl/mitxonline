@@ -1,8 +1,11 @@
 """Tests for the staff-only B2B provisioning API's HTTP surface."""
 
+from urllib.parse import parse_qs, urlsplit
+
 import faker
 import pytest
 from authlib.integrations.base_client.errors import OAuthError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError, Timeout
@@ -301,6 +304,82 @@ def test_patching_an_unprovisioned_organization_is_a_conflict(admin_drf_client):
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert "LEGACYU" in response.json()["detail"]
+
+
+def _logo_url(org_key):
+    return reverse(
+        "b2b:b2b-provisioning-organization-logo", kwargs={"org_key": org_key}
+    )
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_put_logo_stores_it_without_keycloak(
+    admin_drf_client, logo_upload, mocked_connection
+):
+    """The logo is stored and returned as a URL, and Keycloak isn't asked."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    response = admin_drf_client.put(
+        _logo_url(organization.org_key),
+        {"logo": logo_upload()},
+        format="multipart",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    organization.refresh_from_db()
+    assert organization.logo.name.startswith("organization_logos/logo")
+    assert response.json()["logo"].endswith(organization.logo.url)
+    assert response.json()["domains"] is None
+    mocked_connection.organizations.get.assert_not_called()
+    assert OrganizationProvisioningAudit.objects.filter(
+        organization=organization
+    ).exists()
+
+
+def test_put_logo_rejects_a_file_that_is_not_an_image(admin_drf_client, logo_upload):
+    """A file Pillow can't open is a 400 and leaves the logo alone."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    logo_upload()  # isolates MEDIA_ROOT
+
+    response = admin_drf_client.put(
+        _logo_url(organization.org_key),
+        {"logo": SimpleUploadedFile("logo.png", b"not an image")},
+        format="multipart",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "logo" in response.json()["errors"]
+    organization.refresh_from_db()
+    assert not organization.logo
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_delete_logo_clears_it(admin_drf_client, logo_upload):
+    """DELETE removes the logo."""
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", logo=logo_upload()
+    )
+
+    response = admin_drf_client.delete(_logo_url(organization.org_key))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["logo"] is None
+    organization.refresh_from_db()
+    assert not organization.logo
+
+
+@pytest.mark.parametrize("method", ["put", "delete"])
+def test_logo_is_staff_only(user_drf_client, method):
+    """A non-staff user cannot change an organization's logo."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    response = getattr(user_drf_client, method)(_logo_url(organization.org_key))
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_set_onboarding_state(admin_drf_client):
@@ -733,6 +812,29 @@ def test_transition_rejects_skipping_testing(admin_drf_client):
     assert identity_provider.lifecycle_state == IDP_STATE_DRAFT
 
 
+def test_changing_a_pulumi_managed_idp_is_a_conflict(
+    admin_drf_client, mocked_connection
+):
+    """An IdP Pulumi still declares is a 409 naming it, and Keycloak isn't called."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization, state=IDP_STATE_ACTIVE)
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+
+    response = admin_drf_client.post(
+        _identity_provider_url(organization.org_key, "exampleu", suffix="transition"),
+        {"state": IDP_STATE_TESTING},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "exampleu" in response.json()["detail"]
+    mocked_connection.identity_providers.update.assert_not_called()
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_ACTIVE
+
+
 def test_transition_to_testing(admin_drf_client, mocker):
     """The allowed move writes both systems through the provisioning layer."""
 
@@ -925,12 +1027,27 @@ def test_list_organizations_filters_on_onboarding_state(staff_drf_client):
     assert [org["org_key"] for org in response.json()["results"]] == [live.org_key]
 
 
+REALM_URL_CASES = [
+    ("https://sso.example.mit.edu", "https://sso.example.mit.edu/realms/olapps"),
+    ("https://sso.example.mit.edu/", "https://sso.example.mit.edu/realms/olapps"),
+    (
+        "https://sso.example.mit.edu/auth",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+    (
+        "https://sso.example.mit.edu/auth/",
+        "https://sso.example.mit.edu/auth/realms/olapps",
+    ),
+]
+
+
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
 def test_identity_provider_includes_the_service_provider_details(
-    staff_drf_client, settings
+    staff_drf_client, settings, base_url, realm_url
 ):
     """An operator hands the partner these, so the API serves them."""
 
-    settings.KEYCLOAK_BASE_URL = "https://sso.example.mit.edu"
+    settings.KEYCLOAK_BASE_URL = base_url
     settings.KEYCLOAK_REALM_NAME = "olapps"
     organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
     _identity_provider(organization)
@@ -940,10 +1057,75 @@ def test_identity_provider_includes_the_service_provider_details(
     )
 
     assert response.json()["service_provider"] == {
-        "entity_id": "https://sso.example.mit.edu/realms/olapps",
-        "redirect_uri": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint",
-        "metadata_url": "https://sso.example.mit.edu/realms/olapps/broker/exampleu/endpoint/descriptor",
+        "entity_id": realm_url,
+        "redirect_uri": f"{realm_url}/broker/exampleu/endpoint",
+        "metadata_url": f"{realm_url}/broker/exampleu/endpoint/descriptor",
     }
+
+
+@pytest.mark.parametrize(("base_url", "realm_url"), REALM_URL_CASES)
+def test_identity_provider_includes_a_login_url_with_its_alias_as_the_hint(
+    staff_drf_client, settings, base_url, realm_url
+):
+    """The gateway drops kc_idp_hint, so the link goes to Keycloak directly."""
+
+    settings.KEYCLOAK_BASE_URL = base_url
+    settings.KEYCLOAK_REALM_NAME = "olapps"
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    login_url = urlsplit(response.json()["login_url"])
+    assert login_url._replace(query="").geturl() == (
+        f"{realm_url}/protocol/openid-connect/auth"
+    )
+    assert parse_qs(login_url.query) == {
+        "response_type": ["code"],
+        "client_id": ["learn-client"],
+        "redirect_uri": ["https://api.learn.example.mit.edu/login"],
+        "scope": ["openid profile email organization:*"],
+        "kc_idp_hint": ["exampleu"],
+    }
+
+
+def test_login_url_escapes_the_alias(settings):
+    """Nothing restricts an alias's characters, so it can't add parameters."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+
+    login_url = OrganizationIdentityProvider(alias="a&client_id=b").login_url
+
+    query = parse_qs(urlsplit(login_url).query)
+    assert query["kc_idp_hint"] == ["a&client_id=b"]
+    assert query["client_id"] == ["learn-client"]
+
+
+@pytest.mark.parametrize(
+    "unset", ["B2B_IDP_LOGIN_CLIENT_ID", "B2B_IDP_LOGIN_REDIRECT_URI"]
+)
+def test_identity_provider_has_no_login_url_without_a_login_client(
+    staff_drf_client, settings, unset
+):
+    """A link missing its client or redirect URI would fail at Keycloak."""
+
+    settings.B2B_IDP_LOGIN_CLIENT_ID = "learn-client"
+    settings.B2B_IDP_LOGIN_REDIRECT_URI = "https://api.learn.example.mit.edu/login"
+    setattr(settings, unset, None)
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    _identity_provider(organization)
+
+    response = staff_drf_client.get(
+        _identity_provider_url(organization.org_key, "exampleu")
+    )
+
+    assert response.json()["login_url"] is None
 
 
 def _mapper(protocol, user_attribute, **source):

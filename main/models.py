@@ -87,7 +87,12 @@ class AuditableModel(Model):
         if before_obj is not None:
             before_dict = before_obj.to_dict()
 
-        call_stack = "".join(traceback.format_stack()[-6:-2])
+        audit_class = self.get_audit_class()
+        # Frames can be long (deep paths, long source lines), so cap the stack
+        # to the column width rather than fail the save. Keep the tail: the
+        # newest frames (closest to the save) are the most useful.
+        max_length = audit_class._meta.get_field("call_stack").max_length  # noqa: SLF001
+        call_stack = "".join(traceback.format_stack()[-6:-2])[-max_length:]
 
         audit_kwargs = dict(  # noqa: C408
             acting_user=acting_user,
@@ -95,7 +100,6 @@ class AuditableModel(Model):
             data_before=before_dict,
             data_after=self.to_dict(),
         )
-        audit_class = self.get_audit_class()
         audit_kwargs[audit_class.get_related_field_name()] = self
         audit_class.objects.create(**audit_kwargs)
 

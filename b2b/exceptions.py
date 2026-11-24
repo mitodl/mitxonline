@@ -29,6 +29,29 @@ class AliasCollisionError(Exception):
     """
 
 
+class IdentityProviderNotAdoptableError(Exception):
+    """
+    Raised when an identity provider in Keycloak can't be recorded here.
+
+    Every OrganizationIdentityProvider needs a metadata source to refresh from.
+    Keycloak keeps one for a SAML IdP only when it was configured from a
+    metadata URL, and for an OIDC IdP only as its issuer, so an IdP built from
+    inline XML has nothing to record unless the caller supplies the source.
+    Other provider types can't be recorded at all.
+    """
+
+
+class IdentityProviderPulumiManagedError(Exception):
+    """
+    Raised when changing an identity provider that Pulumi still declares.
+
+    The next pulumi up would revert the change. A metadata refresh is worse:
+    it replaces settings Pulumi set deliberately (e.g. signed AuthnRequests)
+    with whatever the partner's metadata says, which can break logins until
+    that next deploy.
+    """
+
+
 class OrganizationNameCollisionError(Exception):
     """
     Raised when a new organization's name would reuse an existing page slug.
@@ -68,3 +91,7 @@ class OrganizationNotProvisionedError(Exception):
 
 class ContractVariantError(Exception):
     """Raised when a change to a contract's variant sets is not allowed."""
+
+
+class ContractProgramOrderError(Exception):
+    """Raised when a program order doesn't name each of a contract's programs once."""

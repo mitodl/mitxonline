@@ -4,6 +4,7 @@ import base64
 import json
 
 import pytest
+from django.contrib.auth import SESSION_KEY
 from django.test import RequestFactory
 
 from authentication.backends.apisix_remote_user_org import (
@@ -93,3 +94,76 @@ def test_configure_user_reconciles_orgs(mocker, has_id_token):
     mocked_reconcile.assert_called_once_with(
         user, [org_id], session_auth_time=12345 if has_id_token else None
     )
+
+
+CURRENT_USER_URL = "/api/v0/users/current_user/"
+
+
+def _userinfo_header(user):
+    """Build the X-Userinfo header APISIX sends for a user."""
+
+    return _b64json(
+        {
+            "sub": str(user.global_id),
+            "preferred_username": user.username,
+            "email": user.email,
+            "name": user.name,
+        }
+    )
+
+
+@pytest.fixture
+def gateway_client(settings, client):
+    """A test client with the API gateway middleware turned on."""
+
+    settings.MITOL_APIGATEWAY_DISABLE_MIDDLEWARE = False
+    return client
+
+
+def test_gateway_keeps_session_for_same_user(settings, mocker, gateway_client):
+    """
+    Test that repeat requests from the same gateway user keep the session.
+
+    USERNAME_FIELD is username while the gateway matches on global_id, so
+    without the library's same-user check every request would log the user
+    out and back in, flushing the session and rewriting last_login.
+    """
+
+    mocked_reconcile = mocker.patch(
+        "authentication.backends.apisix_remote_user_org.reconcile_user_orgs"
+    )
+    user = UserFactory.create()
+    headers = {"HTTP_X_USERINFO": _userinfo_header(user)}
+
+    first = gateway_client.get(CURRENT_USER_URL, **headers)
+    assert first.json()["id"] == user.id
+    session_cookie = gateway_client.cookies[settings.SESSION_COOKIE_NAME].value
+    user.refresh_from_db()
+    last_login = user.last_login
+
+    second = gateway_client.get(CURRENT_USER_URL, **headers)
+
+    assert second.json()["id"] == user.id
+    assert settings.SESSION_COOKIE_NAME not in second.cookies
+    assert gateway_client.cookies[settings.SESSION_COOKIE_NAME].value == session_cookie
+    user.refresh_from_db()
+    assert user.last_login == last_login
+    # configure_user still runs mid-session, so org membership keeps syncing
+    assert mocked_reconcile.call_count == 2
+
+
+def test_gateway_replaces_session_for_different_user(mocker, gateway_client):
+    """Test that a different gateway user replaces the existing session."""
+
+    mocker.patch("authentication.backends.apisix_remote_user_org.reconcile_user_orgs")
+    first_user, second_user = UserFactory.create_batch(2)
+
+    gateway_client.get(CURRENT_USER_URL, HTTP_X_USERINFO=_userinfo_header(first_user))
+    assert gateway_client.session[SESSION_KEY] == str(first_user.pk)
+
+    response = gateway_client.get(
+        CURRENT_USER_URL, HTTP_X_USERINFO=_userinfo_header(second_user)
+    )
+
+    assert response.json()["id"] == second_user.id
+    assert gateway_client.session[SESSION_KEY] == str(second_user.pk)
