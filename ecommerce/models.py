@@ -145,14 +145,10 @@ class Product(TimestampedModel):
         Returns:
         - CalculatedTax: the rate applied (if any), the tax, and the total
         """
-        from ecommerce.tax import (  # noqa: PLC0415
-            calculate_tax,
-            get_tax_rate_for_locale,
-        )
+        from ecommerce.tax import calculate_tax_for_locale  # noqa: PLC0415
 
-        return calculate_tax(
-            self.price if price is None else price,
-            get_tax_rate_for_locale(country_code),
+        return calculate_tax_for_locale(
+            self.price if price is None else price, country_code
         )
 
 
@@ -234,13 +230,15 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
 
         A partial save (update_fields, as delete() does) leaves the other fields
         of this instance as they were loaded, and reversion would version those.
-        Re-read the row so the version matches the database instead.
+        Refresh the instance from the row, so both it and the version match the
+        database.
         """
 
         super().save(*args, **kwargs)
 
         if kwargs.get("update_fields") is not None:
-            reversion.add_to_revision(TaxRate.all_objects.get(pk=self.pk))
+            self.refresh_from_db()
+            reversion.add_to_revision(self)
 
     @property
     def current_version(self) -> Version | None:

@@ -21,6 +21,25 @@ from ecommerce.models import Product, TaxRate
 
 CENTS = Decimal("0.01")
 
+# The fields a tax rate's version must match for it to be the rate applied.
+VERSIONED_FIELDS = (
+    "country_code",
+    "subdivision_1_code",
+    "subdivision_2_code",
+    "tax_rate",
+    "tax_rate_name",
+    "is_active",
+)
+
+
+class TaxRateVersionError(Exception):
+    """
+    Raised when a saved tax rate has no saved version that matches it.
+
+    This happens when tax is calculated inside the reversion revision that
+    changes the rate: the revision isn't written until the block exits.
+    """
+
 
 @dataclass(frozen=True)
 class CalculatedTax:
@@ -59,6 +78,8 @@ class CalculatedTax:
 
 def get_tax_rate_for_locale(
     country_code: str | None,
+    *,
+    lock: bool = False,
 ) -> TaxRate | None:
     """
     Return the active tax rate for a locale, if there is one.
@@ -68,6 +89,7 @@ def get_tax_rate_for_locale(
 
     Args:
     - country_code (str|None): the ISO 3166-1 alpha-2 country code
+    - lock (bool): select the rate for update; must be in a transaction
 
     Returns:
     - TaxRate|None: the rate, or None if the locale isn't taxed
@@ -76,7 +98,9 @@ def get_tax_rate_for_locale(
     if not country_code:
         return None
 
-    return TaxRate.objects.filter(
+    rates = TaxRate.objects.select_for_update() if lock else TaxRate.objects
+
+    return rates.filter(
         country_code=country_code.upper(),
         subdivision_1_code="",
         subdivision_2_code="",
@@ -94,6 +118,9 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
 
     Returns:
     - CalculatedTax: the rate applied, the tax, and the total
+
+    Raises:
+    - TaxRateVersionError: if the saved rate has no saved version matching it
     """
 
     # str() first so a float doesn't carry its binary error into the result.
@@ -118,6 +145,16 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
             tax_rate = TaxRate.all_objects.select_for_update().get(pk=tax_rate.pk)
             tax_rate_version = Version.objects.get_for_object(tax_rate).first()
 
+        if tax_rate_version is None or any(
+            tax_rate_version.field_dict.get(field) != getattr(tax_rate, field)
+            for field in VERSIONED_FIELDS
+        ):
+            msg = (
+                f"Tax rate {tax_rate.pk} has no saved version matching it; "
+                "calculate tax after the revision that saves it closes."
+            )
+            raise TaxRateVersionError(msg)
+
     # A free item in a taxed locale still records the rate, so a record can
     # tell "taxed at 0" apart from "not taxed".
     tax_amount = max(
@@ -135,6 +172,31 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
         tax_amount=tax_amount,
         total=amount + tax_amount,
     )
+
+
+def calculate_tax_for_locale(
+    amount: Decimal, country_code: str | None
+) -> CalculatedTax:
+    """
+    Calculate the tax owed on an amount for a locale.
+
+    The locale's active rate is selected and applied in one transaction, under
+    a row lock, so a rate deactivated or moved to another locale in the
+    meantime isn't charged.
+
+    Args:
+    - amount (Decimal): the amount to tax
+    - country_code (str|None): the ISO 3166-1 alpha-2 country code
+
+    Returns:
+    - CalculatedTax: the rate applied (if any), the tax, and the total
+
+    Raises:
+    - TaxRateVersionError: if the rate has no saved version matching it
+    """
+
+    with transaction.atomic():
+        return calculate_tax(amount, get_tax_rate_for_locale(country_code, lock=True))
 
 
 def get_product(product_id: int | str) -> Product:
@@ -196,6 +258,7 @@ def calculate_tax_for_product(
 
     Raises:
     - Product.DoesNotExist: if the product can't be found
+    - TaxRateVersionError: if the rate has no saved version matching it
     """
 
     return get_product(product_id).calculate_tax_for_locale(country_code, price=price)

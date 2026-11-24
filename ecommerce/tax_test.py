@@ -10,11 +10,14 @@ from django.test import RequestFactory
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
+from ecommerce import tax as tax_module
 from ecommerce.admin import TaxRateAdmin
 from ecommerce.factories import ProductFactory, TaxRateFactory
 from ecommerce.models import Product, TaxRate
 from ecommerce.tax import (
+    TaxRateVersionError,
     calculate_tax,
+    calculate_tax_for_locale,
     calculate_tax_for_product,
     get_product,
     get_tax_rate_for_locale,
@@ -65,6 +68,31 @@ def test_calculate_tax_uses_saved_rate():
     assert result.tax_amount == Decimal("20.00")
     assert result.tax_rate_version == fresh.current_version
     assert Decimal(result.tax_rate_version.field_dict["tax_rate"]) == result.rate
+
+
+def test_calculate_tax_in_open_revision():
+    """A rate whose version isn't saved yet can't be used, so no wrong version is pinned."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+
+    with reversion.create_revision():
+        tax_rate.tax_rate = Decimal(20)
+        tax_rate.save()
+
+        with pytest.raises(TaxRateVersionError):
+            calculate_tax(Decimal("100.00"), tax_rate)
+
+    assert calculate_tax(Decimal("100.00"), tax_rate).rate == Decimal(20)
+
+
+def test_calculate_tax_new_rate_in_open_revision():
+    """A rate created in an open revision has no version yet, so it can't be used."""
+
+    with reversion.create_revision():
+        tax_rate = TaxRateFactory.create(country_code="IN")
+
+        with pytest.raises(TaxRateVersionError):
+            calculate_tax(Decimal("100.00"), tax_rate)
 
 
 @pytest.mark.parametrize("amount", [Decimal("100.00"), Decimal(0)])
@@ -211,6 +239,7 @@ def test_tax_rate_delete_versions_saved_rate():
 
     assert Decimal(stale.current_version.field_dict["tax_rate"]) == Decimal(20)
     assert stale.current_version.field_dict["is_active"] is False
+    assert stale.tax_rate == Decimal(20)
 
 
 def test_tax_rate_admin_bulk_delete_is_versioned():
@@ -274,6 +303,43 @@ def test_product_calculate_tax_for_locale(taxed, price):
     else:
         assert result.tax_rate is None
         assert result.tax_amount == 0
+
+
+@pytest.mark.parametrize("country_code", ["IN", "in"])
+def test_calculate_tax_for_locale(country_code):
+    """calculate_tax_for_locale taxes at the locale's active rate and pins its version."""
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(10))
+
+    result = calculate_tax_for_locale(Decimal("50.00"), country_code)
+
+    assert result.tax_rate == tax_rate
+    assert result.tax_amount == Decimal("5.00")
+    assert result.tax_rate_version == tax_rate.current_version
+
+
+def test_calculate_tax_for_locale_selects_in_transaction(mocker):
+    """The locale's rate is selected for update in the same transaction as the calculation."""
+
+    TaxRateFactory.create(country_code="IN")
+    atomic = mocker.spy(tax_module.transaction, "atomic")
+    select_for_update = mocker.spy(tax_module.TaxRate.objects, "select_for_update")
+
+    calculate_tax_for_locale(Decimal("50.00"), "IN")
+
+    atomic.assert_called()
+    select_for_update.assert_called_once()
+
+
+def test_calculate_tax_for_locale_untaxed():
+    """A locale with no active rate owes no tax."""
+
+    TaxRateFactory.create(country_code="IN").delete()
+
+    result = calculate_tax_for_locale(Decimal("50.00"), "IN")
+
+    assert result.is_taxed is False
+    assert result.total == Decimal("50.00")
 
 
 def test_get_product():
