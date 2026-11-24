@@ -13,8 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from django.db import transaction
-from django.db.models import Q
+from django.db.models import CharField, OuterRef, Q, Subquery
+from django.db.models.functions import Cast
 from reversion.models import Version
 
 from ecommerce.models import Product, TaxRate
@@ -76,10 +76,27 @@ class CalculatedTax:
         return self.tax_rate is not None
 
 
+def _with_version_id(rates):
+    """
+    Annotate rates with the ID of their newest version, as latest_version_id.
+
+    The rate and its version ID then come from one statement, and so from one
+    snapshot: a rate and its version are saved in the same transaction, so the
+    version matches the row unless it is still in an open revision.
+    """
+
+    return rates.annotate(
+        latest_version_id=Subquery(
+            Version.objects.get_for_model(TaxRate)
+            .filter(object_id=Cast(OuterRef("pk"), output_field=CharField()))
+            .order_by("-pk")
+            .values("pk")[:1]
+        )
+    )
+
+
 def get_tax_rate_for_locale(
     country_code: str | None,
-    *,
-    lock: bool = False,
 ) -> TaxRate | None:
     """
     Return the active tax rate for a locale, if there is one.
@@ -89,22 +106,24 @@ def get_tax_rate_for_locale(
 
     Args:
     - country_code (str|None): the ISO 3166-1 alpha-2 country code
-    - lock (bool): select the rate for update; must be in a transaction
 
     Returns:
-    - TaxRate|None: the rate, or None if the locale isn't taxed
+    - TaxRate|None: the rate, or None if the locale isn't taxed. It carries
+      latest_version_id, the ID of its newest version.
     """
 
     if not country_code:
         return None
 
-    rates = TaxRate.objects.select_for_update() if lock else TaxRate.objects
-
-    return rates.filter(
-        country_code=country_code.upper(),
-        subdivision_1_code="",
-        subdivision_2_code="",
-    ).first()
+    return (
+        _with_version_id(TaxRate.objects)
+        .filter(
+            country_code=country_code.upper(),
+            subdivision_1_code="",
+            subdivision_2_code="",
+        )
+        .first()
+    )
 
 
 def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
@@ -114,7 +133,9 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
     Args:
     - amount (Decimal): the amount to tax
     - tax_rate (TaxRate|None): the rate to apply; None means no tax. A saved
-      rate is re-read, so its current value is what gets applied.
+      rate is re-read along with its newest version ID, unless it already
+      carries one from get_tax_rate_for_locale, so the rate applied is the
+      one the version records.
 
     Returns:
     - CalculatedTax: the rate applied, the tax, and the total
@@ -138,12 +159,13 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
 
     tax_rate_version = None
     if tax_rate.pk is not None:
-        # Re-read the rate and its version under a row lock, so the rate
-        # applied is the one the version records, even if the rate passed in
-        # is stale or changes while we look.
-        with transaction.atomic():
-            tax_rate = TaxRate.all_objects.select_for_update().get(pk=tax_rate.pk)
-            tax_rate_version = Version.objects.get_for_object(tax_rate).first()
+        if not hasattr(tax_rate, "latest_version_id"):
+            tax_rate = _with_version_id(TaxRate.all_objects).get(pk=tax_rate.pk)
+
+        # Versions are never changed once written, so loading this one in a
+        # separate statement can't disagree with the row read above.
+        if tax_rate.latest_version_id is not None:
+            tax_rate_version = Version.objects.get(pk=tax_rate.latest_version_id)
 
         if tax_rate_version is None or any(
             tax_rate_version.field_dict.get(field) != getattr(tax_rate, field)
@@ -180,9 +202,10 @@ def calculate_tax_for_locale(
     """
     Calculate the tax owed on an amount for a locale.
 
-    The locale's active rate is selected and applied in one transaction, under
-    a row lock, so a rate deactivated or moved to another locale in the
-    meantime isn't charged.
+    The locale's active rate and its version are read in one statement and
+    applied as read, so a rate deactivated, replaced, or moved to another
+    locale in the meantime isn't charged, and no rate is missed while one is
+    being replaced.
 
     Args:
     - amount (Decimal): the amount to tax
@@ -195,8 +218,7 @@ def calculate_tax_for_locale(
     - TaxRateVersionError: if the rate has no saved version matching it
     """
 
-    with transaction.atomic():
-        return calculate_tax(amount, get_tax_rate_for_locale(country_code, lock=True))
+    return calculate_tax(amount, get_tax_rate_for_locale(country_code))
 
 
 def get_product(product_id: int | str) -> Product:

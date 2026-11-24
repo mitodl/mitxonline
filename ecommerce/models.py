@@ -144,6 +144,9 @@ class Product(TimestampedModel):
 
         Returns:
         - CalculatedTax: the rate applied (if any), the tax, and the total
+
+        Raises:
+        - TaxRateVersionError: if the rate has no saved version matching it
         """
         from ecommerce.tax import calculate_tax_for_locale  # noqa: PLC0415
 

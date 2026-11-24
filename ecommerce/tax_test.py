@@ -5,12 +5,12 @@ from decimal import Decimal
 import pytest
 import reversion
 from django.contrib.admin.sites import AdminSite
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory, ProgramFactory
-from ecommerce import tax as tax_module
 from ecommerce.admin import TaxRateAdmin
 from ecommerce.factories import ProductFactory, TaxRateFactory
 from ecommerce.models import Product, TaxRate
@@ -318,17 +318,20 @@ def test_calculate_tax_for_locale(country_code):
     assert result.tax_rate_version == tax_rate.current_version
 
 
-def test_calculate_tax_for_locale_selects_in_transaction(mocker):
-    """The locale's rate is selected for update in the same transaction as the calculation."""
+def test_calculate_tax_for_locale_one_statement(django_assert_num_queries):
+    """
+    The locale's rate and its version ID come from one statement, so they share
+    a snapshot; the version is then loaded by ID. Nothing is locked.
+    """
 
-    TaxRateFactory.create(country_code="IN")
-    atomic = mocker.spy(tax_module.transaction, "atomic")
-    select_for_update = mocker.spy(tax_module.TaxRate.objects, "select_for_update")
+    tax_rate = TaxRateFactory.create(country_code="IN")
+    ContentType.objects.get_for_model(TaxRate)  # warm the content type cache
 
-    calculate_tax_for_locale(Decimal("50.00"), "IN")
+    with django_assert_num_queries(2) as ctx:
+        result = calculate_tax_for_locale(Decimal("50.00"), "IN")
 
-    atomic.assert_called()
-    select_for_update.assert_called_once()
+    assert result.tax_rate_version == tax_rate.current_version
+    assert not any("FOR UPDATE" in query["sql"] for query in ctx.captured_queries)
 
 
 def test_calculate_tax_for_locale_untaxed():
