@@ -13,7 +13,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.db import transaction
 from django.db.models import Q
+from reversion.models import Version
 
 from ecommerce.models import Product, TaxRate
 
@@ -27,6 +29,8 @@ class CalculatedTax:
 
     Attributes:
     - tax_rate (TaxRate|None): the rate applied, or None if no tax is owed
+    - tax_rate_version (Version|None): the version of the rate applied, for
+      records to point at; None if no tax is owed or the rate is unsaved
     - rate (Decimal): the percentage applied (0 if no tax is owed)
     - taxable_amount (Decimal): the amount the tax was calculated on
     - tax_amount (Decimal): the tax owed, rounded to the cent
@@ -34,6 +38,7 @@ class CalculatedTax:
     """
 
     tax_rate: TaxRate | None
+    tax_rate_version: Version | None
     rate: Decimal
     taxable_amount: Decimal
     tax_amount: Decimal
@@ -84,7 +89,8 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
 
     Args:
     - amount (Decimal): the amount to tax
-    - tax_rate (TaxRate|None): the rate to apply; None means no tax
+    - tax_rate (TaxRate|None): the rate to apply; None means no tax. A saved
+      rate is re-read, so its current value is what gets applied.
 
     Returns:
     - CalculatedTax: the rate applied, the tax, and the total
@@ -96,11 +102,21 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
     if tax_rate is None:
         return CalculatedTax(
             tax_rate=None,
+            tax_rate_version=None,
             rate=Decimal(0),
             taxable_amount=amount,
             tax_amount=Decimal("0.00"),
             total=amount,
         )
+
+    tax_rate_version = None
+    if tax_rate.pk is not None:
+        # Re-read the rate and its version under a row lock, so the rate
+        # applied is the one the version records, even if the rate passed in
+        # is stale or changes while we look.
+        with transaction.atomic():
+            tax_rate = TaxRate.all_objects.select_for_update().get(pk=tax_rate.pk)
+            tax_rate_version = Version.objects.get_for_object(tax_rate).first()
 
     # A free item in a taxed locale still records the rate, so a record can
     # tell "taxed at 0" apart from "not taxed".
@@ -113,6 +129,7 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
 
     return CalculatedTax(
         tax_rate=tax_rate,
+        tax_rate_version=tax_rate_version,
         rate=tax_rate.tax_rate,
         taxable_amount=amount,
         tax_amount=tax_amount,
@@ -140,7 +157,8 @@ def get_product(product_id: int | str) -> Product:
 
     from courses.models import CourseRun, Program  # noqa: PLC0415
 
-    run_ids = CourseRun.objects.filter(courseware_id=product_id).values("pk")
+    # all_objects, so source runs are found here just as they are by ID.
+    run_ids = CourseRun.all_objects.filter(courseware_id=product_id).values("pk")
     program_ids = Program.objects.filter(readable_id=product_id).values("pk")
 
     return Product.objects.get(

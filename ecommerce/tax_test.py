@@ -6,9 +6,10 @@ import pytest
 import reversion
 from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ValidationError
+from django.test import RequestFactory
 from reversion.models import Version
 
-from courses.factories import ProgramFactory
+from courses.factories import CourseRunFactory, ProgramFactory
 from ecommerce.admin import TaxRateAdmin
 from ecommerce.factories import ProductFactory, TaxRateFactory
 from ecommerce.models import Product, TaxRate
@@ -18,6 +19,7 @@ from ecommerce.tax import (
     get_product,
     get_tax_rate_for_locale,
 )
+from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
 
@@ -46,6 +48,23 @@ def test_calculate_tax(amount, rate, expected_tax):
     assert result.total == amount + expected_tax
     assert result.tax_rate_name == tax_rate.tax_rate_name
     assert result.is_taxed is True
+    assert result.tax_rate_version == tax_rate.current_version
+
+
+def test_calculate_tax_uses_saved_rate():
+    """A stale rate is re-read, so the rate applied matches the version returned."""
+
+    stale = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    fresh = TaxRate.objects.get(pk=stale.pk)
+    fresh.tax_rate = Decimal(20)
+    fresh.save()
+
+    result = calculate_tax(Decimal("100.00"), stale)
+
+    assert result.rate == Decimal(20)
+    assert result.tax_amount == Decimal("20.00")
+    assert result.tax_rate_version == fresh.current_version
+    assert Decimal(result.tax_rate_version.field_dict["tax_rate"]) == result.rate
 
 
 @pytest.mark.parametrize("amount", [Decimal("100.00"), Decimal(0)])
@@ -55,6 +74,7 @@ def test_calculate_tax_no_rate(amount):
     result = calculate_tax(amount, None)
 
     assert result.tax_rate is None
+    assert result.tax_rate_version is None
     assert result.rate == 0
     assert result.tax_amount == 0
     assert result.total == amount
@@ -136,22 +156,15 @@ def test_tax_rate_unique_active_locale():
     TaxRateFactory.create(country_code="IN")
 
 
-@pytest.mark.parametrize("bad_rate", [Decimal(-1), Decimal("100.0001")])
-def test_tax_rate_range(bad_rate):
-    """The rate must be a percentage between 0 and 100."""
+@pytest.mark.parametrize("rate", [Decimal(-1), Decimal(100), Decimal("150.5")])
+def test_tax_rate_unbounded(rate):
+    """The rate isn't bounded, so an unusual rate can still be stored as set."""
 
-    with pytest.raises(ValidationError):
-        TaxRateFactory.build(country_code="IN", tax_rate=bad_rate).save()
-
-
-def test_tax_rate_allows_100():
-    """A rate of 100% fits the field."""
-
-    tax_rate = TaxRateFactory.build(country_code="IN", tax_rate=Decimal(100))
+    tax_rate = TaxRateFactory.build(country_code="IN", tax_rate=rate)
     tax_rate.save()
 
     tax_rate.refresh_from_db()
-    assert tax_rate.tax_rate == Decimal(100)
+    assert tax_rate.tax_rate == rate
 
 
 @pytest.mark.parametrize("in_revision", [True, False])
@@ -186,6 +199,20 @@ def test_tax_rate_delete_is_versioned():
     assert tax_rate.current_version.field_dict["is_active"] is False
 
 
+def test_tax_rate_delete_versions_saved_rate():
+    """A deletion's version records the rate as saved, not a stale copy of it."""
+
+    stale = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    fresh = TaxRate.objects.get(pk=stale.pk)
+    fresh.tax_rate = Decimal(20)
+    fresh.save()
+
+    stale.delete()
+
+    assert Decimal(stale.current_version.field_dict["tax_rate"]) == Decimal(20)
+    assert stale.current_version.field_dict["is_active"] is False
+
+
 def test_tax_rate_admin_bulk_delete_is_versioned():
     """The admin's bulk delete versions each deletion."""
 
@@ -194,14 +221,18 @@ def test_tax_rate_admin_bulk_delete_is_versioned():
         TaxRateFactory.create(country_code="GB"),
     ]
 
+    request = RequestFactory().post("/")
+    request.user = UserFactory.create()
+
     TaxRateAdmin(TaxRate, AdminSite()).delete_queryset(
-        None, TaxRate.objects.filter(pk__in=[rate.pk for rate in rates])
+        request, TaxRate.objects.filter(pk__in=[rate.pk for rate in rates])
     )
 
     for rate in rates:
         rate.refresh_from_db()
         assert rate.is_active is False
         assert rate.current_version.field_dict["is_active"] is False
+        assert rate.current_version.revision.user == request.user
 
 
 def test_tax_rate_admin_bulk_delete_skips_deleted():
@@ -213,8 +244,11 @@ def test_tax_rate_admin_bulk_delete_skips_deleted():
     deleted_on = rate.deleted_on
     version_count = Version.objects.get_for_object(rate).count()
 
+    request = RequestFactory().post("/")
+    request.user = UserFactory.create()
+
     TaxRateAdmin(TaxRate, AdminSite()).delete_queryset(
-        None, TaxRate.all_objects.filter(pk=rate.pk)
+        request, TaxRate.all_objects.filter(pk=rate.pk)
     )
 
     rate.refresh_from_db()
@@ -257,6 +291,16 @@ def test_get_product():
 
     with pytest.raises(Product.DoesNotExist):
         get_product("course-v1:MITx+nope+1T2099")
+
+
+def test_get_product_source_run():
+    """A product for a source run is found by its readable ID, as by its ID."""
+
+    product = ProductFactory.create(
+        purchasable_object=CourseRunFactory.create(is_source_run=True)
+    )
+
+    assert get_product(product.purchasable_object.courseware_id) == product
 
 
 def test_get_product_skips_inactive():

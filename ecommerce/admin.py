@@ -156,7 +156,7 @@ class TaxRateAdmin(VersionAdmin):
 
         return self.model.all_objects.get_queryset()
 
-    def delete_queryset(self, request, queryset):  # noqa: ARG002
+    def delete_queryset(self, request, queryset):
         """
         Delete each rate on its own, so each deletion is versioned.
 
@@ -165,7 +165,9 @@ class TaxRateAdmin(VersionAdmin):
 
         # Already-deleted rates are skipped, so their deletion time is kept.
         for tax_rate in queryset.filter(is_active=True):
-            tax_rate.delete()
+            with reversion.create_revision():
+                tax_rate.delete()
+                reversion.set_user(request.user)
 
 
 @admin.register(Basket)

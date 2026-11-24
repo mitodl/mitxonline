@@ -14,7 +14,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils.functional import cached_property
@@ -186,7 +185,6 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         help_text="The tax rate, as a percentage (e.g. 18 for 18%).",
         max_digits=7,
         decimal_places=4,
-        validators=[MinValueValidator(Decimal(0)), MaxValueValidator(Decimal(100))],
     )
     tax_rate_name = models.CharField(
         help_text="The name of the tax, shown to learners (e.g. VAT, GST).",
@@ -224,11 +222,25 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         """
 
         if reversion.is_active():
-            super().save(*args, **kwargs)
+            self._save_and_version(*args, **kwargs)
             return
 
         with reversion.create_revision():
-            super().save(*args, **kwargs)
+            self._save_and_version(*args, **kwargs)
+
+    def _save_and_version(self, *args, **kwargs):
+        """
+        Save the rate and record the row as saved in the current revision.
+
+        A partial save (update_fields, as delete() does) leaves the other fields
+        of this instance as they were loaded, and reversion would version those.
+        Re-read the row so the version matches the database instead.
+        """
+
+        super().save(*args, **kwargs)
+
+        if kwargs.get("update_fields") is not None:
+            reversion.add_to_revision(TaxRate.all_objects.get(pk=self.pk))
 
     @property
     def current_version(self) -> Version | None:
