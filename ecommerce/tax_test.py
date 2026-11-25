@@ -198,15 +198,24 @@ def test_tax_rate_unique_active_locale():
     TaxRateFactory.create(country_code="IN")
 
 
-@pytest.mark.parametrize("rate", [Decimal(-1), Decimal(100), Decimal("150.5")])
-def test_tax_rate_unbounded(rate):
-    """The rate isn't bounded, so an unusual rate can still be stored as set."""
+@pytest.mark.parametrize("rate", [Decimal(100), Decimal("150.5")])
+def test_tax_rate_unbounded_positive(rate):
+    """The rate has a lower bound of 0; make sure we can save >100% tax rates."""
 
     tax_rate = TaxRateFactory.build(country_code="IN", tax_rate=rate)
     tax_rate.save()
 
     tax_rate.refresh_from_db()
     assert tax_rate.tax_rate == rate
+
+
+def test_tax_rate_lower_bound():
+    """We shouldn't be able to store a rate < 0%."""
+
+    tax_rate = TaxRateFactory.build(country_code="JP", tax_rate=Decimal("-0.01"))
+
+    with pytest.raises(ValidationError):
+        tax_rate.save()
 
 
 @pytest.mark.parametrize("in_revision", [True, False])

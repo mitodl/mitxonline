@@ -155,7 +155,7 @@ class Product(TimestampedModel):
         )
 
 
-@reversion.register(exclude=("created_on", "updated_on"))
+@reversion.register()
 class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
     """
     The tax we charge for a locale.
@@ -237,6 +237,7 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         database.
         """
 
+        self.clean()
         super().save(*args, **kwargs)
 
         if kwargs.get("update_fields") is not None:
@@ -253,6 +254,23 @@ class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
         """
 
         return Version.objects.get_for_object(self).first()
+
+    @property
+    def locale(self) -> str:
+        """Return a formatted locality string for the rate."""
+
+        return (
+            (f"{self.subdivision_2_code}, " if self.subdivision_2_code else "")
+            + (f"{self.subdivision_1_code}, " if self.subdivision_1_code else "")
+            + str(self.country_code)
+        )
+
+    def clean(self):
+        """Ensure tax rate is greater than zero."""
+
+        if self.tax_rate < Decimal(0):
+            msg = f"Tax rate {self.tax_rate} must be above 0 for {self.locale}"
+            raise ValidationError(msg)
 
 
 class Basket(TimestampedModel):

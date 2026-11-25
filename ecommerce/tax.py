@@ -37,7 +37,9 @@ class TaxRateVersionError(Exception):
     Raised when a saved tax rate has no saved version that matches it.
 
     This happens when tax is calculated inside the reversion revision that
-    changes the rate: the revision isn't written until the block exits.
+    changes the rate: the revision isn't written until the block exits. Also
+    raised if operating on a rate that was changed without using `.save` (and
+    thus a new version wasn't committed), e.g. when using `.update`.
     """
 
 
@@ -47,7 +49,7 @@ class CalculatedTax:
     The result of a tax calculation.
 
     Attributes:
-    - tax_rate (TaxRate|None): the rate applied, or None if no tax is owed
+    - tax_rate (TaxRate|None): the rate applied, or None if the locale isn't taxed
     - tax_rate_version (Version|None): the version of the rate applied, for
       records to point at; None if no tax is owed or the rate is unsaved
     - rate (Decimal): the percentage applied (0 if no tax is owed)
@@ -144,7 +146,7 @@ def calculate_tax(amount: Decimal, tax_rate: TaxRate | None) -> CalculatedTax:
     """
 
     if tax_rate is not None and tax_rate.pk is not None:
-        tax_rate = _with_version_id(TaxRate.all_objects).get(pk=tax_rate.pk)
+        tax_rate = _with_version_id(TaxRate.objects).get(pk=tax_rate.pk)
 
     return _calculate_tax(amount, tax_rate)
 
@@ -247,7 +249,7 @@ def get_product(product_id: int | str) -> Product:
     - Product.DoesNotExist: if nothing matches
     """
 
-    if isinstance(product_id, int) or str(product_id).isdigit():
+    if isinstance(product_id, int) or str(product_id).isdecimal():
         return Product.objects.get(pk=int(product_id))
 
     from courses.models import CourseRun, Program  # noqa: PLC0415
