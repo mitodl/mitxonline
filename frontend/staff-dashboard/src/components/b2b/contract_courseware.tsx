@@ -39,6 +39,9 @@ const additionSummary = ({ data }: { data: ICoursewareAddition }) => ({
             data.courses_without_source_run
                 ? `${data.courses_without_source_run} course${data.courses_without_source_run === 1 ? " has" : "s have"} no source run to clone.`
                 : "",
+            data.courses_with_invalid_key
+                ? `${data.courses_with_invalid_key} course${data.courses_with_invalid_key === 1 ? " was" : "s were"} skipped because no valid contract run ID could be built for ${data.courses_with_invalid_key === 1 ? "it" : "them"}.`
+                : "",
             data.skipped_reason,
         ]
             .filter(Boolean)
@@ -277,7 +280,19 @@ export const ContractCourseware: React.FC<IContractCoursewareProps> = ({ contrac
                     <Table.Column dataIndex="clone_attempts" title="Attempts" />
                     <Table.Column<IContractRunSetup>
                         title="Last error"
-                        render={(_, run) => <Typography.Text style={{ wordBreak: "break-word" }}>{run.clone_error}</Typography.Text>}
+                        render={(_, run) =>
+                            run.clone_error ? (
+                                <Typography.Paragraph
+                                    style={{ wordBreak: "break-word", marginBottom: 0 }}
+                                    ellipsis={{ rows: 2, expandable: true }}
+                                >
+                                    {/* Until the status is "failed" the clone task still owns
+                                        the run, so the error is from an earlier attempt. */}
+                                    {run.clone_status === "failed" ? "" : "An earlier attempt failed: "}
+                                    {run.clone_error}
+                                </Typography.Paragraph>
+                            ) : null
+                        }
                     />
                     <Table.Column<IContractRunSetup>
                         title="Actions"

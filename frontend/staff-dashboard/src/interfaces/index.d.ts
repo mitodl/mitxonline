@@ -271,6 +271,7 @@ export interface IContractSetupStatus {
 export interface ICoursewareAddition {
     runs_added: number;
     courses_without_source_run: number;
+    courses_with_invalid_key: number;
     skipped_reason: string;
 }
 
