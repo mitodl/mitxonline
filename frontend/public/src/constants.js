@@ -1,15 +1,5 @@
 // Put constants here
 
-export const ENROLLABLE_ITEM_ID_SEPARATOR = "+"
-export const PRODUCT_TYPE_PROGRAM = "program"
-export const PRODUCT_TYPE_COURSERUN = "courserun"
-
-export const GENDER_CHOICES = [
-  ["m", "Male"],
-  ["f", "Female"],
-  ["o", "Other/Prefer Not to Say"]
-]
-
 export const EMPLOYMENT_INDUSTRY = [
   "Association, Nonprofit Organization, NGO",
   "Business and Professional Services",
@@ -168,9 +158,7 @@ export const DISCOUNT_TYPE_PERCENT_OFF = "percent-off"
 export const RECORDS_PAGE_TITLE = "Program Record"
 
 /* Program Requirements constants */
-export const NODETYPE_ROOT = "program_root"
 export const NODETYPE_OPERATOR = "operator"
 export const NODETYPE_COURSE = "course"
 
 export const NODEOPER_ALL = "all_of"
-export const NODEOPER_MIN = "min_number_of"
