@@ -206,6 +206,10 @@ STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION = "Initial CheckoutSession"
 
 STRIPE_OBJECT_CHECKOUT_SESSION = "checkout.session"
 
+# How long to give another checkout to log the session it's opening before
+# expiring it, when a newer checkout supersedes that order.
+STRIPE_SESSION_OPENING_GRACE_SECONDS = 60
+
 STRIPE_EVENT_CHECKOUT_SESSION_COMPLETED = "checkout.session.completed"
 STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED = "checkout.session.expired"
 STRIPE_EVENT_CHECKOUT_SESSION_ASYNC_PAYMENT_FAILED = (

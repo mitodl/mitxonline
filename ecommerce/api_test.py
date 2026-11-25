@@ -116,6 +116,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_NPR,
     STRIPE_PAYMENT_STATUS_PAID,
     STRIPE_PAYMENT_STATUS_UNPAID,
+    STRIPE_SESSION_OPENING_GRACE_SECONDS,
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     TRANSACTION_TYPE_REFUND,
@@ -3767,6 +3768,30 @@ def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, produc
 
     assert supersede_open_stripe_checkouts(new_order) is None
     mock_expire.assert_not_called()
+
+
+def test_supersede_open_stripe_checkouts_session_still_opening(mocker, user, products):
+    """
+    An earlier order whose session another checkout is still opening is
+    cancelled, so that checkout refuses its page, and its session is expired
+    after a grace period in case it's logged just after.
+    """
+
+    mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
+    mock_expire_later = mocker.patch(
+        "ecommerce.api.expire_cancelled_stripe_checkout.apply_async"
+    )
+    new_order = _create_stripe_order(user, products[0])
+    opening_order = _create_stripe_order(user, products[0])
+
+    assert supersede_open_stripe_checkouts(new_order) is None
+
+    opening_order.refresh_from_db()
+    assert opening_order.state == OrderStatus.CANCELED
+    mock_expire.assert_not_called()
+    mock_expire_later.assert_called_once_with(
+        (opening_order.id,), countdown=STRIPE_SESSION_OPENING_GRACE_SECONDS
+    )
 
 
 def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):

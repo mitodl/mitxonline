@@ -73,6 +73,7 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
     STRIPE_REFUND_STATUS_SUCCEEDED,
+    STRIPE_SESSION_OPENING_GRACE_SECONDS,
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     ZERO_PAYMENT_DATA,
@@ -2337,6 +2338,16 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
     unavailable = False
 
     for earlier_order in earlier_orders:
+        if not get_stripe_checkout_session_id(earlier_order):
+            # Another checkout may still be opening this order's session. Once
+            # it logs the session it sees the order cancelled and refuses the
+            # page; the delayed expiry catches a session logged just after.
+            earlier_order.get_object_flow().cancel()
+            expire_cancelled_stripe_checkout.apply_async(
+                (earlier_order.id,), countdown=STRIPE_SESSION_OPENING_GRACE_SECONDS
+            )
+            continue
+
         try:
             expired = expire_stripe_checkout_session(earlier_order)
         except stripe.StripeError:
