@@ -9,7 +9,7 @@ from django.contrib.admin.decorators import display
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch
 from django.forms import TextInput
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -30,7 +30,9 @@ from courses.api import (
 )
 from courses.forms import (
     ADMIN_ENROLL_RUN_SUFFIX,
+    PAID_RUN_AUDIT_BLOCKED_MESSAGE,
     AdminEnrollUserInRunsForm,
+    CourseRunEnrollmentAdminForm,
     ProgramAdminForm,
 )
 from courses.models import (
@@ -826,6 +828,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
     """Admin for CourseRunEnrollment"""
 
     model = CourseRunEnrollment
+    form = CourseRunEnrollmentAdminForm
     search_fields = [
         "user__email",
         "user__username",
@@ -1031,7 +1034,31 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         selection takes longer than a request may last. Inactive and
         non-verified enrollments are skipped.
         """
-        enrollment_ids = list(queryset.values_list("id", flat=True))
+        from ecommerce.models import OrderStatus  # noqa: PLC0415
+
+        paid = queryset.filter(
+            Exists(
+                PaidCourseRun.objects.filter(
+                    user=OuterRef("user"),
+                    course_run=OuterRef("run"),
+                    order__state=OrderStatus.FULFILLED,
+                )
+            )
+        )
+        paid_ids = list(paid.values_list("id", flat=True))
+        if paid_ids:
+            self.message_user(
+                request,
+                f"Skipped {len(paid_ids)} enrollment(s) "
+                f"(IDs {', '.join(map(str, paid_ids))}): "
+                f"{PAID_RUN_AUDIT_BLOCKED_MESSAGE}",
+                messages.ERROR,
+            )
+        enrollment_ids = list(
+            queryset.exclude(id__in=paid_ids).values_list("id", flat=True)
+        )
+        if not enrollment_ids:
+            return
         downgrade_enrollments.delay(enrollment_ids)
         self.message_user(
             request,

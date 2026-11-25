@@ -9,6 +9,8 @@ from webpack_loader import utils as webpack_loader_utils
 from courses.models import (
     Course,
     CourseRun,
+    CourseRunEnrollment,
+    PaidCourseRun,
     Program,
     ProgramRequirement,
     ProgramRequirementNodeType,
@@ -16,6 +18,7 @@ from courses.models import (
 from courses.requirement_tree import programs_requiring, validate_requirement_tree
 from courses.serializers.v1.programs import ProgramRequirementTreeSerializer
 from courses.widgets import ProgramRequirementsInput
+from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE
 
 #: Courseware ID suffix of the runs offered by the admin "enroll in runs" page
 ADMIN_ENROLL_RUN_SUFFIX = "0T2026"
@@ -193,6 +196,41 @@ class ProgramAdminForm(ModelForm):
             chunk["url"]
             for chunk in webpack_loader_utils.get_files("requirementsAdmin", "js")
         ]
+
+
+PAID_RUN_AUDIT_BLOCKED_MESSAGE = (
+    "This learner paid for this course run, so it can't be set to audit. "
+    "Refund the order instead, or, if the run came free with a program, use "
+    'the "Undo verification from program entitlement" action.'
+)
+
+
+class CourseRunEnrollmentAdminForm(ModelForm):
+    """
+    Admin form for a course run enrollment.
+
+    Blocks setting a paid enrollment to audit: the paid order would stay in
+    place, so the learner sees "Upgrade" on the dashboard but checkout refuses
+    the run as already purchased.
+    """
+
+    class Meta:
+        model = CourseRunEnrollment
+        fields = "__all__"  # noqa: DJ007
+
+    def clean(self):
+        cleaned_data = super().clean()
+        enrollment = self.instance
+        if (
+            enrollment.pk
+            and enrollment.enrollment_mode != EDX_ENROLLMENT_AUDIT_MODE
+            and cleaned_data.get("enrollment_mode") == EDX_ENROLLMENT_AUDIT_MODE
+            and PaidCourseRun.fulfilled_paid_course_run_exists(
+                enrollment.user, enrollment.run
+            )
+        ):
+            self.add_error("enrollment_mode", PAID_RUN_AUDIT_BLOCKED_MESSAGE)
+        return cleaned_data
 
 
 class AdminEnrollUserInRunsForm(forms.Form):
