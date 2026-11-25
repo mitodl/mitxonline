@@ -2103,6 +2103,58 @@ def test_add_verified_program_course_enrollment(
 
 
 @pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize("enrollment_change", ["set_to_audit", "deleted"])
+def test_add_verified_program_course_enrollment_restores_paid_run(
+    user, user_drf_client, enrollment_change
+):
+    """
+    If the learner already paid for the run but no longer has a verified
+    enrollment in it, upgrading restores the verified enrollment instead of
+    failing checkout as a duplicate purchase.
+    """
+    responses.add(
+        responses.GET,
+        f"{settings.OPENEDX_API_BASE_URL}/api/enrollment/v1/enrollments",
+        json={"results": [{"mode": EDX_ENROLLMENT_VERIFIED_MODE, "is_active": True}]},
+        status=status.HTTP_200_OK,
+    )
+    program = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    ).program
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        for purchasable in (program, course_run):
+            Product.objects.create(
+                price=10,
+                is_active=True,
+                object_id=purchasable.id,
+                content_type=ContentType.objects.get_for_model(purchasable),
+            )
+    url = reverse(
+        "v2:add_verified_program_course_enrollment",
+        kwargs={"courserun_id": course_run.courseware_id},
+    )
+
+    assert (
+        user_drf_client.post(url, data=[program.readable_id]).status_code
+        == status.HTTP_201_CREATED
+    )
+    enrollments = CourseRunEnrollment.all_objects.filter(user=user, run=course_run)
+    if enrollment_change == "set_to_audit":
+        enrollments.update(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
+    else:
+        enrollments.delete()
+    order_count = user.orders.count()
+
+    resp = user_drf_client.post(url, data=[program.readable_id])
+
+    assert resp.status_code == status.HTTP_201_CREATED
+    assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+    assert user.orders.count() == order_count
+
+
+@pytest.mark.skip_nplusone_check
 def test_add_verified_program_course_enrollment_incomplete_profile(
     mocker, mocked_export_compliance, user, user_drf_client
 ):

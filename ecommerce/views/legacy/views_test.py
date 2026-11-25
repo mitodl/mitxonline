@@ -929,6 +929,44 @@ def test_checkout_product_with_verified_program_enrollment(
 
 
 @pytest.mark.dont_mock_enrollments
+@pytest.mark.skip_nplusone_check
+def test_checkout_product_restores_paid_run_set_to_audit(user, user_client):
+    """
+    If the learner already paid for the run but the enrollment was later set
+    to audit, /cart/add restores the verified enrollment instead of failing
+    checkout as a duplicate purchase and sending the learner to the cart.
+    """
+    program = ProgramFactory.create()
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    with reversion.create_revision():
+        ProductFactory.create(purchasable_object=program)
+        ProductFactory.create(purchasable_object=course_run)
+    ProgramEnrollmentFactory.create(
+        program=program,
+        user=user,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        active=True,
+    )
+    _pay_for_program(user, program)
+    params = {"course_id": course_run.courseware_id}
+
+    user_client.get(reverse("checkout-product"), params)
+    CourseRunEnrollment.objects.filter(user=user, run=course_run).update(
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    )
+    order_count = Order.objects.filter(purchaser=user).count()
+
+    resp = user_client.get(reverse("checkout-product"), params)
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("user-dashboard")
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    assert Order.objects.filter(purchaser=user).count() == order_count
+
+
+@pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
     user, user_client
 ):
