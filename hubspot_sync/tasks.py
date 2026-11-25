@@ -504,17 +504,6 @@ def batch_update_hubspot_objects_chunked(
 
 
 @app.task(bind=True)
-@single_task(10, key=task_obj_lock)
-def sync_all_contacts_with_hubspot(self):
-    hubspot_type = HubspotObjectType.CONTACTS.value
-    model_name = ContentType.objects.get_for_model(User).model
-    app_label = User._meta.app_label  # noqa: SLF001
-    raise self.replace(
-        batch_upsert_hubspot_objects(hubspot_type, model_name, app_label, False)  # noqa: FBT003
-    )
-
-
-@app.task(bind=True)
 def batch_upsert_hubspot_objects(  # pylint:disable=too-many-arguments  # noqa: PLR0913
     self,
     hubspot_type: str,

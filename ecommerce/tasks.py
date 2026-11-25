@@ -50,13 +50,6 @@ def send_order_refund_email(order_id):
 
 
 @app.task(acks_late=True)
-def process_pending_order_resolutions():
-    from ecommerce.api import check_and_process_pending_orders_for_resolution
-
-    check_and_process_pending_orders_for_resolution()
-
-
-@app.task(acks_late=True)
 def perform_check_for_duplicate_discount_redemptions():
     from ecommerce.api import (
         check_for_double_spent_sources,
