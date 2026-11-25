@@ -99,6 +99,34 @@ def test_calculate_tax_in_open_revision():
     assert calculate_tax(Decimal("100.00"), tax_rate).rate == Decimal(20)
 
 
+def test_calculate_tax_reactivated_in_open_revision():
+    """
+    A rate reactivated in an open revision can't be used.
+
+    Its newest version still records it as inactive, and that's the only field
+    that differs, so the version check has to compare is_active. (A rate
+    deactivated in an open revision is never reached: the active manager
+    doesn't return it.)
+    """
+
+    tax_rate = TaxRateFactory.create(country_code="IN", tax_rate=Decimal(18))
+    tax_rate.delete()
+    assert tax_rate.current_version.field_dict["is_active"] is False
+
+    with reversion.create_revision():
+        tax_rate.is_active = True
+        tax_rate.save()
+
+        with pytest.raises(TaxRateVersionError):
+            calculate_tax(Decimal("100.00"), tax_rate)
+
+        with pytest.raises(TaxRateVersionError):
+            calculate_tax_for_locale(Decimal("100.00"), "IN")
+
+    result = calculate_tax(Decimal("100.00"), tax_rate)
+    assert result.tax_rate_version.field_dict["is_active"] is True
+
+
 def test_calculate_tax_new_rate_in_open_revision():
     """A rate created in an open revision has no version yet, so it can't be used."""
 
