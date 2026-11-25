@@ -2423,6 +2423,8 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
 
     # Telling the learner a payment is going through beats a retryable error.
     if paid_order:
+        # It may have been fulfilled since it was read, e.g. during the check.
+        paid_order.refresh_from_db(fields=["state"])
         return {
             "payment_in_progress": True,
             "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,

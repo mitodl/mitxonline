@@ -3871,13 +3871,15 @@ def test_supersede_open_stripe_checkouts_fulfilled_before_lock(mocker, user, pro
         "ecommerce.api._cancel_if_no_stripe_session", side_effect=_lock_sees_fulfilled
     )
 
-    assert supersede_open_stripe_checkouts(new_order) == {
+    payload = supersede_open_stripe_checkouts(new_order)
+
+    assert payload == {
         **PAYMENT_IN_PROGRESS,
         "order": earlier_order,
         "order_id": earlier_order.id,
     }
-    earlier_order.refresh_from_db()
-    assert earlier_order.state == OrderStatus.FULFILLED
+    # The Learn redirect reports this state, so it has to be the current one.
+    assert payload["order"].state == OrderStatus.FULFILLED
 
 
 def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):
