@@ -4,7 +4,6 @@ from urllib.parse import urljoin, urlparse
 import requests
 from django.conf import settings
 
-from cms.models import Page
 from main.celery import app
 
 
@@ -44,32 +43,6 @@ def call_fastly_purge_api(relative_url):
     else:
         logger.info(f"Fastly returned: {resp.text}")  # noqa: G004
         return resp.json()
-
-
-@app.task
-def queue_fastly_purge_url(page_id):
-    """
-    Purges the given page_id from the Fastly cache.
-    """
-    logger = logging.getLogger("fastly_purge")
-
-    logger.info(f"Processing purge request for {page_id}")  # noqa: G004
-
-    page = Page.objects.get(pk=page_id)
-
-    logger.debug(f"Page URL is {page.get_url()}")  # noqa: G004
-
-    if page is None:
-        raise Exception(f"Page {page_id} not found.")  # noqa: EM102, TRY002
-
-    resp = call_fastly_purge_api(page.get_url())
-
-    if resp and resp["status"] == "ok":
-        logger.info("Purge request processed OK.")
-        return True
-
-    logger.error("Purge request failed.")
-    return False
 
 
 @app.task()
