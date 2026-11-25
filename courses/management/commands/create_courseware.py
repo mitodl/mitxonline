@@ -5,7 +5,7 @@ a course run).
 
 from datetime import timedelta
 from decimal import Decimal
-from typing import List, Union  # noqa: UP035
+from typing import Union  # noqa: UP035
 
 import reversion
 from django.core.management import BaseCommand
@@ -128,25 +128,6 @@ class Command(BaseCommand):
                 )
             )
             exit(-1)  # noqa: PLR1722
-
-    def _create_departments(self, departments: List[str]) -> models.QuerySet:  # noqa: UP006
-        """
-        Creates Department objects from a list of department names (strings).
-
-        Args:
-            departments (List[str]): List of department names.
-
-        Returns:
-            models.QuerySet: Query set containing all of the departments specified
-                in the list of department names.
-        """
-        add_depts = Department.objects.filter(name__in=departments).all()
-        for dept in departments:
-            found = len([db_dept for db_dept in add_depts if db_dept.name == dept]) > 0
-            if not found:
-                Department.objects.create(name=dept)
-
-        return Department.objects.filter(name__in=departments).all()
 
     def _get_or_create_departments(
         self,

@@ -3504,49 +3504,6 @@ class ProgramCollection(Page, ClusterableModel):
         """
         return self.collection_items.all().order_by("sort_order")
 
-    def add_program(self, program, order=None):
-        """
-        Add a program to this collection with optional order
-
-        Args:
-            program: Program instance to add
-            order: Optional order position. If None, adds at the end
-        """
-        if order is None:
-            last_item = self.collection_items.order_by("-sort_order").first()
-            order = (last_item.sort_order + 1) if last_item else 0
-
-        collection_item, created = ProgramCollectionItem.objects.get_or_create(
-            collection=self, program=program, defaults={"sort_order": order}
-        )
-
-        if not created:
-            collection_item.sort_order = order
-            collection_item.save()
-
-        return collection_item
-
-    def remove_program(self, program):
-        """
-        Remove a program from this collection
-
-        Args:
-            program: Program instance to remove
-        """
-        ProgramCollectionItem.objects.filter(collection=self, program=program).delete()
-
-    def reorder_programs(self, program_order_list):
-        """
-        Reorder programs in the collection
-
-        Args:
-            program_order_list: List of (program_id, order) tuples
-        """
-        for program_id, order in program_order_list:
-            ProgramCollectionItem.objects.filter(
-                collection=self, program_id=program_id
-            ).update(sort_order=order)
-
     class Meta:
         verbose_name = "Program Collection"
         verbose_name_plural = "Program Collections"

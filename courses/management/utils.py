@@ -40,18 +40,6 @@ def enrollment_summary(enrollment):
         return f"<CourseRunEnrollment: id={enrollment.id}, run={enrollment.run.text_id}, mode={enrollment.enrollment_mode}>"
 
 
-def enrollment_summaries(enrollments):
-    """
-    Returns a list of string representations of enrollments for command output
-
-    Args:
-        enrollments (iterable of ProgramEnrollment or CourseRunEnrollment): The enrollments
-    Returns:
-        list of str: A list of string representations of enrollments
-    """
-    return list(map(enrollment_summary, enrollments))
-
-
 def create_or_update_enrollment(model_cls, defaults=None, **kwargs):
     """Creates or updates an enrollment record"""
     defaults = {**(defaults or {}), "active": True, "change_status": None}
