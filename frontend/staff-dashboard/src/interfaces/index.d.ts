@@ -208,6 +208,7 @@ export interface IProvisionedOrganization {
     redirect_url: string | null;
     onboarding: IOrganizationOnboarding | null;
     identity_providers: IOrganizationIdentityProvider[];
+    contract_runs_exist: boolean;
 }
 
 export interface IProvisioningEvent {

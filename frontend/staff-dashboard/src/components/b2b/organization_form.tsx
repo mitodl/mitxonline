@@ -13,34 +13,43 @@ const ORG_KEY_RULE = {
 interface IOrganizationFormProps {
     formProps: FormProps;
     creating: boolean;
+    // True once a contract run's courseware ID carries the prefix.
+    prefixLocked?: boolean;
 }
 
-export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, creating }) => (
+const PREFIX_HELP =
+    "Prepended to the org key in courseware IDs. UAI_ runs are flagged as UAI in HubSpot. Leave blank for no prefix.";
+
+export const OrganizationForm: React.FC<IOrganizationFormProps> = ({ formProps, creating, prefixLocked = false }) => (
     <Form {...formProps} layout="vertical">
         <Form.Item label="Name" name="name" rules={[{ required: true }]}>
             <Input />
         </Form.Item>
         {/* org_key is only sent on create: the update endpoint rejects it. */}
         {creating && (
-            <>
-                <Form.Item
-                    label="Org key"
-                    name="org_key"
-                    rules={[{ required: true, max: 30 }, ORG_KEY_RULE]}
-                    extra="Part of every courseware ID for this organization, so it cannot change after the organization is created."
-                >
-                    <Input />
-                </Form.Item>
-                <Form.Item
-                    label="Org key prefix"
-                    name="org_key_prefix"
-                    rules={[{ max: 30 }, ORG_KEY_RULE]}
-                    extra="Prepended to the org key in courseware IDs. UAI_ runs are flagged as UAI in HubSpot. Leave blank for no prefix."
-                >
-                    <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear />
-                </Form.Item>
-            </>
+            <Form.Item
+                label="Org key"
+                name="org_key"
+                rules={[{ required: true, max: 30 }, ORG_KEY_RULE]}
+                extra="Part of every courseware ID for this organization, and the Keycloak organization's alias, so it cannot change after the organization is created."
+            >
+                <Input />
+            </Form.Item>
         )}
+        <Form.Item
+            label="Org key prefix"
+            name="org_key_prefix"
+            rules={[{ max: 30 }, ORG_KEY_RULE]}
+            extra={
+                prefixLocked
+                    ? "Course runs have already been created for this organization's contracts, and their IDs carry this prefix, so it can no longer change."
+                    : creating
+                      ? PREFIX_HELP
+                      : `${PREFIX_HELP} It can be corrected until course runs are created for the organization's contracts.`
+            }
+        >
+            <AutoComplete options={COMMON_ORG_KEY_PREFIXES} placeholder="No prefix" allowClear disabled={prefixLocked} />
+        </Form.Item>
         <Form.Item
             label="Email domains"
             name="domains"

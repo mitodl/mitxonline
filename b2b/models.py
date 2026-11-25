@@ -10,6 +10,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.db import models, transaction
+from django.db.models import Q, Value
+from django.db.models.functions import Concat
 from django.http import Http404
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -39,7 +41,7 @@ from b2b.constants import (
     PROVISIONING_ACTION_ORG_UPDATED,
 )
 from b2b.exceptions import SourceCourseIncompleteError
-from courses.models import Program
+from courses.models import CourseRun, Program
 from main.models import AuditModel, ValidateOnSaveMixin
 from main.utils import keycloak_realm_url
 from variants.models import SupportedVariant
@@ -307,6 +309,46 @@ class OrganizationPage(Page):
             data_after={"sso_organization_id": str(after) if after else None},
         )
 
+    @staticmethod
+    def contract_runs(organization, org_key_prefix, org_key):
+        """
+        Course runs that lock an organization's courseware ID prefix.
+
+        A run counts if it is linked to one of the organization's contracts, or
+        if its courseware ID starts with the prefix and key, which catches runs
+        unlinked from a contract after they were built. The arguments are
+        expressions so the same filter works for one organization and inside
+        an annotation (OuterRef).
+
+        Args:
+        - organization (int | Expression): the organization's primary key
+        - org_key_prefix (Expression): its courseware ID prefix
+        - org_key (Expression): its org key
+        Returns:
+        - QuerySet[CourseRun]: the runs, source runs included
+        """
+
+        id_start = Concat(
+            Value("course-v1:"),
+            org_key_prefix,
+            org_key,
+            Value("+"),
+            output_field=models.CharField(),
+        )
+        # all_objects: CourseRun.objects hides source runs, which can be
+        # attached to a contract as they are.
+        return CourseRun.all_objects.filter(
+            Q(b2b_contracts__organization=organization)
+            | Q(courseware_id__startswith=id_start)
+        )
+
+    def contract_runs_exist(self):
+        """Whether a course run locks this organization's courseware ID prefix."""
+
+        return self.contract_runs(
+            self.pk, Value(self.org_key_prefix), Value(self.org_key)
+        ).exists()
+
     def get_learners(self):
         """Get the learners associated with this organization."""
 
@@ -513,11 +555,9 @@ class ContractProgramItem(Orderable):
         if is_new and not skip_run_creation:
             from b2b.tasks import create_program_contract_runs  # noqa: PLC0415
 
-            create_program_contract_runs.delay(
-                self.contract.id,
-                self.program.id,
-                org_prefix=self.contract.organization.org_key_prefix,
-            )
+            # No org_prefix: the task reads the organization's prefix when it
+            # runs, so a prefix corrected while it is queued is the one used.
+            create_program_contract_runs.delay(self.contract.id, self.program.id)
             log.info(
                 "Queued contract run creation for program %s in contract %s",
                 self.program.id,

@@ -19,7 +19,7 @@ import logging
 import django_filters
 from authlib.integrations.base_client.errors import OAuthError
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
@@ -55,6 +55,7 @@ from b2b.exceptions import (
     ContractVariantError,
     IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
+    OrganizationKeyInUseError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
     OrphanedKeycloakOrganizationError,
@@ -147,6 +148,7 @@ class ProvisioningExceptionMixin:
             exc,
             AliasCollisionError
             | IdentityProviderPulumiManagedError
+            | OrganizationKeyInUseError
             | OrganizationNameCollisionError
             | OrganizationNotProvisionedError,
         ):
@@ -205,11 +207,23 @@ class OrganizationProvisioningViewSet(
     queryset = (
         OrganizationPage.objects.select_related("onboarding")
         .prefetch_related("identity_providers")
+        .annotate(
+            annotated_contract_runs_exist=Exists(
+                OrganizationPage.contract_runs(
+                    OuterRef("pk"), OuterRef("org_key_prefix"), OuterRef("org_key")
+                )
+            )
+        )
         .order_by("name")
     )
     pagination_class = RefinePagination
     filter_backends = [django_filters.rest_framework.DjangoFilterBackend]
     filterset_class = ProvisionedOrganizationFilterSet
+
+    def _reloaded(self, organization):
+        """Read an organization a provisioning call returned back through the queryset."""
+
+        return self.get_queryset().get(pk=organization.pk)
 
     def _with_keycloak(self, organization, connection=None):
         """
@@ -270,7 +284,9 @@ class OrganizationProvisioningViewSet(
         )
 
         return Response(
-            self.get_serializer(self._with_keycloak(organization, connection)).data,
+            self.get_serializer(
+                self._with_keycloak(self._reloaded(organization), connection)
+            ).data,
             status=status.HTTP_201_CREATED,
         )
 
@@ -289,6 +305,7 @@ class OrganizationProvisioningViewSet(
         responses={
             200: ProvisionedOrganizationSerializer,
             400: DetailSerializer,
+            409: DetailSerializer,
             502: DetailSerializer,
         },
     )
@@ -309,7 +326,9 @@ class OrganizationProvisioningViewSet(
         )
 
         return Response(
-            self.get_serializer(self._with_keycloak(organization, connection)).data
+            self.get_serializer(
+                self._with_keycloak(self._reloaded(organization), connection)
+            ).data
         )
 
     @extend_schema(
@@ -337,7 +356,7 @@ class OrganizationProvisioningViewSet(
             actor=request.user,
         )
 
-        return Response(self.get_serializer(organization).data)
+        return Response(self.get_serializer(self._reloaded(organization)).data)
 
     @extend_schema(request=None, responses={200: ProvisionedOrganizationSerializer})
     @logo.mapping.delete
@@ -348,7 +367,7 @@ class OrganizationProvisioningViewSet(
             self.get_object(), None, actor=request.user
         )
 
-        return Response(self.get_serializer(organization).data)
+        return Response(self.get_serializer(self._reloaded(organization)).data)
 
     @extend_schema(
         request=SetOnboardingStateSerializer,

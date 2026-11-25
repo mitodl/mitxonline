@@ -1025,6 +1025,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProvisioningDetail'
           description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisioningDetail'
+          description: ''
         '502':
           content:
             application/json:
@@ -8203,6 +8209,15 @@ components:
           items:
             type: string
             minLength: 1
+        org_key_prefix:
+          description: Courseware ID prefix. Changeable only until the organization
+            has a contract run; blank means no prefix.
+          oneOf:
+          - type: string
+            pattern: ^[A-Za-z0-9_.\-]+$
+            maxLength: 30
+          - type: string
+            maxLength: 0
     PatchedUserDiscountMetaRequest:
       type: object
       description: Serializes UserDiscount but only allows depth = 1
@@ -8610,7 +8625,12 @@ components:
           items:
             $ref: '#/components/schemas/OrganizationIdentityProvider'
           readOnly: true
+        contract_runs_exist:
+          type: boolean
+          description: Whether the organization has a contract run, which locks org_key_prefix.
+          readOnly: true
       required:
+      - contract_runs_exist
       - description
       - domains
       - id

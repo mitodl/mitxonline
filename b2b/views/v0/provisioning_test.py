@@ -23,7 +23,11 @@ from b2b.constants import (
     PROVISIONING_ACTION_ONBOARDING_CHANGED,
 )
 from b2b.exceptions import AliasCollisionError, OrganizationNameCollisionError
-from b2b.factories import OrganizationIndexPageFactory, OrganizationPageFactory
+from b2b.factories import (
+    ContractPageFactory,
+    OrganizationIndexPageFactory,
+    OrganizationPageFactory,
+)
 from b2b.keycloak_admin_dataclasses import (
     IdentityProviderMapperRepresentation,
     OrganizationDomainRepresentation,
@@ -36,6 +40,7 @@ from b2b.models import (
     OrganizationProvisioningAudit,
 )
 from b2b.provisioning import IDP_ATTRIBUTE_MAPPERS, set_onboarding_state
+from courses.factories import CourseRunFactory
 
 pytestmark = [pytest.mark.django_db]
 FAKE = faker.Faker()
@@ -262,6 +267,79 @@ def test_patch_rejects_an_org_key_change(admin_drf_client):
     organization.refresh_from_db()
     assert organization.org_key == "EXAMPLEU"
     assert organization.name != "Renamed"
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_patch_corrects_the_prefix_before_any_contract_run(admin_drf_client):
+    """org_key_prefix can change while nothing has been built from it."""
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", org_key_prefix="OLD_"
+    )
+
+    response = admin_drf_client.patch(
+        _organization_url(organization.org_key),
+        {"org_key_prefix": "NEW_"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["org_key_prefix"] == "NEW_"
+    assert response.json()["contract_runs_exist"] is False
+    organization.refresh_from_db()
+    assert organization.org_key_prefix == "NEW_"
+
+
+def test_patch_refuses_a_prefix_change_after_a_contract_run(admin_drf_client):
+    """The refusal says why, so the dashboard can show it."""
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", org_key_prefix="OLD_"
+    )
+    CourseRunFactory.create().b2b_contracts.add(
+        ContractPageFactory.create(organization=organization)
+    )
+
+    response = admin_drf_client.patch(
+        _organization_url(organization.org_key),
+        {"org_key_prefix": "NEW_"},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "course runs" in response.json()["detail"]
+    organization.refresh_from_db()
+    assert organization.org_key_prefix == "OLD_"
+
+
+@pytest.mark.parametrize(
+    ("run", "locked"),
+    [("linked", True), ("unlinked_with_prefix", True), (None, False)],
+)
+def test_organizations_report_whether_contract_runs_exist(
+    admin_drf_client, run, locked
+):
+    """
+    The list and the detail both say whether the prefix is locked.
+
+    A run unlinked from the contract still counts when its ID carries the
+    prefix, which the annotation builds from the row's own columns.
+    """
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", org_key_prefix="UAI_"
+    )
+    contract = ContractPageFactory.create(organization=organization)
+    if run == "linked":
+        CourseRunFactory.create().b2b_contracts.add(contract)
+    elif run == "unlinked_with_prefix":
+        CourseRunFactory.create(courseware_id="course-v1:UAI_EXAMPLEU+CS101+1T1C2026")
+
+    detail = admin_drf_client.get(_organization_url(organization.org_key)).json()
+    (listed,) = admin_drf_client.get(_organizations_url()).json()["results"]
+
+    assert detail["contract_runs_exist"] is locked
+    assert listed["contract_runs_exist"] is locked
 
 
 def test_patch_updates_the_mutable_fields(admin_drf_client, mocker):

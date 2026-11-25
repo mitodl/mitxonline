@@ -89,6 +89,16 @@ class OrganizationNotProvisionedError(Exception):
     """
 
 
+class OrganizationKeyInUseError(Exception):
+    """
+    Raised when an organization's courseware ID prefix changes after use.
+
+    create_contract_run_key builds every contract run's courseware ID from
+    org_key_prefix and org_key, and finds a course's last run by that ID's
+    prefix, so a changed prefix would split one org's runs across two keys.
+    """
+
+
 class ContractVariantError(Exception):
     """Raised when a change to a contract's variant sets is not allowed."""
 
