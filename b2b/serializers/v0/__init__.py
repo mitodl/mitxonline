@@ -227,6 +227,21 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
 
 
+class EnrollmentErrorSerializer(serializers.Serializer):
+    """
+    Body of a courses.exceptions.EnrollmentError, for the API docs.
+
+    reason_code and missing_fields are only there when the cause declares
+    them (e.g. CS_700 for a compliance decline, CS_701 for profile fields).
+    """
+
+    detail = serializers.CharField()
+    reason_code = serializers.CharField(required=False)
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
+
+
 class DataConsentSerializer(serializers.Serializer):
     """
     Records whether a user has consented to data sharing for a contract

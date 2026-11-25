@@ -534,7 +534,7 @@ def clear_basket(request):
 @extend_schema(
     description=("Returns the payload necessary to start the payment process."),
     methods=["GET"],
-    responses=CheckoutPayloadSerializer,
+    responses={200: CheckoutPayloadSerializer, 400: CheckoutPayloadSerializer},
 )
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

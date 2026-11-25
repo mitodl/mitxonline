@@ -259,7 +259,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateB2BEnrollment'
+                $ref: '#/components/schemas/CreateB2BEnrollmentError'
           description: ''
   /api/v0/b2b/manager/organizations/:
     get:
@@ -2306,6 +2306,12 @@ paths:
       - baskets
       responses:
         '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutPayload'
+          description: ''
+        '400':
           content:
             application/json:
               schema:
@@ -5388,6 +5394,10 @@ components:
       - order
       - price
       - result
+    CreateB2BEnrollmentError:
+      oneOf:
+      - $ref: '#/components/schemas/CreateB2BEnrollment'
+      - $ref: '#/components/schemas/EnrollmentError'
     CreateBasketWithProductIDRequest:
       type: object
       description: Defines the schema for a product ID and quantity in the CreateBasketWithProductsSerializer.
@@ -5872,6 +5882,24 @@ components:
       - clicked
       - failed
       - pending
+    EnrollmentError:
+      type: object
+      description: |-
+        Body of a courses.exceptions.EnrollmentError, for the API docs.
+
+        reason_code and missing_fields are only there when the cause declares
+        them (e.g. CS_700 for a compliance decline, CS_701 for profile fields).
+      properties:
+        detail:
+          type: string
+        reason_code:
+          type: string
+        missing_fields:
+          type: array
+          items:
+            type: string
+      required:
+      - detail
     ErrorEnum:
       enum:
       - enroll-blocked
