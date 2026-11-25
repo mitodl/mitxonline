@@ -16,7 +16,7 @@ from edx_api.client import EdxApi
 from edx_api.course_detail.models import CourseMode
 from edx_api.course_list import CourseList
 from edx_api.course_runs.exceptions import CourseRunAPIError
-from edx_api.course_runs.models import CourseRun, CourseRunList
+from edx_api.course_runs.models import CourseRun
 from mitol.common.utils import (
     find_object_with_matching_attr,
     get_error_response_summary,
@@ -1184,17 +1184,6 @@ def get_edx_api_lti_dup_email_client():
     return edx_client.lti_tools
 
 
-def get_edx_api_course_mode_client():
-    """
-    Gets an edx api client instance for use with the grades api
-
-    Returns:
-        CourseDetails: edx api course client instance
-    """
-    edx_client = get_edx_api_service_client()
-    return edx_client.course_mode
-
-
 def get_edx_api_course_list_client(*, use_jwt=True):
     """
     Gets an edx api client instance for use with the course list api
@@ -1768,25 +1757,6 @@ def get_edx_course(course_id: str, *, client: EdxApi | None = None) -> CourseRun
     return edx_client.course_runs.get_course_run(course_id)
 
 
-def get_edx_course_list(
-    page_url: str | None = None, *, client: EdxApi | None = None
-) -> CourseRunList:
-    """
-    Get the paginated list of course runs from edX.
-
-    Args:
-    - page_url (str): The page to retreive. This is part of the CourseRunList object.
-    Keyword Args:
-    - client (EdxApi): edX client (if you want to reuse one)
-    Returns:
-    - edx_api.course_runs.models.CourseRunList: paginated list of course runs
-    """
-
-    edx_client = client if client else get_edx_course_management_service_client()
-
-    return edx_client.course_runs.get_course_runs_list(page_url)
-
-
 def clone_edx_course(
     existing_course_id: str, new_course_id: str, *, client: EdxApi | None = None
 ) -> CourseRun | bool:
@@ -1811,53 +1781,6 @@ def clone_edx_course(
         return get_edx_course(new_course_id)
 
     return False
-
-
-def create_edx_course(  # noqa: PLR0913
-    org: str,
-    number: str,
-    run: str,
-    title: str,
-    pacing_type: str | None = None,
-    start: datetime | None = None,
-    end: datetime | None = None,
-    enrollment_start: datetime | None = None,
-    enrollment_end: datetime | None = None,
-    *,
-    client: EdxApi | None = None,
-) -> CourseRun:
-    """
-    Create a new, blank edX course run.
-
-    Args:
-    - org (str): Organization for the new course run.
-    - number (str): Course number for the new course run. (Without 'course-v1')
-    - run (str): The run id for the new course run.
-    - title (str): The title of the new course run.
-    - pacing_type (str, optional): The pacing type for the new course run. Defaults to None.
-    - start (datetime, optional): The start date for the new course run. Defaults to None.
-    - end (datetime, optional): The end date for the new course run. Defaults to None.
-    - enrollment_start (datetime, optional): The enrollment start date for the new course run. Defaults to None.
-    - enrollment_end (datetime, optional): The enrollment end date for the new course run. Defaults to None.
-    Keyword Args:
-    - client (EdxApi): edX client (if you want to reuse one)
-    Returns:
-    - edx_api.course_runs.models.CourseRun: the course run details
-    """
-
-    edx_client = client if client else get_edx_course_management_service_client()
-
-    return edx_client.course_runs.create_course_run(
-        org,
-        number,
-        run,
-        title,
-        pacing_type,
-        start,
-        end,
-        enrollment_start,
-        enrollment_end,
-    )
 
 
 def update_edx_course(  # noqa: PLR0913
@@ -2032,28 +1955,6 @@ def get_edx_course_modes(
     return edx_client.course_mode.get_course_modes(course_id=course_id)
 
 
-def get_edx_course_mode(
-    course_id: str, mode_slug: str, *, client: EdxApi | None = None
-) -> CourseMode:
-    """
-    Get the specified mode for a given course.
-
-    Args:
-    - course_id: the readable ID of the course to use as the base
-    - mode_slug: the slug of the mode you want to retrieve (audit, verified, etc)
-    Keyword Args:
-    - client (EdxApi): edX client (if you want to reuse one)
-    Returns:
-    - list(edx_api.course_detail.models.CourseMode): the modes configured for the course
-    """
-
-    edx_client = client if client else get_edx_api_service_client()
-
-    return edx_client.course_mode.get_course_mode(
-        course_id=course_id, mode_slug=mode_slug
-    )
-
-
 def create_edx_course_mode(  # noqa: PLR0913
     course_id: str,
     mode_slug: str,
@@ -2114,19 +2015,6 @@ def update_edx_course_mode(  # noqa: PLR0913
         currency=currency,
         expiration_datetime=str(expiration_datetime) if expiration_datetime else None,
         min_price=min_price,
-    )
-
-
-def delete_edx_course_mode(
-    course_id: str, mode_slug: str, *, client: EdxApi | None = None
-):
-    """Delete the specified course mode from the edX course."""
-
-    edx_client = client if client else get_edx_api_service_client()
-
-    return edx_client.course_mode.delete_course_mode(
-        course_id=course_id,
-        mode_slug=mode_slug,
     )
 
 
