@@ -113,15 +113,16 @@ def process_refund_request(refund_request_id):
     )
 
 
-# Retrying every 10 minutes for 150 tries outlasts the 24-hour session lifetime,
-# after which Stripe has expired the session itself.
+# Retries back off 1s, 2s, 4s ... 512s, then every 10 minutes: 160 of them take
+# about 25 hours, outlasting the 24-hour session lifetime, after which Stripe
+# has expired the session itself.
 @app.task(
     acks_late=True,
     autoretry_for=(stripe.APIConnectionError, stripe.APIError, stripe.RateLimitError),
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=False,
-    max_retries=150,
+    max_retries=160,
 )
 def expire_cancelled_stripe_checkout(order_id):
     """

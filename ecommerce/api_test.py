@@ -3896,6 +3896,50 @@ def test_generate_checkout_payload_supersedes_checkouts(
         mock_start_payment.assert_called_once()
 
 
+def test_generate_checkout_payload_cancelled_during_start_payment(
+    mocker, user, products
+):
+    """
+    An order staff cancel while Stripe opens its session has that session
+    expired once it's logged, and its payment page isn't handed out.
+    """
+
+    create_basket(user, products)
+    mocker.patch("ecommerce.api.supersede_open_stripe_checkouts", return_value=None)
+    mock_expire = mocker.patch("ecommerce.api.expire_cancelled_stripe_checkout.delay")
+
+    def _start_payment(*args, **kwargs):
+        Order.objects.filter(purchaser=user).update(state=OrderStatus.CANCELED)
+        return {
+            "payload": mocker.Mock(
+                to_dict=mocker.Mock(
+                    return_value={
+                        "object": STRIPE_OBJECT_CHECKOUT_SESSION,
+                        "id": "cs_new",
+                    }
+                )
+            )
+        }
+
+    mocker.patch(
+        "ecommerce.api.PaymentGateway.start_payment", side_effect=_start_payment
+    )
+
+    payload = generate_checkout_payload(
+        authed_request(user), gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+
+    order = Order.objects.get(purchaser=user)
+    assert payload == {
+        "checkout_unavailable": True,
+        "error": USER_MSG_TYPE_PAYMENT_ERROR,
+    }
+    assert order.transactions.filter(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
+    ).exists()
+    mock_expire.assert_called_once_with(order.id)
+
+
 def test_generate_checkout_payload_free_skips_supersede(mocker, user):
     """A free checkout opens no payment page, so it leaves open ones alone."""
 

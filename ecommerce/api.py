@@ -108,7 +108,10 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
-from ecommerce.tasks import perform_downgrade_from_order
+from ecommerce.tasks import (
+    expire_cancelled_stripe_checkout,
+    perform_downgrade_from_order,
+)
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
 from main import features
@@ -401,6 +404,16 @@ def generate_checkout_payload(  # noqa: PLR0913
             payload["payload"].to_dict(for_json=True),
             reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
         )
+
+        # Staff may have cancelled the order while Stripe was opening the
+        # session, when there was no session yet for the cancel to expire.
+        order.refresh_from_db(fields=["state"])
+        if order.state != OrderStatus.PENDING:
+            expire_cancelled_stripe_checkout.delay(order.id)
+            return {
+                "checkout_unavailable": True,
+                "error": USER_MSG_TYPE_PAYMENT_ERROR,
+            }
 
     return payload
 

@@ -2,6 +2,7 @@ import pytest
 import reversion
 import stripe
 from celery.exceptions import Retry
+from celery.utils.time import get_exponential_backoff_interval
 
 from ecommerce.factories import OrderFactory, ProductFactory
 from ecommerce.models import OrderStatus
@@ -166,4 +167,11 @@ def test_expire_cancelled_stripe_checkout_outlasts_session():
     """Retries keep going past the 24-hour session lifetime."""
     task = expire_cancelled_stripe_checkout
 
-    assert task.max_retries * task.retry_backoff_max >= 24 * 60 * 60
+    delays = [
+        get_exponential_backoff_interval(
+            factor=1, retries=retries, maximum=task.retry_backoff_max, full_jitter=False
+        )
+        for retries in range(task.max_retries)
+    ]
+
+    assert sum(delays) >= 24 * 60 * 60
