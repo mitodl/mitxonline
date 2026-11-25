@@ -3,7 +3,7 @@
 from io import StringIO
 
 import pytest
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 
 from courses.factories import (
     CourseRunCertificateFactory,
@@ -142,6 +142,31 @@ def test_dry_run_changes_nothing(signer, make_certificate, mock_certificate_page
     assert "Backfilled" not in output
 
 
+@pytest.mark.parametrize("ids", ["", ",", " ", " , "])
+def test_requires_ids_or_uuid(ids):
+    """Without a usable --ids or --uuid the command fails"""
+    with pytest.raises(CommandError, match="either --ids or --uuid"):
+        call_command(
+            "backfill_verifiable_credentials",
+            "--type",
+            "program",
+            "--ids",
+            ids,
+            "--execute",
+        )
+
+
+def test_ids_without_type_fails():
+    """--ids without --type would select nothing, so the command fails instead"""
+    with pytest.raises(CommandError, match="--type"):
+        call_command(
+            "backfill_verifiable_credentials",
+            "--ids",
+            "some-program",
+            "--execute",
+        )
+
+
 @pytest.fixture
 def program_selection():
     """Certificates for the program being backfilled, plus ones that must be left alone"""
@@ -226,3 +251,15 @@ def test_program_ids_with_no_matching_program_processes_nothing(
     for certificate in program_selection["targets"] + program_selection["others"]:
         certificate.refresh_from_db()
         assert certificate.verifiable_credential is None
+
+
+def test_program_ids_ignore_spaces_around_ids(signer, program_selection):
+    """Spaces after the commas do not stop a later id from matching"""
+    other_program = ProgramFactory.create()
+    other_certificate = ProgramCertificateFactory.create(program=other_program)
+    ids = f"{program_selection['program'].readable_id}, {other_program.readable_id}"
+
+    output = _run_by_program(ids)
+
+    for certificate in [*program_selection["targets"], other_certificate]:
+        assert f"DRY RUN -- Would backfill certificate {certificate}" in output
