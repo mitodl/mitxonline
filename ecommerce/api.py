@@ -73,7 +73,6 @@ from ecommerce.constants import (
     STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
     STRIPE_REFUND_STATUS_SUCCEEDED,
-    STRIPE_SESSION_OPENING_GRACE_SECONDS,
     STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
     TRANSACTION_TYPE_PAYMENT,
     ZERO_PAYMENT_DATA,
@@ -400,16 +399,19 @@ def generate_checkout_payload(  # noqa: PLR0913
         # We will have gotten a CheckoutSession object from start_payment above.
         # This needs to be logged as a transaction, or we won't be able to find
         # this again in Stripe if something goes wrong after this step.
-        order_flow = order.get_object_flow()
-        order_flow.create_transaction(
-            payload["payload"].to_dict(for_json=True),
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
-        )
+        # The order is locked for this, as superseding locks it to decide the
+        # order has no session yet. Staff, or a newer checkout, may have
+        # cancelled the order while Stripe was opening the session; there was
+        # no session to expire then, so it's expired here.
+        with transaction.atomic():
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            locked_order.get_object_flow().create_transaction(
+                payload["payload"].to_dict(for_json=True),
+                reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+            )
+            still_pending = locked_order.state == OrderStatus.PENDING
 
-        # Staff may have cancelled the order while Stripe was opening the
-        # session, when there was no session yet for the cancel to expire.
-        order.refresh_from_db(fields=["state"])
-        if order.state != OrderStatus.PENDING:
+        if not still_pending:
             expire_cancelled_stripe_checkout.delay(order.id)
             return {
                 "checkout_unavailable": True,
@@ -2274,6 +2276,42 @@ def expire_stripe_checkout_session(order) -> bool:
     return True
 
 
+def _cancel_if_no_stripe_session(order) -> bool:
+    """
+    Cancel a pending Stripe order that has no CheckoutSession logged yet.
+
+    Another checkout may still be opening the session. The order is locked
+    the same way that checkout logs the session, so either the session is
+    logged first and is returned for expiring, or the order is cancelled first
+    and that checkout refuses the page.
+
+    Returns:
+    - bool: True if the order has no session to expire (it's now cancelled,
+      or is no longer pending), False if it has one
+    """
+
+    with transaction.atomic():
+        locked_order = (
+            Order.objects.select_for_update()
+            .filter(pk=order.pk, state=OrderStatus.PENDING)
+            .first()
+        )
+
+        if not locked_order:
+            return True
+
+        if get_stripe_checkout_session_id(locked_order):
+            return False
+
+        locked_order.get_object_flow().cancel()
+
+    log.info(
+        "Cancelled order %s, superseded before its CheckoutSession was logged",
+        order.reference_number,
+    )
+    return True
+
+
 def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
     """
     Expire the CheckoutSessions of the purchaser's earlier Stripe orders.
@@ -2297,6 +2335,9 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
             purchaser=order.purchaser,
             state=OrderStatus.PENDING,
             gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+            # A free order never opens a payment page, and is only pending
+            # while it's being fulfilled.
+            total_price_paid__gt=0,
         )
         .exclude(pk=order.pk)
         .prefetch_related("lines")
@@ -2338,14 +2379,7 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
     unavailable = False
 
     for earlier_order in earlier_orders:
-        if not get_stripe_checkout_session_id(earlier_order):
-            # Another checkout may still be opening this order's session. Once
-            # it logs the session it sees the order cancelled and refuses the
-            # page; the delayed expiry catches a session logged just after.
-            earlier_order.get_object_flow().cancel()
-            expire_cancelled_stripe_checkout.apply_async(
-                (earlier_order.id,), countdown=STRIPE_SESSION_OPENING_GRACE_SECONDS
-            )
+        if _cancel_if_no_stripe_session(earlier_order):
             continue
 
         try:
