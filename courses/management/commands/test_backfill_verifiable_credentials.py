@@ -26,19 +26,16 @@ def signer(mocker):
     )
 
 
-def _run(certificate, *extra_args):
+def _call(*args):
     """Run the command and return everything it wrote to stdout and stderr"""
     out = StringIO()
-    call_command(
-        "backfill_verifiable_credentials",
-        "--uuid",
-        str(certificate.uuid),
-        "--execute",
-        *extra_args,
-        stdout=out,
-        stderr=out,
-    )
+    call_command("backfill_verifiable_credentials", *args, stdout=out, stderr=out)
     return out.getvalue()
+
+
+def _run(certificate, *extra_args):
+    """Execute the command for one certificate, selected by uuid"""
+    return _call("--uuid", str(certificate.uuid), "--execute", *extra_args)
 
 
 def test_creates_missing_credential(signer, make_certificate, mock_certificate_page):
@@ -135,28 +132,19 @@ def test_dry_run_changes_nothing(signer, make_certificate, mock_certificate_page
     """Without --execute the command only lists what it would process"""
     mock_certificate_page()
     certificate = make_certificate()
-    out = StringIO()
 
-    call_command(
-        "backfill_verifiable_credentials",
-        "--uuid",
-        str(certificate.uuid),
-        "--force",
-        stdout=out,
-        stderr=out,
-    )
+    output = _call("--uuid", str(certificate.uuid), "--force")
 
     signer.assert_not_called()
     certificate.refresh_from_db()
     assert certificate.verifiable_credential.credential_data["old"] is True
-    assert "DRY RUN" in out.getvalue()
-    assert "Backfilled" not in out.getvalue()
+    assert "DRY RUN" in output
+    assert "Backfilled" not in output
 
 
 @pytest.fixture
-def program_selection(mock_certificate_page):
+def program_selection():
     """Certificates for the program being backfilled, plus ones that must be left alone"""
-    mock_certificate_page()
     program = ProgramFactory.create()
     return {
         "program": program,
@@ -168,26 +156,18 @@ def program_selection(mock_certificate_page):
     }
 
 
-def _run_by_program(readable_id, *extra_args):
-    out = StringIO()
-    call_command(
-        "backfill_verifiable_credentials",
-        "--type",
-        "program",
-        "--ids",
-        readable_id,
-        *extra_args,
-        stdout=out,
-        stderr=out,
-    )
-    return out.getvalue()
+def _run_by_program(*readable_ids, execute=False):
+    args = ["--type", "program", "--ids", ",".join(readable_ids)]
+    return _call(*args, "--execute") if execute else _call(*args)
 
 
 def test_program_ids_backfills_only_that_programs_certificates(
-    signer, program_selection
+    signer, mock_certificate_page, program_selection
 ):
     """--type program --ids processes every certificate of the named program and no others"""
-    _run_by_program(program_selection["program"].readable_id, "--execute")
+    mock_certificate_page()
+
+    _run_by_program(program_selection["program"].readable_id, execute=True)
 
     for certificate in program_selection["targets"]:
         certificate.refresh_from_db()
@@ -198,8 +178,31 @@ def test_program_ids_backfills_only_that_programs_certificates(
     assert signer.call_count == len(program_selection["targets"])
 
 
-def test_program_ids_dry_run_changes_nothing(signer, program_selection):
-    """Without --execute the program selection is only listed"""
+def test_program_ids_accepts_several_programs(
+    signer, mock_certificate_page, program_selection
+):
+    """A comma-separated --ids list selects the certificates of every program in it"""
+    mock_certificate_page()
+    other_program_certificate, course_run_certificate = program_selection["others"]
+
+    _run_by_program(
+        program_selection["program"].readable_id,
+        other_program_certificate.program.readable_id,
+        execute=True,
+    )
+
+    for certificate in [*program_selection["targets"], other_program_certificate]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential.credential_data["proof"]
+    course_run_certificate.refresh_from_db()
+    assert course_run_certificate.verifiable_credential is None
+    assert signer.call_count == len(program_selection["targets"]) + 1
+
+
+def test_program_ids_dry_run_lists_but_does_not_change_certificates(
+    signer, program_selection
+):
+    """Without --execute the named program's certificates are listed, not changed, and no others are listed"""
     output = _run_by_program(program_selection["program"].readable_id)
 
     signer.assert_not_called()
@@ -207,6 +210,8 @@ def test_program_ids_dry_run_changes_nothing(signer, program_selection):
         certificate.refresh_from_db()
         assert certificate.verifiable_credential is None
         assert f"DRY RUN -- Would backfill certificate {certificate}" in output
+    for certificate in program_selection["others"]:
+        assert str(certificate) not in output
     assert "Backfilled" not in output
 
 
@@ -214,11 +219,10 @@ def test_program_ids_with_no_matching_program_processes_nothing(
     signer, program_selection
 ):
     """An unknown program readable id selects no certificates"""
-    output = _run_by_program("program-v1:does+not+exist", "--execute")
+    output = _run_by_program("program-v1:does+not+exist", execute=True)
 
     signer.assert_not_called()
-    assert "Backfilled" not in output
-    assert "DRY RUN" not in output
+    assert output == ""
     for certificate in program_selection["targets"] + program_selection["others"]:
         certificate.refresh_from_db()
         assert certificate.verifiable_credential is None
