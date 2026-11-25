@@ -900,6 +900,18 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
             user = form.cleaned_data["user"]
             mode = EDX_ENROLLMENT_AUDIT_MODE
             for run in form.cleaned_data["runs"]:
+                if CourseRunEnrollment.objects.filter(user=user, run=run).exclude(
+                    enrollment_mode=mode
+                ).exists() and PaidCourseRun.fulfilled_paid_course_run_exists(
+                    user, run
+                ):
+                    self.message_user(
+                        request,
+                        f"Skipped {run.courseware_id} for {user.email}: "
+                        f"{PAID_RUN_AUDIT_BLOCKED_MESSAGE}",
+                        messages.ERROR,
+                    )
+                    continue
                 try:
                     enrollments, edx_success = create_run_enrollments(
                         user, [run], mode=mode, skip_compliance_check=True

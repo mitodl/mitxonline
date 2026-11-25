@@ -635,3 +635,23 @@ def test_downgrade_enrollment_action_skips_paid_runs(mocker, admin_client):
         f"IDs {paid.id}" in t and PAID_RUN_AUDIT_BLOCKED_MESSAGE in t
         for t in message_texts
     )
+
+
+def test_enroll_in_runs_skips_paid_verified_enrollment(mocker, admin_client):
+    """Enroll in runs doesn't move a paid verified enrollment to audit"""
+    enrollment = _paid_enrollment()
+    enrollment.run.courseware_id = "course-v1:MITx+P+0T2026"
+    enrollment.run.save()
+    mock_enroll = mocker.patch(
+        "courses.admin.create_run_enrollments", return_value=([mocker.Mock()], True)
+    )
+
+    response = admin_client.post(
+        reverse(ENROLL_IN_RUNS_URL),
+        {"user": str(enrollment.user.id), "runs": [enrollment.run.id]},
+        follow=True,
+    )
+
+    mock_enroll.assert_not_called()
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any(PAID_RUN_AUDIT_BLOCKED_MESSAGE in t for t in message_texts)

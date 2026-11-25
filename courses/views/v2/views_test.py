@@ -2103,14 +2103,14 @@ def test_add_verified_program_course_enrollment(
 
 
 @pytest.mark.skip_nplusone_check
-@pytest.mark.parametrize("enrollment_change", ["set_to_audit", "deleted"])
+@pytest.mark.parametrize("enrollment_change", ["set_to_audit", "deleted", "deferred"])
 def test_add_verified_program_course_enrollment_restores_paid_run(
     user, user_drf_client, enrollment_change
 ):
     """
     If the learner already paid for the run but no longer has a verified
     enrollment in it, upgrading restores the verified enrollment instead of
-    failing checkout as a duplicate purchase.
+    failing checkout as a duplicate purchase, unless it was deferred.
     """
     responses.add(
         responses.GET,
@@ -2141,17 +2141,59 @@ def test_add_verified_program_course_enrollment_restores_paid_run(
         == status.HTTP_201_CREATED
     )
     enrollments = CourseRunEnrollment.all_objects.filter(user=user, run=course_run)
-    if enrollment_change == "set_to_audit":
-        enrollments.update(enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE)
-    else:
+    if enrollment_change == "deleted":
         enrollments.delete()
+    else:
+        enrollments.update(
+            enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+            change_status="deferred" if enrollment_change == "deferred" else None,
+        )
     order_count = user.orders.count()
 
     resp = user_drf_client.post(url, data=[program.readable_id])
 
-    assert resp.status_code == status.HTTP_201_CREATED
-    assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
     assert user.orders.count() == order_count
+    if enrollment_change == "deferred":
+        # A deferral keeps the payment for a later run, so it isn't restored.
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+        assert enrollments.get().change_status == "deferred"
+    else:
+        assert resp.status_code == status.HTTP_201_CREATED
+        assert resp.json()["enrollment_mode"] == EDX_ENROLLMENT_VERIFIED_MODE
+
+
+@pytest.mark.skip_nplusone_check
+def test_add_verified_program_course_enrollment_keeps_verified_run(
+    mocker, user, user_drf_client
+):
+    """
+    A request that would give the learner an audit enrollment (here, through an
+    audit program enrollment) doesn't downgrade a verified seat they already hold.
+    """
+    mock_enroll = mocker.patch("courses.views.v2.create_run_enrollments")
+    program = ProgramEnrollmentFactory.create(
+        user=user, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
+    ).program
+    course_run = CourseRunFactory.create()
+    program.add_requirement(course_run.course)
+    CourseRunEnrollmentFactory.create(
+        user=user, run=course_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+
+    resp = user_drf_client.post(
+        reverse(
+            "v2:add_verified_program_course_enrollment",
+            kwargs={"courserun_id": course_run.courseware_id},
+        ),
+        data=[program.readable_id],
+    )
+
+    assert resp.status_code == status.HTTP_204_NO_CONTENT
+    mock_enroll.assert_not_called()
+    assert (
+        CourseRunEnrollment.objects.get(user=user, run=course_run).enrollment_mode
+        == EDX_ENROLLMENT_VERIFIED_MODE
+    )
 
 
 @pytest.mark.skip_nplusone_check

@@ -1004,6 +1004,54 @@ def test_checkout_product_paid_run_restore_blocked_uses_cart(mocker, user, user_
 
 
 @pytest.mark.dont_mock_enrollments
+@pytest.mark.skip_nplusone_check
+@pytest.mark.parametrize(
+    ("change_status", "active", "restored"),
+    [(None, True, True), ("deferred", True, False), ("unenrolled", False, False)],
+)
+def test_checkout_restores_paid_run_set_to_audit(
+    user, user_client, change_status, active, restored
+):
+    """
+    Checking out a run the learner already paid for, whose enrollment was set
+    to audit, restores the verified enrollment and empties the basket, unless
+    the enrollment is deferred or inactive.
+    """
+    course_run = CourseRunFactory.create()
+    with reversion.create_revision():
+        product = ProductFactory.create(purchasable_object=course_run)
+    PaidCourseRun.objects.create(
+        user=user,
+        course_run=course_run,
+        order=OrderFactory.create(purchaser=user, state=OrderStatus.FULFILLED),
+    )
+    CourseRunEnrollment.all_objects.create(
+        user=user,
+        run=course_run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        change_status=change_status,
+        active=active,
+    )
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    order_count = Order.objects.filter(purchaser=user).count()
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    enrollment = CourseRunEnrollment.all_objects.get(user=user, run=course_run)
+    assert Order.objects.filter(purchaser=user).count() == order_count
+    if restored:
+        assert resp.status_code == 302
+        assert resp.url == reverse("user-dashboard")
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+        assert not BasketItem.objects.filter(basket=basket).exists()
+    else:
+        assert reverse("cart") in resp.url
+        assert enrollment.enrollment_mode == EDX_ENROLLMENT_AUDIT_MODE
+        assert enrollment.change_status == change_status
+
+
+@pytest.mark.dont_mock_enrollments
 def test_checkout_product_with_unpaid_verified_program_enrollment_uses_cart(
     user, user_client
 ):
