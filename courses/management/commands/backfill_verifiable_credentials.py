@@ -1,6 +1,6 @@
 import time
 
-from django.core.management import BaseCommand
+from django.core.management import BaseCommand, CommandError
 
 from courses.api import create_verifiable_credential
 from courses.models import CourseRun, CourseRunCertificate, Program, ProgramCertificate
@@ -91,21 +91,26 @@ class Command(BaseCommand):
             return
         self.stdout.write(self.style.SUCCESS(f"Backfilled certificate {certificate}"))
 
+    def validate_selection(self, ids, certificate_uuid, courseware_type):
+        """Fail if the options do not select anything to backfill"""
+        if certificate_uuid:
+            return
+        if not ids:
+            msg = "You must provide either --ids or --uuid to backfill certificates."
+            raise CommandError(msg)
+        if not courseware_type:
+            msg = "You must provide --type (program or course) with --ids."
+            raise CommandError(msg)
+
     def handle(self, *args, **options):  # noqa: ARG002
         # These are either the readable IDs of a program or the IDs of course runs to process
-        ids = [i for i in options["ids"].split(",") if i]
+        ids = [i.strip() for i in options["ids"].split(",") if i.strip()]
         force = options["force"]
         sleep = options["sleep"]
         execute = options["execute"]
         certificate_uuid = options["uuid"]
         courseware_type = options["type"]
-        if not ids and not certificate_uuid:
-            self.stderr.write(
-                self.style.ERROR(
-                    "You must provide either --ids or --uuid to backfill certificates."
-                )
-            )
-            return
+        self.validate_selection(ids, certificate_uuid, courseware_type)
 
         certificates = []
         if certificate_uuid:
