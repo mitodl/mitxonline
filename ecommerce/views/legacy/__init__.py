@@ -40,6 +40,8 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from compliance.exceptions import ExportComplianceError
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
@@ -1137,6 +1139,10 @@ class CheckoutProductView(RedirectView):
             VerifiedProgramNoProductError,
             VerifiedProgramInvalidBasketError,
             VerifiedProgramInvalidOrderError,
+            # Restoring a run the learner already paid for enrolls directly, so
+            # a block surfaces as these rather than as a checkout result.
+            CountryBlockedError,
+            ExportComplianceError,
         ):
             log.exception(
                 "Failed to create verified program course enrollment for user id %s, run %s",
