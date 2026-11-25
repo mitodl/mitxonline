@@ -320,6 +320,9 @@ def generate_checkout_payload(  # noqa: PLR0913
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
+    # Anything fulfilled from here on got past the preflight duplicate checks.
+    checkout_started_on = now_in_utc()
+
     preflight_error = _run_checkout_preflight(
         request,
         basket,
@@ -375,7 +378,9 @@ def generate_checkout_payload(  # noqa: PLR0913
 
     # A free order (fulfilled above) opens no payment page, so it leaves the
     # learner's open ones alone.
-    if supersede_error := supersede_open_stripe_checkouts(order):
+    if supersede_error := supersede_open_stripe_checkouts(
+        order, since=checkout_started_on
+    ):
         order.get_object_flow().cancel()
         return supersede_error
 
@@ -2255,7 +2260,7 @@ def expire_stripe_checkout_session(order) -> bool:
     return True
 
 
-def supersede_open_stripe_checkouts(order) -> dict | None:
+def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
     """
     Expire the CheckoutSessions of the purchaser's earlier Stripe orders.
 
@@ -2264,6 +2269,9 @@ def supersede_open_stripe_checkouts(order) -> dict | None:
 
     Args:
     - order (Order): the new order, which is left alone
+    - since (datetime): when this checkout started. An order fulfilled since
+      then (e.g. by a webhook racing this checkout) for something in this one
+      refuses checkout, as the checkout's duplicate checks ran before it.
     Returns:
     - None if the learner can check out, otherwise the error payload: either
       an earlier order for something in this one has been paid (or is being
@@ -2281,14 +2289,38 @@ def supersede_open_stripe_checkouts(order) -> dict | None:
         .order_by("created_on")
     )
 
-    if not earlier_orders:
+    recently_fulfilled_orders = (
+        Order.objects.filter(
+            purchaser=order.purchaser,
+            state=OrderStatus.FULFILLED,
+            updated_on__gte=since,
+        ).prefetch_related("lines")
+        if since
+        else Order.objects.none()
+    )
+
+    if not earlier_orders and not recently_fulfilled_orders:
         return None
 
     products = {
         (line.purchased_content_type_id, line.purchased_object_id)
         for line in order.lines.all()
     }
-    paid_order = None
+
+    def _overlaps(other_order):
+        return any(
+            (line.purchased_content_type_id, line.purchased_object_id) in products
+            for line in other_order.lines.all()
+        )
+
+    paid_order = next(
+        (
+            fulfilled_order
+            for fulfilled_order in recently_fulfilled_orders
+            if _overlaps(fulfilled_order)
+        ),
+        None,
+    )
     unavailable = False
 
     for earlier_order in earlier_orders:
@@ -2302,14 +2334,7 @@ def supersede_open_stripe_checkouts(order) -> dict | None:
             unavailable = True
             continue
 
-        if (
-            not expired
-            and not paid_order
-            and any(
-                (line.purchased_content_type_id, line.purchased_object_id) in products
-                for line in earlier_order.lines.all()
-            )
-        ):
+        if not expired and not paid_order and _overlaps(earlier_order):
             log.info(
                 "Not checking out user %s again: order %s is already being paid",
                 order.purchaser_id,
@@ -2323,6 +2348,7 @@ def supersede_open_stripe_checkouts(order) -> dict | None:
             "payment_in_progress": True,
             "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
             "order": paid_order,
+            "order_id": paid_order.id,
         }
 
     if unavailable:

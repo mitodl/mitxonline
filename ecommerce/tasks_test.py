@@ -115,15 +115,20 @@ def test_delayed_downgrade_user(mocker, user):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("state", [OrderStatus.PENDING, OrderStatus.CANCELED])
+@pytest.mark.parametrize(
+    "state", [OrderStatus.PENDING, OrderStatus.CANCELED, OrderStatus.FULFILLED]
+)
 def test_expire_cancelled_stripe_checkout(mocker, state):
-    """The task expires the session of an order that's still pending."""
+    """
+    The task expires the session of an order that's pending, or that staff
+    cancelled, but leaves a paid one alone.
+    """
     mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
     order = OrderFactory.create(state=state)
 
     expire_cancelled_stripe_checkout(order.id)
 
-    if state == OrderStatus.PENDING:
+    if state != OrderStatus.FULFILLED:
         mock_expire.assert_called_once_with(order)
     else:
         mock_expire.assert_not_called()
@@ -142,3 +147,23 @@ def test_expire_cancelled_stripe_checkout_retries(mocker):
         expire_cancelled_stripe_checkout.apply(args=[order.id])
 
     mock_expire.assert_called_once_with(order)
+
+
+@pytest.mark.django_db
+def test_expire_cancelled_stripe_checkout_no_retry_on_bad_request(mocker):
+    """A Stripe error that won't go away on retry isn't retried."""
+    mocker.patch(
+        "ecommerce.api.expire_stripe_checkout_session",
+        side_effect=stripe.AuthenticationError("bad key"),
+    )
+    order = OrderFactory.create(state=OrderStatus.PENDING)
+
+    with pytest.raises(stripe.AuthenticationError):
+        expire_cancelled_stripe_checkout.apply(args=[order.id])
+
+
+def test_expire_cancelled_stripe_checkout_outlasts_session():
+    """Retries keep going past the 24-hour session lifetime."""
+    task = expire_cancelled_stripe_checkout
+
+    assert task.max_retries * task.retry_backoff_max >= 24 * 60 * 60

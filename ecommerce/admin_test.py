@@ -6,6 +6,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.test import RequestFactory
 from django.urls import NoReverseMatch, reverse
+from mitol.payment_gateway.constants import (
+    MITOL_PAYMENT_GATEWAY_CYBERSOURCE,
+    MITOL_PAYMENT_GATEWAY_STRIPE,
+)
 from reversion.models import Version
 
 from courses.factories import CourseRunFactory
@@ -280,6 +284,58 @@ def test_transition_view_ignores_posted_state(client, admin_user):
     assert response.status_code == 302
     order.refresh_from_db()
     assert order.state == OrderStatus.CANCELED
+
+
+@pytest.mark.parametrize(
+    ("gateway_type", "expect_expire"),
+    [(MITOL_PAYMENT_GATEWAY_STRIPE, True), (MITOL_PAYMENT_GATEWAY_CYBERSOURCE, False)],
+)
+def test_pending_order_admin_cancel_expires_stripe_checkout(  # noqa: PLR0913
+    mocker,
+    client,
+    admin_user,
+    django_capture_on_commit_callbacks,
+    gateway_type,
+    expect_expire,
+):
+    """Staff cancelling a Stripe order also expires its payment page."""
+
+    mock_expire = mocker.patch("ecommerce.admin.expire_cancelled_stripe_checkout.delay")
+    _login_admin(client, admin_user)
+    order = OrderFactory.create(state=OrderStatus.PENDING, gateway_type=gateway_type)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        response = client.post(
+            reverse(
+                "admin:ecommerce_pendingorder_transition", args=(order.id, "cancel")
+            ),
+            # An empty POST doesn't bind the confirmation form.
+            data={"confirm": "1"},
+        )
+
+    assert response.status_code == 302
+    order.refresh_from_db()
+    assert order.state == OrderStatus.CANCELED
+    if expect_expire:
+        mock_expire.assert_called_once_with(order.id)
+    else:
+        mock_expire.assert_not_called()
+
+
+def test_pending_order_admin_other_transition_skips_expire(mocker, client, admin_user):
+    """Only cancelling queues expiring the payment page."""
+
+    mock_expire = mocker.patch("ecommerce.admin.expire_cancelled_stripe_checkout.delay")
+    _login_admin(client, admin_user)
+    order = OrderFactory.create(
+        state=OrderStatus.PENDING, gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE
+    )
+
+    client.get(
+        reverse("admin:ecommerce_pendingorder_transition", args=(order.id, "cancel"))
+    )
+
+    mock_expire.assert_not_called()
 
 
 def test_admin_product_create_generates_reversion(client, admin_user):

@@ -107,7 +107,6 @@ from ecommerce.constants import (
     STRIPE_OVERALL_CHECKOUT_STATUS_PAID,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING,
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
-    STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
     STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
     STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION,
     STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE,
@@ -2952,7 +2951,8 @@ class MockedCheckoutSessionClient:
         (
             STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
             STRIPE_PAYMENT_STATUS_UNPAID,
-            STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
+            # Stripe's own spelling, so the constant can't drift from it
+            "canceled",
             "",
             STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED,
         ),
@@ -3737,7 +3737,9 @@ def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
     )
 
     assert supersede_open_stripe_checkouts(new_order) == (
-        {**PAYMENT_IN_PROGRESS, "order": order} if refused else None
+        {**PAYMENT_IN_PROGRESS, "order": order, "order_id": order.id}
+        if refused
+        else None
     )
     mock_expire.assert_called_once_with(order)
 
@@ -3810,11 +3812,46 @@ def test_supersede_open_stripe_checkouts_paid_beats_stripe_error(
     assert supersede_open_stripe_checkouts(new_order) == {
         **PAYMENT_IN_PROGRESS,
         "order": paid_order,
+        "order_id": paid_order.id,
     }
     assert mock_expire.call_args_list == [
         mocker.call(paid_order),
         mocker.call(erroring_order),
     ]
+
+
+@pytest.mark.parametrize(
+    ("fulfilled_after_start", "same_product", "refused"),
+    [(True, True, True), (True, False, False), (False, True, False)],
+)
+def test_supersede_open_stripe_checkouts_fulfilled_since_start(
+    user, products, fulfilled_after_start, same_product, refused
+):
+    """
+    An order for the same thing fulfilled after this checkout started (e.g. by
+    a webhook racing it) refuses checkout; one fulfilled before it was already
+    covered by the checkout's duplicate checks.
+    """
+
+    new_order = _create_stripe_order(user, products[0])
+    fulfilled_order = _create_stripe_order(
+        user, products[0] if same_product else products[1]
+    )
+    Order.objects.filter(pk=fulfilled_order.pk).update(
+        state=OrderStatus.FULFILLED,
+        updated_on=now_in_utc()
+        + timedelta(seconds=1 if fulfilled_after_start else -60),
+    )
+
+    assert supersede_open_stripe_checkouts(new_order, since=now_in_utc()) == (
+        {
+            **PAYMENT_IN_PROGRESS,
+            "order": fulfilled_order,
+            "order_id": fulfilled_order.id,
+        }
+        if refused
+        else None
+    )
 
 
 @pytest.mark.parametrize("supersede_error", [None, PAYMENT_IN_PROGRESS])
@@ -3849,7 +3886,7 @@ def test_generate_checkout_payload_supersedes_checkouts(
     )
 
     order = Order.objects.get(purchaser=user)
-    mock_supersede.assert_called_once_with(order)
+    mock_supersede.assert_called_once_with(order, since=mocker.ANY)
     if supersede_error:
         assert payload == supersede_error
         assert order.state == OrderStatus.CANCELED

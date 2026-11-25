@@ -113,16 +113,22 @@ def process_refund_request(refund_request_id):
     )
 
 
+# Retrying every 10 minutes for 150 tries outlasts the 24-hour session lifetime,
+# after which Stripe has expired the session itself.
 @app.task(
     acks_late=True,
-    autoretry_for=(stripe.StripeError,),
+    autoretry_for=(stripe.APIConnectionError, stripe.APIError, stripe.RateLimitError),
     retry_backoff=True,
-    max_retries=3,
+    retry_backoff_max=600,
+    retry_jitter=False,
+    max_retries=150,
 )
 def expire_cancelled_stripe_checkout(order_id):
     """
-    Expire the CheckoutSession of a Stripe order the learner cancelled, so the
-    payment page can't still be used (e.g. from another tab).
+    Expire the CheckoutSession of a Stripe order the learner or staff
+    cancelled, so the payment page can't still be used (e.g. from another tab).
+
+    Transient Stripe errors are retried until the session is closed.
 
     Args:
        order_id (int): Id of the order
@@ -130,7 +136,9 @@ def expire_cancelled_stripe_checkout(order_id):
     from ecommerce.api import expire_stripe_checkout_session
     from ecommerce.models import Order, OrderStatus
 
-    order = Order.objects.filter(pk=order_id, state=OrderStatus.PENDING).first()
+    order = Order.objects.filter(
+        pk=order_id, state__in=[OrderStatus.PENDING, OrderStatus.CANCELED]
+    ).first()
 
     if order:
         expire_stripe_checkout_session(order)
