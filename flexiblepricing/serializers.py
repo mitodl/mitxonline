@@ -10,22 +10,6 @@ from flexiblepricing import models
 from users.serializers import UserSerializer
 
 
-class CurrencyExchangeRateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.CurrencyExchangeRate
-        fields = [
-            "id",
-            "currency_code",
-            "exchange_rate",
-        ]
-
-
-class CountryIncomeThresholdSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = models.CountryIncomeThreshold
-        fields = ["id", "country_code", "income_threshold"]
-
-
 class FlexiblePriceTierSerializer(serializers.ModelSerializer):
     courseware_object = serializers.SerializerMethodField()
 
@@ -45,43 +29,6 @@ class FlexiblePriceTierSerializer(serializers.ModelSerializer):
             return BaseCourseSerializer(instance=instance.courseware_object).data
         else:
             return BaseProgramSerializer(instance=instance.courseware_object).data
-
-
-class FlexiblePriceSerializer(serializers.ModelSerializer):
-    """
-    Serializer for flexible price requests
-    """
-
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = models.FlexiblePrice
-        fields = [
-            "id",
-            "user",
-            "status",
-            "income_usd",
-            "original_income",
-            "original_currency",
-            "country_of_income",
-            "date_exchange_rate",
-            "date_documents_sent",
-            "justification",
-            "country_of_residence",
-        ]
-        read_only_fields = [
-            "id",
-            "user",
-            "status",
-            "income_usd",
-            "original_income",
-            "original_currency",
-            "country_of_income",
-            "date_exchange_rate",
-            "date_documents_sent",
-            "justification",
-            "country_of_residence",
-        ]
 
 
 class FlexiblePriceIncomeSerializer(serializers.ModelSerializer):
