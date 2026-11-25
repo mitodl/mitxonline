@@ -49,6 +49,7 @@ from courses.factories import (
 from courses.models import PaidCourseRun
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
+    _cancel_if_no_stripe_session,
     _retrieve_pending_cybersource_orders,
     apply_discount_to_basket,
     apply_user_discounts,
@@ -99,6 +100,7 @@ from ecommerce.constants import (
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_EXPIRED,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_ERROR_CODE_RESOURCE_MISSING,
     STRIPE_EVENT_CHARGE_REFUND_UPDATED,
     STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED,
     STRIPE_EVENT_REFUND_UPDATED,
@@ -3689,6 +3691,32 @@ def test_expire_stripe_checkout_session(  # noqa: PLR0913
         mock_status.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    ("error_code", "expected"),
+    [(STRIPE_ERROR_CODE_RESOURCE_MISSING, True), ("parameter_invalid", None)],
+)
+def test_expire_stripe_checkout_session_missing_in_stripe(
+    mocker, user, products, error_code, expected
+):
+    """
+    A session Stripe has no record of can't be paid, so it doesn't block
+    checkout; any other refusal to look it up still raises.
+    """
+
+    mock_client = mocker.patch("ecommerce.api._get_stripe_checkout_session_v1")()
+    mock_client.expire.side_effect = InvalidRequestError("No such session", None)
+    mock_client.retrieve.side_effect = InvalidRequestError(
+        "No such session", None, code=error_code
+    )
+    order = _create_stripe_checkout_order(user, products[0])
+
+    if expected is None:
+        with pytest.raises(InvalidRequestError):
+            expire_stripe_checkout_session(order)
+    else:
+        assert expire_stripe_checkout_session(order) is expected
+
+
 def test_expire_stripe_checkout_session_no_session(mocker, user):
     """An order with no CheckoutSession logged has nothing to expire."""
 
@@ -3727,7 +3755,6 @@ def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
     mock_expire = mocker.patch(
         "ecommerce.api.expire_stripe_checkout_session", return_value=not already_paid
     )
-    new_order = _create_stripe_order(user, products[0])
     order = _create_stripe_checkout_order(
         user, products[0] if same_product else products[1]
     )
@@ -3735,6 +3762,8 @@ def test_supersede_open_stripe_checkouts(  # noqa: PLR0913
     Order.objects.filter(pk=order.pk).update(
         created_on=now_in_utc() - timedelta(days=3)
     )
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order) == (
         {**PAYMENT_IN_PROGRESS, "order": order, "order_id": order.id}
@@ -3751,7 +3780,6 @@ def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, produc
     """
 
     mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
-    new_order = _create_stripe_order(user, products[0])
 
     _create_stripe_checkout_order(UserFactory.create(), products[0])
     OrderFactory.create(
@@ -3765,6 +3793,8 @@ def test_supersede_open_stripe_checkouts_skips_other_orders(mocker, user, produc
         gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
     )
 
+    new_order = _create_stripe_order(user, products[0])
+
     assert supersede_open_stripe_checkouts(new_order) is None
     mock_expire.assert_not_called()
 
@@ -3776,8 +3806,9 @@ def test_supersede_open_stripe_checkouts_session_still_opening(mocker, user, pro
     """
 
     mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
-    new_order = _create_stripe_order(user, products[0])
     opening_order = _create_stripe_order(user, products[0])
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order) is None
 
@@ -3793,15 +3824,60 @@ def test_supersede_open_stripe_checkouts_skips_free_orders(mocker, user, product
     """
 
     mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
-    new_order = _create_stripe_order(user, products[0])
     free_order = _create_stripe_order(user, products[0])
     Order.objects.filter(pk=free_order.pk).update(total_price_paid=0)
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order) is None
 
     free_order.refresh_from_db()
     assert free_order.state == OrderStatus.PENDING
     mock_expire.assert_not_called()
+
+
+def test_supersede_open_stripe_checkouts_leaves_newer_orders(mocker, user, products):
+    """
+    A newer order isn't superseded, so two checkouts at once don't cancel each
+    other.
+    """
+
+    mock_expire = mocker.patch("ecommerce.api.expire_stripe_checkout_session")
+    order = _create_stripe_order(user, products[0])
+    newer_order = _create_stripe_order(user, products[0])
+
+    assert supersede_open_stripe_checkouts(order) is None
+
+    newer_order.refresh_from_db()
+    assert newer_order.state == OrderStatus.PENDING
+    mock_expire.assert_not_called()
+
+
+def test_supersede_open_stripe_checkouts_fulfilled_before_lock(mocker, user, products):
+    """
+    An earlier order a webhook fulfils after it was read, but before it's
+    locked, refuses checkout rather than being skipped.
+    """
+
+    earlier_order = _create_stripe_order(user, products[0])
+    new_order = _create_stripe_order(user, products[0])
+
+    def _lock_sees_fulfilled(order):
+        # The webhook fulfils the order just before it's locked.
+        Order.objects.filter(pk=earlier_order.pk).update(state=OrderStatus.FULFILLED)
+        return _cancel_if_no_stripe_session(order)
+
+    mocker.patch(
+        "ecommerce.api._cancel_if_no_stripe_session", side_effect=_lock_sees_fulfilled
+    )
+
+    assert supersede_open_stripe_checkouts(new_order) == {
+        **PAYMENT_IN_PROGRESS,
+        "order": earlier_order,
+        "order_id": earlier_order.id,
+    }
+    earlier_order.refresh_from_db()
+    assert earlier_order.state == OrderStatus.FULFILLED
 
 
 def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):
@@ -3815,8 +3891,9 @@ def test_supersede_open_stripe_checkouts_stripe_error(mocker, user, products):
         side_effect=APIConnectionError("Stripe is down"),
     )
     mock_log = mocker.patch("ecommerce.api.log")
-    new_order = _create_stripe_order(user, products[0])
     order = _create_stripe_checkout_order(user, products[1])
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order) == {
         "checkout_unavailable": True,
@@ -3834,7 +3911,6 @@ def test_supersede_open_stripe_checkouts_paid_beats_stripe_error(
     another one, so the learner isn't told to retry a payment that went through.
     """
 
-    new_order = _create_stripe_order(user, products[0])
     paid_order = _create_stripe_checkout_order(user, products[0])
     erroring_order = _create_stripe_checkout_order(
         user, products[1], session_id="cs_test_other"
@@ -3843,6 +3919,8 @@ def test_supersede_open_stripe_checkouts_paid_beats_stripe_error(
         "ecommerce.api.expire_stripe_checkout_session",
         side_effect=[False, APIConnectionError("Stripe is down")],
     )
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order) == {
         **PAYMENT_IN_PROGRESS,
@@ -3868,7 +3946,6 @@ def test_supersede_open_stripe_checkouts_fulfilled_since_start(
     covered by the checkout's duplicate checks.
     """
 
-    new_order = _create_stripe_order(user, products[0])
     fulfilled_order = _create_stripe_order(
         user, products[0] if same_product else products[1]
     )
@@ -3877,6 +3954,8 @@ def test_supersede_open_stripe_checkouts_fulfilled_since_start(
         updated_on=now_in_utc()
         + timedelta(seconds=1 if fulfilled_after_start else -60),
     )
+
+    new_order = _create_stripe_order(user, products[0])
 
     assert supersede_open_stripe_checkouts(new_order, since=now_in_utc()) == (
         {

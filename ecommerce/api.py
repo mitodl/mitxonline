@@ -57,6 +57,7 @@ from ecommerce.constants import (
     REFUND_SUCCESS_STATES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_ERROR_CODE_RESOURCE_MISSING,
     STRIPE_EVENTS_CHECKOUT_SESSION,
     STRIPE_EVENTS_REFUND,
     STRIPE_OBJECT_CHECKOUT_SESSION,
@@ -2257,7 +2258,20 @@ def expire_stripe_checkout_session(order) -> bool:
     try:
         _get_stripe_checkout_session_v1().expire(session_id)
     except stripe.InvalidRequestError:
-        session = process_stripe_checkout_session_status(session_id)
+        try:
+            session = process_stripe_checkout_session_status(session_id)
+        except stripe.InvalidRequestError as error:
+            if error.code != STRIPE_ERROR_CODE_RESOURCE_MISSING:
+                raise
+
+            # Stripe has no such session (e.g. it was made with other keys),
+            # so there's no page left to pay on.
+            log.warning(
+                "CheckoutSession %s for order %s doesn't exist in Stripe",
+                session_id,
+                order.reference_number,
+            )
+            return True
 
         # A failed payment needs a new payment method, which a completed
         # session won't take, so the learner has to check out again.
@@ -2276,32 +2290,29 @@ def expire_stripe_checkout_session(order) -> bool:
     return True
 
 
-def _cancel_if_no_stripe_session(order) -> bool:
+def _cancel_if_no_stripe_session(order) -> str | None:
     """
     Cancel a pending Stripe order that has no CheckoutSession logged yet.
 
     Another checkout may still be opening the session. The order is locked
     the same way that checkout logs the session, so either the session is
-    logged first and is returned for expiring, or the order is cancelled first
+    logged first and is left for expiring, or the order is cancelled first
     and that checkout refuses the page.
 
     Returns:
-    - bool: True if the order has no session to expire (it's now cancelled,
-      or is no longer pending), False if it has one
+    - str|None: None if the order has a session to expire, otherwise the
+      order's state now: canceled, or whatever it moved to meanwhile (e.g.
+      fulfilled by a webhook)
     """
 
     with transaction.atomic():
-        locked_order = (
-            Order.objects.select_for_update()
-            .filter(pk=order.pk, state=OrderStatus.PENDING)
-            .first()
-        )
+        locked_order = Order.objects.select_for_update().get(pk=order.pk)
 
-        if not locked_order:
-            return True
+        if locked_order.state != OrderStatus.PENDING:
+            return locked_order.state
 
         if get_stripe_checkout_session_id(locked_order):
-            return False
+            return None
 
         locked_order.get_object_flow().cancel()
 
@@ -2309,7 +2320,7 @@ def _cancel_if_no_stripe_session(order) -> bool:
         "Cancelled order %s, superseded before its CheckoutSession was logged",
         order.reference_number,
     )
-    return True
+    return OrderStatus.CANCELED
 
 
 def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
@@ -2339,7 +2350,8 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
             # while it's being fulfilled.
             total_price_paid__gt=0,
         )
-        .exclude(pk=order.pk)
+        # Only older orders, so two checkouts at once don't cancel each other.
+        .filter(pk__lt=order.pk)
         .prefetch_related("lines")
         .order_by("created_on")
     )
@@ -2379,7 +2391,16 @@ def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
     unavailable = False
 
     for earlier_order in earlier_orders:
-        if _cancel_if_no_stripe_session(earlier_order):
+        state_without_session = _cancel_if_no_stripe_session(earlier_order)
+
+        if state_without_session is not None:
+            # A webhook may have fulfilled it since it was read above.
+            if (
+                state_without_session == OrderStatus.FULFILLED
+                and not paid_order
+                and _overlaps(earlier_order)
+            ):
+                paid_order = earlier_order
             continue
 
         try:
