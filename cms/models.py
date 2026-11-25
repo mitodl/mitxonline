@@ -69,9 +69,7 @@ from cms.wagtail_api.serializers import ImageSerializer, ProductChildPageSeriali
 from courses.api import get_relevant_course_run_qset
 from courses.models import (
     Course,
-    CourseRunCertificate,
     Program,
-    ProgramCertificate,
 )
 from flexiblepricing.api import (
     determine_auto_approval,
@@ -179,8 +177,9 @@ class SignatoryIndexPage(SignatoryObjectIndexPage):
 
 class CertificateIndexPage(RoutablePageMixin, Page):
     """
-    Certificate index page placeholder that handles routes for serving
-    certificates given by UUID
+    Placeholder that keeps /certificate/ as a slug under the home page.
+    Certificates are served by MIT Learn; Fastly redirects the legacy
+    /certificate/<uuid>/ links there.
     """
 
     parent_page_types = ["HomePage"]
@@ -198,60 +197,6 @@ class CertificateIndexPage(RoutablePageMixin, Page):
             super().can_create_at(parent)
             and not parent.get_children().type(cls).exists()
         )
-
-    @route(r"^program/([A-Fa-f0-9-]+)/?$")
-    def program_certificate(self, request, uuid, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
-        """
-        Serve a program certificate by uuid
-        """
-        # Try to fetch a certificate by the uuid passed in the URL
-        try:
-            certificate = ProgramCertificate.objects.get(uuid=uuid)
-        except ProgramCertificate.DoesNotExist:
-            raise Http404()  # noqa: B904, RSE102
-
-        # Get a CertificatePage to serve this request
-        certificate_page = (
-            certificate.certificate_page_revision.as_object()
-            if certificate.certificate_page_revision
-            else certificate.program.certificate_page
-        )
-        if not certificate_page:
-            raise Http404()  # noqa: RSE102
-
-        if not certificate.certificate_page_revision:
-            # The certificate.save() is overridden,it associates the certificate
-            # page revision with the user's program certificate object
-            certificate.save()
-
-        certificate_page.certificate = certificate
-        return certificate_page.serve(request)
-
-    @route(r"^([A-Fa-f0-9-]+)/?$")
-    def course_certificate(self, request, uuid, *args, **kwargs):  # pylint: disable=unused-argument  # noqa: ARG002
-        """
-        Serve a course certificate by uuid
-        """
-        # Try to fetch a certificate by the uuid passed in the URL
-        try:
-            certificate = CourseRunCertificate.objects.get(uuid=uuid)
-        except CourseRunCertificate.DoesNotExist:
-            raise Http404()  # noqa: B904, RSE102
-
-        # Get a CertificatePage to serve this request
-        certificate_page = (
-            certificate.certificate_page_revision.as_object()
-            if certificate.certificate_page_revision
-            else certificate.course_run.course.certificate_page
-        )
-
-        if not certificate_page:
-            raise Http404()  # noqa: RSE102
-
-        if not certificate.certificate_page_revision:
-            certificate.save()
-        certificate_page.certificate = certificate
-        return certificate_page.serve(request)
 
     @route(r"^$")
     def index_route(self, request, *args, **kwargs):  # noqa: ARG002
@@ -389,8 +334,9 @@ class CertificatePage(CourseProgramChildPage):
     CMS page representing a Certificate.
     """
 
-    template = "certificate_page.html"
     parent_page_types = ["CoursePage", "ProgramPage"]
+    # Certificates render on MIT Learn, so there is no template to preview.
+    preview_modes = []
 
     def get_certificate_revision(self):
         """
@@ -509,10 +455,6 @@ class CertificatePage(CourseProgramChildPage):
     class Meta:
         verbose_name = "Certificate"
 
-    def __init__(self, *args, **kwargs):
-        self.certificate = None
-        super().__init__(*args, **kwargs)
-
     def save(self, clean=True, user=None, log_action=False, **kwargs):  # noqa: FBT002
         # auto generate a unique slug so we don't hit a ValidationError
         self.title = (
@@ -523,12 +465,6 @@ class CertificatePage(CourseProgramChildPage):
 
         self.slug = slugify(f"certificate-{self.get_parent().id}")
         Page.save(self, clean=clean, user=user, log_action=log_action, **kwargs)
-
-    def serve(self, request, *args, **kwargs):
-        """
-        We need to serve the certificate template for preview.
-        """
-        return Page.serve(self, request, *args, **kwargs)
 
     @property
     def signatory_pages(self):
@@ -566,72 +502,6 @@ class CertificatePage(CourseProgramChildPage):
         Get the parent of this page.
         """
         return self.get_parent().specific
-
-    def get_context(self, request, *args, **kwargs):
-        preview_context = {}
-        context = {}
-
-        if request.is_preview:
-            is_program_certificate = False
-            if isinstance(self.parent, ProgramPage):
-                is_program_certificate = True
-                product_name = self.parent.program.title
-            else:
-                product_name = self.parent.course.title
-            preview_context = {
-                "uuid": "fake-uuid",
-                "learner_name": "Anthony M. Stark",
-                "product_name": product_name,
-                "issue_date": datetime.now(),  # noqa: DTZ005
-                "CEUs": self.CEUs,
-                "is_program_certificate": is_program_certificate,
-            }
-        elif self.certificate:
-            # Verify that the certificate in fact is for this same course
-            if self.parent.product.id != self.certificate.get_courseware_object_id():
-                raise Http404()  # noqa: RSE102
-            CEUs = self.CEUs
-
-            for override in self.overrides:  # pylint: disable=not-an-iterable
-                if (
-                    override.value.get("readable_id")
-                    == self.certificate.get_courseware_object_readable_id()
-                ):
-                    CEUs = override.value.get("CEUs")
-                    break
-
-            is_program_certificate = False
-            if isinstance(self.certificate, ProgramCertificate):
-                is_program_certificate = True
-                product_name = self.parent.program.title
-            else:
-                product_name = self.parent.course.title
-
-            context = {
-                "uuid": self.certificate.uuid,
-                "product_name": product_name,
-                "certificate_user": self.certificate.user,
-                "learner_name": self.certificate.user.get_full_name(),
-                "issue_date": self.certificate.issue_date,
-                "CEUs": CEUs,
-                "is_program_certificate": is_program_certificate,
-                "program_type": (
-                    self.parent.program.program_type if is_program_certificate else ""
-                ),
-            }
-        else:
-            raise Http404()  # noqa: RSE102
-
-        # The share image url needs to be absolute
-        return {
-            "site_name": settings.SITE_NAME,
-            "share_image_width": "1665",
-            "share_image_height": "1291",
-            "share_text": f"I just earned a certificate in {product_name} from {settings.SITE_NAME}",
-            **super().get_context(request, *args, **kwargs),
-            **preview_context,
-            **context,
-        }
 
 
 class FormField(AbstractFormField):
