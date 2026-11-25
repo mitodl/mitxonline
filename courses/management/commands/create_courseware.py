@@ -5,7 +5,7 @@ a course run).
 
 from datetime import timedelta
 from decimal import Decimal
-from typing import Union  # noqa: UP035
+from typing import Union
 
 import reversion
 from django.core.management import BaseCommand
