@@ -7,6 +7,7 @@ from django.core.management import call_command
 
 from courses.factories import (
     CourseRunCertificateFactory,
+    CourseRunFactory,
     ProgramCertificateFactory,
     ProgramFactory,
 )
@@ -224,5 +225,76 @@ def test_program_ids_with_no_matching_program_processes_nothing(
     signer.assert_not_called()
     assert output == ""
     for certificate in program_selection["targets"] + program_selection["others"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
+
+
+@pytest.fixture
+def course_selection(mock_certificate_page):
+    """Certificates for the course run being backfilled, plus ones that must be left alone"""
+    mock_certificate_page()
+    course_run = CourseRunFactory.create()
+    return {
+        "course_run": course_run,
+        "targets": CourseRunCertificateFactory.create_batch(2, course_run=course_run),
+        "others": [
+            CourseRunCertificateFactory.create(),
+            ProgramCertificateFactory.create(),
+        ],
+    }
+
+
+def _run_by_course(courseware_id, *extra_args):
+    out = StringIO()
+    call_command(
+        "backfill_verifiable_credentials",
+        "--type",
+        "course",
+        "--ids",
+        courseware_id,
+        *extra_args,
+        stdout=out,
+        stderr=out,
+    )
+    return out.getvalue()
+
+
+def test_course_ids_backfills_only_that_course_runs_certificates(
+    signer, course_selection
+):
+    """--type course --ids processes every certificate of the named course run and no others"""
+    _run_by_course(course_selection["course_run"].courseware_id, "--execute")
+
+    for certificate in course_selection["targets"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential.credential_data["proof"]
+    for certificate in course_selection["others"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
+    assert signer.call_count == len(course_selection["targets"])
+
+
+def test_course_ids_dry_run_changes_nothing(signer, course_selection):
+    """Without --execute the course run selection is only listed"""
+    output = _run_by_course(course_selection["course_run"].courseware_id)
+
+    signer.assert_not_called()
+    for certificate in course_selection["targets"]:
+        certificate.refresh_from_db()
+        assert certificate.verifiable_credential is None
+        assert f"DRY RUN -- Would backfill certificate {certificate}" in output
+    assert "Backfilled" not in output
+
+
+def test_course_ids_with_no_matching_course_run_processes_nothing(
+    signer, course_selection
+):
+    """An unknown courseware id selects no certificates"""
+    output = _run_by_course("course-v1:does+not+exist", "--execute")
+
+    signer.assert_not_called()
+    assert "Backfilled" not in output
+    assert "DRY RUN" not in output
+    for certificate in course_selection["targets"] + course_selection["others"]:
         certificate.refresh_from_db()
         assert certificate.verifiable_credential is None
