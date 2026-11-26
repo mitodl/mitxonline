@@ -1,7 +1,7 @@
 import logging
 
 from django.http import Http404, HttpResponseForbidden, JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.views.decorators.http import require_GET
 from mitol.olposthog.features import is_enabled
 from rest_framework.decorators import api_view
@@ -77,3 +77,9 @@ def credential_metadata(request, parent_page_id):
             "errors": metadata.errors,
         }
     )
+
+
+@require_GET
+def credential_examples(request):
+    """Example credential descriptions and criteria, linked from the CertificatePage help text."""
+    return render(request, "cms/credential_examples.html")

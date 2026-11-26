@@ -119,3 +119,19 @@ def test_credential_metadata_anonymous(client, mock_fetch):
 
     assert resp.status_code == 302
     mock_fetch.assert_not_called()
+
+
+def test_credential_examples_page(admin_client):
+    """CMS users can open the examples page"""
+    response = admin_client.get(reverse("cms_credential_examples"))
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Credential description and criteria examples" in content
+    assert "Molecular Biology - Part 2" in content
+
+
+def test_credential_examples_page_requires_cms_login(client):
+    """The examples page is not public"""
+    response = client.get(reverse("cms_credential_examples"))
+    assert response.status_code == 302
+    assert "login" in response["Location"]

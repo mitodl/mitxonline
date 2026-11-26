@@ -1726,6 +1726,20 @@ def test_generate_with_ai_panel_loads_script():
     assert "js/credential_metadata_admin.js" in str(bound.media)
 
 
+def test_certificate_page_vc_panels_link_to_examples():
+    """Both credential fields link to the examples page, opening in a new tab."""
+    panels = {
+        p.field_name: p
+        for p in CertificatePage.content_panels[4].children
+        if hasattr(p, "field_name")
+    }
+    for name in ("verifiable_credential_description", "verifiable_credential_criteria"):
+        help_text = str(panels[name].help_text)
+        assert f'href="{reverse("cms_credential_examples")}"' in help_text
+        assert 'target="_blank"' in help_text
+        assert "noopener" in help_text
+
+
 @pytest.mark.parametrize(
     ("path", "expected_url"),
     [
