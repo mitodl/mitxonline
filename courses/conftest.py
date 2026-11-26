@@ -457,12 +457,16 @@ def user_with_enrollments_and_certificates(
     )
 
 
-@pytest.fixture
-def make_certificate():
-    """Factory for a course run certificate, optionally with a stored (old) verifiable credential"""
+@pytest.fixture(params=[CourseRunCertificateFactory, ProgramCertificateFactory])
+def make_certificate(request):
+    """
+    Factory for a certificate, optionally with a stored (old) verifiable credential.
+
+    Parametrized so every test using it runs for both course run and program certificates.
+    """
 
     def _make(*, with_credential=True):
-        certificate = CourseRunCertificateFactory.create()
+        certificate = request.param.create()
         if with_credential:
             certificate.verifiable_credential = VerifiableCredential.objects.create(
                 uuid=certificate.uuid,
