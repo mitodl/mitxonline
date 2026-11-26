@@ -1,13 +1,14 @@
 """Admin management for Ecommerce module"""
 
 import logging
+from typing import Any
 
 import reversion
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpResponseRedirect
+from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
@@ -38,6 +39,7 @@ from ecommerce.models import (
     RefundedOrder,
     RefundRequest,
     StripeEventLog,
+    TaxRate,
     Transaction,
     UserDiscount,
 )
@@ -130,6 +132,58 @@ class ProductAdmin(VersionAdmin):
                 item.is_active = False
                 item.save()
 
+            reversion.set_user(request.user)
+
+
+@admin.register(TaxRate)
+class TaxRateAdmin(VersionAdmin):
+    """Admin for TaxRate"""
+
+    model = TaxRate
+    list_display = (
+        "id",
+        "is_active",
+        "country_code",
+        "subdivision_1_code",
+        "subdivision_2_code",
+        "tax_rate",
+        "tax_rate_name",
+    )
+    list_filter = ("is_active", "country_code")
+    search_fields = ("country_code", "tax_rate_name")
+
+    def get_queryset(self, request):  # noqa: ARG002
+        """Use the all_objects manager, so we can see deleted rates."""
+
+        return self.model.all_objects.get_queryset()
+
+    def delete_queryset(self, request, queryset):
+        """
+        Delete each rate on its own, so each deletion is versioned.
+
+        A queryset delete is a bulk update, which records no versions.
+        """
+
+        # Already-deleted rates are skipped, so their deletion time is kept.
+        for tax_rate in queryset.filter(is_active=True):
+            with reversion.create_revision():
+                tax_rate.delete()
+                reversion.set_user(request.user)
+
+    def delete_model(self, request: HttpRequest, obj: Any) -> None:
+        """
+        Delete the model and record a revision for that op correctly.
+
+        Skip deletion if the object is already deleted. If the object is deleted,
+        then ensure the user is set on the revision.
+        """
+
+        prior_version = self.get_queryset(request).filter(pk=obj.id)
+        if not prior_version.exists() or not prior_version.get().is_active:
+            return
+
+        with reversion.create_revision():
+            obj.delete()
             reversion.set_user(request.user)
 
 

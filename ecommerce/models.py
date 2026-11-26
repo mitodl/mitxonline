@@ -17,6 +17,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Count, Exists, OuterRef, Q, TextChoices
 from django.utils.functional import cached_property
+from django_countries.fields import CountryField
 from mitol.common.models import TimestampedModel
 from mitol.common.utils.datetime import now_in_utc
 from mitol.olposthog.features import is_enabled
@@ -51,13 +52,16 @@ from ecommerce.constants import (
     TRANSACTION_TYPES,
 )
 from ecommerce.tasks import send_ecommerce_order_receipt, send_order_refund_email
+from location.models import SoftDeleteTimestampedModel
 from main import features
+from main.models import ValidateOnSaveMixin
 from main.plugin_manager import get_plugin_manager
 from users.models import User
 
 if TYPE_CHECKING:
     from b2b.models import ContractPage
     from ecommerce.discount_sources import SourceResolution
+    from ecommerce.tax import CalculatedTax
 
 User = get_user_model()  # noqa: F811
 
@@ -126,6 +130,147 @@ class Product(TimestampedModel):
 
     def __str__(self):
         return f"#{self.id} {self.description} {self.price}"
+
+    def calculate_tax_for_locale(
+        self, country_code: str | None, *, price: Decimal | None = None
+    ) -> CalculatedTax:
+        """
+        Calculate the tax owed on this product for the given locale.
+
+        Args:
+        - country_code (str|None): the ISO 3166-1 alpha-2 country code
+        - price (Decimal|None): the amount to tax; defaults to the product's
+          price. Pass the discounted price to tax that instead.
+
+        Returns:
+        - CalculatedTax: the rate applied (if any), the tax, and the total
+
+        Raises:
+        - TaxRateVersionError: if the rate has no saved version matching it
+        """
+        from ecommerce.tax import calculate_tax_for_locale  # noqa: PLC0415
+
+        return calculate_tax_for_locale(
+            self.price if price is None else price, country_code
+        )
+
+
+@reversion.register()
+class TaxRate(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
+    """
+    The tax we charge for a locale.
+
+    The locale is a country for now. The subdivision fields are there so a rate
+    can be narrowed to a region later; nothing reads them yet.
+
+    The rate is versioned with django-reversion so an order can point at the
+    rate that was in force when it was placed, even after the rate changes.
+    """
+
+    country_code = CountryField()
+    subdivision_1_code = models.CharField(
+        help_text="ISO-3166-2 code for the first-level subdivision of the country, without the alpha-2 prefix. Not used yet.",
+        max_length=3,
+        blank=True,
+        default="",
+    )
+    subdivision_2_code = models.CharField(
+        help_text="ISO-3166-2 code for the second-level subdivision of the country, without the alpha-2 prefix. Not used yet.",
+        max_length=3,
+        blank=True,
+        default="",
+    )
+    tax_rate = models.DecimalField(
+        help_text="The tax rate, as a percentage (e.g. 18 for 18%).",
+        max_digits=7,
+        decimal_places=4,
+    )
+    tax_rate_name = models.CharField(
+        help_text="The name of the tax, shown to learners (e.g. VAT, GST).",
+        max_length=100,
+        default="VAT",
+    )
+
+    class Meta:
+        """Only allow one active rate per locale."""
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=(
+                    "country_code",
+                    "subdivision_1_code",
+                    "subdivision_2_code",
+                ),
+                condition=models.Q(is_active=True),
+                name="tax_rate_unique_active_locale",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.tax_rate}% {self.tax_rate_name} for {self.country_code}"
+
+    def save(self, *args, **kwargs):
+        """
+        Save the rate, always recording a version of it.
+
+        Tax records will point at the version of the rate they used, so every
+        change has to produce one - not just the ones made in the admin.
+
+        Bulk queryset .update() and .delete() skip save(), so they record no
+        version; change rates one at a time instead.
+        """
+
+        if reversion.is_active():
+            self._save_and_version(*args, **kwargs)
+            return
+
+        with reversion.create_revision():
+            self._save_and_version(*args, **kwargs)
+
+    def _save_and_version(self, *args, **kwargs):
+        """
+        Save the rate and record the row as saved in the current revision.
+
+        A partial save (update_fields, as delete() does) leaves the other fields
+        of this instance as they were loaded, and reversion would version those.
+        Refresh the instance from the row, so both it and the version match the
+        database.
+        """
+
+        self.clean()
+        super().save(*args, **kwargs)
+
+        if kwargs.get("update_fields") is not None:
+            self.refresh_from_db()
+            reversion.add_to_revision(self)
+
+    @property
+    def current_version(self) -> Version | None:
+        """
+        Return the newest version of this rate.
+
+        This matches the row as last saved, which is not necessarily this
+        instance if the rate changed after it was loaded.
+        """
+
+        return Version.objects.get_for_object(self).first()
+
+    @property
+    def locale(self) -> str:
+        """Return a formatted locality string for the rate."""
+
+        return (
+            (f"{self.subdivision_2_code}, " if self.subdivision_2_code else "")
+            + (f"{self.subdivision_1_code}, " if self.subdivision_1_code else "")
+            + str(self.country_code)
+        )
+
+    def clean(self):
+        """Ensure tax rate is greater than zero."""
+
+        if self.tax_rate < Decimal(0):
+            msg = f"Tax rate {self.tax_rate} must be above 0 for {self.locale}"
+            raise ValidationError(msg)
 
 
 class Basket(TimestampedModel):
