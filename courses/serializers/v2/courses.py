@@ -53,13 +53,6 @@ def _get_canonical_runs_per_tag(runs):
     return canonical
 
 
-class CourseLocalizedTitleSerializer(serializers.Serializer):
-    """Serializer for localized course title list"""
-
-    language = serializers.CharField()
-    title = serializers.CharField()
-
-
 @extend_schema_serializer(component_name="V2Course")
 class CourseSerializer(BaseCourseSerializer):
     """Course model serializer"""

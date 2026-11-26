@@ -164,67 +164,6 @@ class ProgramSerializer(serializers.ModelSerializer):
         ]
 
 
-class FullProgramSerializer(ProgramSerializer):
-    """Adds more data to the ProgramSerializer."""
-
-    start_date = serializers.SerializerMethodField()
-    end_date = serializers.SerializerMethodField()
-    enrollment_start = serializers.SerializerMethodField()
-
-    def get_start_date(self, instance):
-        """
-        start_date is the starting date for the earliest live course run for all courses in a program
-
-        Returns:
-            datetime: The starting date
-        """
-        courses_in_program = [course[0] for course in instance.courses]
-        return (
-            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
-            .order_by("start_date")
-            .values_list("start_date", flat=True)
-            .first()
-        )
-
-    def get_end_date(self, instance):
-        """
-        end_date is the end date for the latest live course run for all courses in a program.
-
-        Returns:
-            datetime: The ending date
-        """
-        courses_in_program = [course[0] for course in instance.courses]
-        return (
-            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
-            .order_by("end_date")
-            .values_list("end_date", flat=True)
-            .last()
-        )
-
-    def get_enrollment_start(self, instance):
-        """
-        enrollment_start is first date where enrollment starts for any live course run
-        """
-        courses_in_program = [course[0] for course in instance.courses]
-        return (
-            models.CourseRun.objects.filter(course__in=courses_in_program, live=True)
-            .order_by("enrollment_start")
-            .values_list("enrollment_start", flat=True)
-            .first()
-        )
-
-    class Meta(ProgramSerializer.Meta):
-        fields = ProgramSerializer.Meta.fields + [  # noqa: RUF005
-            "title",
-            "readable_id",
-            "id",
-            "courses",
-            "num_courses",
-            "requirements",
-            "req_tree",
-        ]
-
-
 @extend_schema_serializer(component_name="V1ProgramCertificate")
 class ProgramCertificateSerializer(serializers.ModelSerializer):
     """ProgramCertificate model serializer"""

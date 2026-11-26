@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 
 from django.conf import settings
 from django.db.models import Exists, OuterRef, Q
-from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
 
 from courses.constants import (
@@ -182,24 +181,6 @@ def get_unenrollable_courses(queryset):
     return queryset.filter(
         courseruns__id__in=courseruns_qs.values_list("id", flat=True)
     ).distinct()
-
-
-def get_archived_courseruns(queryset):
-    """
-    Returns course runs that are archived. This is defined as:
-    - The course runs are open for enrollment
-    - The course run end date has passed
-    - The course run enrollment end date is in the future or None.
-
-    Args:
-        queryset: Queryset of CourseRun objects
-    """
-    now = now_in_utc()
-    return queryset.filter(
-        CourseRunQuerySet.get_enrollable_filter(now)
-        & Q(end_date__lt=now)
-        & (Q(enrollment_end__isnull=True) | Q(enrollment_end__gt=now))
-    )
 
 
 def get_dated_courseruns(queryset):
