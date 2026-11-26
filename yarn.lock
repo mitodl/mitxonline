@@ -13926,6 +13926,7 @@ __metadata:
     raf: "npm:3.4.1"
     ramda: "npm:0.32.0"
     react: "npm:16.14.0"
+    react-content-loader: "npm:^6.2.1"
     react-document-title: "npm:2.0.3"
     react-dom: "npm:16.14.0"
     react-ga: "npm:2.7.0"
@@ -13963,8 +13964,6 @@ __metadata:
 "mitx-online-root@workspace:.":
   version: 0.0.0-use.local
   resolution: "mitx-online-root@workspace:."
-  dependencies:
-    react-content-loader: "npm:^6.2.1"
   languageName: unknown
   linkType: soft
 
