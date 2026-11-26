@@ -13926,6 +13926,7 @@ __metadata:
     raf: "npm:3.4.1"
     ramda: "npm:0.32.0"
     react: "npm:16.14.0"
+    react-content-loader: "npm:^6.2.1"
     react-document-title: "npm:2.0.3"
     react-dom: "npm:16.14.0"
     react-ga: "npm:2.7.0"
@@ -13956,7 +13957,6 @@ __metadata:
     webpack-bundle-tracker: "npm:1.4.0"
     webpack-cli: "npm:6.0.1"
     webpack-dev-server: "npm:5.2.6"
-    webpack-merge: "npm:5.8.0"
     yup: "npm:0.31.1"
   languageName: unknown
   linkType: soft
@@ -13964,11 +13964,6 @@ __metadata:
 "mitx-online-root@workspace:.":
   version: 0.0.0-use.local
   resolution: "mitx-online-root@workspace:."
-  dependencies:
-    react-content-loader: "npm:^6.2.1"
-    redux-query: "npm:3.3.1"
-    redux-query-interface-superagent: "npm:3.3.1"
-    redux-query-react: "npm:3.3.1"
   languageName: unknown
   linkType: soft
 
