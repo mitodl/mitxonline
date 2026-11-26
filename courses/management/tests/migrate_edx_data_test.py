@@ -6,10 +6,24 @@ from io import StringIO
 
 import pymysql
 import pytest
+from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from cms.factories import SignatoryPageFactory
-from courses.factories import CourseFactory, CourseRunFactory, CourseRunGradeFactory
+from cms.factories import (
+    CourseIndexPageFactory,
+    CoursePageFactory,
+    ProgramPageFactory,
+    SignatoryPageFactory,
+)
+from cms.models import CourseIndexPage
+from courses.factories import (
+    CourseFactory,
+    CourseRunCertificateFactory,
+    CourseRunEnrollmentFactory,
+    CourseRunFactory,
+    CourseRunGradeFactory,
+    ProgramCertificateFactory,
+)
 from courses.management.commands import migrate_edx_data
 from courses.management.commands.migrate_edx_data import (
     MIGRATION_SCHEMA,
@@ -18,7 +32,16 @@ from courses.management.commands.migrate_edx_data import (
     Command,
     _warehouse_list,
 )
-from courses.models import CourseRunGrade, CourseRunGradeAudit
+from courses.models import (
+    Course,
+    CourseRun,
+    CourseRunCertificate,
+    CourseRunEnrollment,
+    CourseRunGrade,
+    CourseRunGradeAudit,
+    ProgramCertificate,
+    ProgramEnrollment,
+)
 from users.factories import UserFactory
 from users.models import LegalAddress, User, UserProfile
 
@@ -750,3 +773,452 @@ def test_bulk_create_certificates_reads_naive_issue_date_as_utc(
 
     [certificate] = bulk_create.call_args.args[0]
     assert certificate.issue_date == datetime(2024, 5, 6, 7, 8, 9, tzinfo=UTC)
+
+
+def test_handle_rejects_type_not_available_for_platform(mocker):
+    """An edX.org-only type is an error for another platform, before connecting"""
+    connect = mocker.patch.object(Command, "_connect_to_warehouse")
+
+    with pytest.raises(CommandError, match="entitlements is not available"):
+        call_command("migrate_edx_data", platform="xpro", type="entitlements")
+
+    connect.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("migrate_type", "method"),
+    [
+        ("course_runs", "_migrate_course_runs"),
+        ("users", "_migrate_users"),
+        ("course_enrollments", "_migrate_course_enrollments"),
+        ("program_certificates", "_migrate_platform_program_certificates"),
+    ],
+)
+def test_handle_runs_platform_migration(mocker, migrate_type, method):
+    """--platform xpro runs the migration that reads the mitxonline_migration_* tables"""
+    mocker.patch.object(Command, "_connect_to_warehouse")
+    migrate = mocker.patch.object(Command, method)
+
+    call_command(
+        "migrate_edx_data", platform="xpro", type=migrate_type, stdout=StringIO()
+    )
+
+    migrate.assert_called_once()
+    assert migrate.call_args.args[1]["platform"] == "xpro"
+
+
+@pytest.mark.usefixtures("trino_settings")
+def test_platform_users_read_the_platform_rows():
+    """--platform xpro reads its own rows of mitxonline_migration_users"""
+    conn = FakeConnection(
+        columns=USER_COLUMNS, rows=[_user_row("xpro@example.com", "X Learner")]
+    )
+
+    Command(stdout=StringIO())._migrate_users(conn, {"platform": "xpro"})  # noqa: SLF001
+
+    [(query, _)] = conn.executed
+    assert query == (
+        f"SELECT * FROM ol_data_lake_production.{MIGRATION_SCHEMA}."  # noqa: S608
+        "mitxonline_migration_users WHERE source = 'xpro'"
+    )
+    user = User.objects.get(email="xpro@example.com")
+    assert user.legal_address.country == "US"
+
+
+PLATFORM_COURSE_RUN_COLUMNS = [
+    "source",
+    "mitxonline_course_id",
+    "course_readable_id",
+    "course_title",
+    "courserun_title",
+    "courseware_id",
+    "run_tag",
+    "enrollment_start",
+    "enrollment_end",
+    "start_date",
+    "end_date",
+    "is_self_paced",
+    "is_published",
+]
+
+
+@pytest.mark.parametrize("is_published", [True, False])
+def test_platform_course_runs_create_course_without_department(is_published):
+    """The platform tables have no department or signatory names; the course,
+    its pages and the run are still created
+    """
+    if not CourseIndexPage.objects.filter(live=True).exists():
+        CourseIndexPageFactory.create()
+    conn = FakeConnection(
+        columns=PLATFORM_COURSE_RUN_COLUMNS,
+        rows=[
+            (
+                "xpro",
+                None,
+                "course-v1:xPRO+PCC",
+                "Course",
+                "Run",
+                "course-v1:xPRO+PCC+R1",
+                "R1",
+                None,
+                datetime(2024, 1, 1, tzinfo=UTC),
+                datetime(2024, 1, 2, tzinfo=UTC),
+                datetime(2024, 5, 1, tzinfo=UTC),
+                False,
+                is_published,
+            )
+        ],
+    )
+
+    Command(stdout=StringIO())._migrate_course_runs(  # noqa: SLF001
+        conn, {"platform": "xpro", "use_default_signatory": False}
+    )
+
+    course = Course.objects.get(readable_id="course-v1:xPRO+PCC")
+    assert not course.departments.exists()
+    assert course.get_certificate_page_revision() is not None
+    run = CourseRun.objects.get(courseware_id="course-v1:xPRO+PCC+R1")
+    assert run.course == course
+    assert run.live is is_published
+
+
+ENROLLMENT_COLUMNS = [
+    "source",
+    "migration_status",
+    "user_mitxonline_id",
+    "courserun_id",
+    "courserunenrollment_enrollment_mode",
+    "courserunenrollment_is_active",
+    "courserungrade_grade",
+    "courserungrade_letter_grade",
+    "courserungrade_is_passing",
+    "courseruncertificate_uuid",
+    "courseruncertificate_is_revoked",
+    "courseruncertificate_created_on",
+]
+CERTIFICATE_UUID = "6f1c1a3e-2a8e-4d55-9a57-0b6c1f0a9d11"
+
+
+@pytest.fixture
+def course_run():
+    """A course run whose course has a certificate page"""
+    return CourseRunFactory.create(course=CoursePageFactory.create().course)
+
+
+def _enrollment_row(  # noqa: PLR0913
+    status,
+    user,
+    run,
+    *,
+    is_active=True,
+    grade=0.9,
+    is_revoked=False,
+    issued_on="2024-05-06T07:08:09Z",
+):
+    return (
+        "xpro",
+        status,
+        user.id,
+        run.id,
+        "verified",
+        is_active,
+        grade,
+        "A" if grade is not None else None,
+        grade is not None,
+        CERTIFICATE_UUID if issued_on else None,
+        is_revoked if issued_on else None,
+        issued_on,
+    )
+
+
+def _migrate_course_enrollments(rows, **options):
+    conn = FakeConnection(columns=ENROLLMENT_COLUMNS, rows=rows)
+    Command(stdout=StringIO())._migrate_course_enrollments(  # noqa: SLF001
+        conn, {"platform": "xpro", **options}
+    )
+    return conn
+
+
+@pytest.mark.usefixtures("trino_settings")
+def test_course_enrollments_query_filters_platform_and_runs():
+    """The query reads the platform's rows that have MITx Online ids, with the
+    course run filter bound as a parameter
+    """
+    conn = _migrate_course_enrollments([], courserun_readable_ids="course-v1:xPRO+A+R1")
+
+    [(query, params)] = conn.executed
+    assert query == (
+        f"SELECT * FROM ol_data_lake_production.{MIGRATION_SCHEMA}."  # noqa: S608
+        "mitxonline_migration_course_enrollments WHERE source = 'xpro' "
+        "AND user_mitxonline_id IS NOT NULL AND courserun_id IS NOT NULL "
+        "AND courserun_readable_id IN (?)"
+    )
+    assert params == ["course-v1:xPRO+A+R1"]
+
+
+def test_course_enrollments_new_row_creates_enrollment_grade_and_certificate(
+    course_run,
+):
+    """A new row creates the enrollment, the grade and the certificate, which
+    keeps the source's UUID and issue date
+    """
+    user = UserFactory.create()
+
+    _migrate_course_enrollments([_enrollment_row("new", user, course_run)])
+
+    enrollment = CourseRunEnrollment.objects.get(user=user, run=course_run)
+    assert enrollment.enrollment_mode == "verified"
+    assert enrollment.edx_enrolled is True
+    grade = CourseRunGrade.objects.get(user=user, course_run=course_run)
+    assert (grade.grade, grade.letter_grade, grade.passed) == (0.9, "A", True)
+    certificate = CourseRunCertificate.objects.get(user=user, course_run=course_run)
+    assert str(certificate.uuid) == CERTIFICATE_UUID
+    assert certificate.issue_date == datetime(2024, 5, 6, 7, 8, 9, tzinfo=UTC)
+    assert certificate.certificate_page_revision is not None
+
+
+@pytest.mark.parametrize("is_active", [True, False])
+def test_course_enrollments_status_changed_sets_active(course_run, is_active):
+    """A status_changed row sets the enrollment's active status"""
+    enrollment = CourseRunEnrollmentFactory.create(run=course_run, active=not is_active)
+
+    _migrate_course_enrollments(
+        [
+            _enrollment_row(
+                "status_changed", enrollment.user, course_run, is_active=is_active
+            )
+        ]
+    )
+
+    enrollment.refresh_from_db()
+    assert enrollment.active is is_active
+
+
+def test_course_enrollments_grade_changed_updates_grade_with_audit(course_run):
+    """A grade_changed row updates the grade and writes an audit row"""
+    grade = CourseRunGradeFactory.create(
+        course_run=course_run,
+        grade=0.2,
+        passed=False,
+        letter_grade="F",
+        set_by_admin=False,
+    )
+
+    _migrate_course_enrollments(
+        [_enrollment_row("grade_changed", grade.user, course_run, issued_on=None)]
+    )
+
+    grade.refresh_from_db()
+    assert (grade.grade, grade.letter_grade, grade.passed) == (0.9, "A", True)
+    audit = CourseRunGradeAudit.objects.get(course_run_grade=grade)
+    assert audit.data_before["grade"] == 0.2
+    assert audit.data_after["grade"] == 0.9
+
+
+@pytest.mark.parametrize("is_revoked", [True, False])
+def test_course_enrollments_certificate_changed_sets_revoked(course_run, is_revoked):
+    """A certificate_changed row sets the existing certificate's revoked status"""
+    certificate = CourseRunCertificateFactory.create(
+        course_run=course_run, is_revoked=not is_revoked
+    )
+
+    _migrate_course_enrollments(
+        [
+            _enrollment_row(
+                "certificate_changed",
+                certificate.user,
+                course_run,
+                is_revoked=is_revoked,
+            )
+        ]
+    )
+
+    certificate.refresh_from_db()
+    assert certificate.is_revoked is is_revoked
+    assert CourseRunCertificate.all_objects.filter(user=certificate.user).count() == 1
+
+
+def test_course_enrollments_dry_run_does_not_write(course_run):
+    """A dry run counts the changes and writes nothing"""
+    new_user = UserFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(run=course_run, active=True)
+    grade = CourseRunGradeFactory.create(
+        course_run=course_run, grade=0.2, set_by_admin=False
+    )
+    stdout = StringIO()
+    conn = FakeConnection(
+        columns=ENROLLMENT_COLUMNS,
+        rows=[
+            _enrollment_row("new", new_user, course_run),
+            _enrollment_row(
+                "status_changed", enrollment.user, course_run, is_active=False
+            ),
+            _enrollment_row("grade_changed", grade.user, course_run, issued_on=None),
+        ],
+    )
+
+    Command(stdout=stdout)._migrate_course_enrollments(  # noqa: SLF001
+        conn, {"platform": "xpro", "dry_run": True}
+    )
+
+    assert not CourseRunEnrollment.all_objects.filter(user=new_user).exists()
+    assert not CourseRunCertificate.all_objects.exists()
+    enrollment.refresh_from_db()
+    grade.refresh_from_db()
+    assert enrollment.active is True
+    assert grade.grade == 0.2
+    assert (
+        "[DRY RUN] Would write: 1 enrollments created, 1 enrollments updated, "
+        "1 grades created, 1 grades updated, 1 certificates created, "
+        "0 certificates updated"
+    ) in stdout.getvalue()
+
+
+PROGRAM_CERTIFICATE_COLUMNS = [
+    "source",
+    "migration_status",
+    "user_mitxonline_id",
+    "program_id",
+    "programcertificate_uuid",
+    "programcertificate_is_revoked",
+    "program_certificate_issued_on",
+]
+
+
+def _migrate_program_certificates(rows):
+    conn = FakeConnection(columns=PROGRAM_CERTIFICATE_COLUMNS, rows=rows)
+    Command(stdout=StringIO())._migrate_platform_program_certificates(  # noqa: SLF001
+        conn, {"platform": "xpro"}
+    )
+    return conn
+
+
+@pytest.mark.usefixtures("trino_settings")
+def test_platform_program_certificates_new_row_creates_enrollment_and_certificate():
+    """A new row creates the program enrollment and the certificate"""
+    program = ProgramPageFactory.create().program
+    user = UserFactory.create()
+
+    conn = _migrate_program_certificates(
+        [
+            (
+                "xpro",
+                "new",
+                user.id,
+                program.id,
+                CERTIFICATE_UUID,
+                False,
+                "2024-05-06T07:08:09Z",
+            )
+        ]
+    )
+
+    [(query, _)] = conn.executed
+    assert query.endswith(
+        "mitxonline_migration_program_certificates WHERE source = 'xpro' "
+        "AND user_mitxonline_id IS NOT NULL AND program_id IS NOT NULL"
+    )
+    assert ProgramEnrollment.objects.filter(user=user, program=program).exists()
+    certificate = ProgramCertificate.objects.get(user=user, program=program)
+    assert str(certificate.uuid) == CERTIFICATE_UUID
+    assert certificate.issue_date == datetime(2024, 5, 6, 7, 8, 9, tzinfo=UTC)
+
+
+def test_platform_program_certificates_certificate_changed_revokes():
+    """A certificate_changed row sets the existing certificate's revoked status"""
+    certificate = ProgramCertificateFactory.create(
+        program=ProgramPageFactory.create().program
+    )
+
+    _migrate_program_certificates(
+        [
+            (
+                "xpro",
+                "certificate_changed",
+                certificate.user_id,
+                certificate.program_id,
+                CERTIFICATE_UUID,
+                True,
+                "2024-05-06T07:08:09Z",
+            )
+        ]
+    )
+
+    certificate.refresh_from_db()
+    assert certificate.is_revoked is True
+    assert not ProgramEnrollment.all_objects.filter(user=certificate.user).exists()
+
+
+@pytest.mark.parametrize(
+    ("migrate_type", "method"),
+    [
+        ("course_runs", "_migrate_course_runs"),
+        ("program_certificates", "_migrate_program_certificates"),
+        ("letter_grades", "_backfill_letter_grades"),
+    ],
+)
+def test_handle_defaults_to_edxorg(mocker, migrate_type, method):
+    """Without --platform the command runs the edX.org migrations, as before"""
+    mocker.patch.object(Command, "_connect_to_warehouse")
+    migrate = mocker.patch.object(Command, method)
+
+    call_command("migrate_edx_data", type=migrate_type, stdout=StringIO())
+
+    migrate.assert_called_once()
+    assert migrate.call_args.args[1]["platform"] == "edxorg"
+
+
+EDXORG_COURSE_RUN_COLUMNS = [
+    *PLATFORM_COURSE_RUN_COLUMNS,
+    "department_name",
+    "signatory_names",
+    "certificate_count",
+]
+
+
+@pytest.mark.usefixtures("trino_settings")
+def test_edxorg_course_runs_stay_live_with_department():
+    """edX.org runs are live even when edX.org has them unpublished, and the
+    course gets its department
+    """
+    if not CourseIndexPage.objects.filter(live=True).exists():
+        CourseIndexPageFactory.create()
+    signatory = SignatoryPageFactory.create()
+    conn = FakeConnection(
+        columns=EDXORG_COURSE_RUN_COLUMNS,
+        rows=[
+            (
+                "edxorg",
+                None,
+                "course-v1:MITx+6.00x",
+                "Course",
+                "Run",
+                "course-v1:MITx+6.00x+1T2024",
+                "1T2024",
+                None,
+                None,
+                None,
+                None,
+                False,
+                False,
+                "Electrical Engineering",
+                f'["{signatory.name}"]',
+                3,
+            )
+        ],
+    )
+
+    Command(stdout=StringIO())._migrate_course_runs(  # noqa: SLF001
+        conn, {"use_default_signatory": False}
+    )
+
+    [(query, _)] = conn.executed
+    assert query == (
+        f"SELECT * FROM ol_data_lake_production.{MIGRATION_SCHEMA}."  # noqa: S608
+        "edxorg_to_mitxonline_course_runs"
+    )
+    course = Course.objects.get(readable_id="course-v1:MITx+6.00x")
+    assert list(course.departments.values_list("name", flat=True)) == [
+        "Electrical Engineering"
+    ]
+    assert CourseRun.objects.get(courseware_id="course-v1:MITx+6.00x+1T2024").live

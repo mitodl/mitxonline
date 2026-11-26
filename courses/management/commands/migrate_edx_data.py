@@ -1,6 +1,9 @@
 import json
 import ssl
-from datetime import UTC
+import uuid
+from collections import defaultdict
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import pymysql
 import trino.dbapi
@@ -51,6 +54,12 @@ MIGRATION_SCHEMA = "ol_warehouse_production_migration"
 # exposes it under this catalog; Trino's catalog name comes from TRINO_CATALOG.
 STARROCKS_CATALOG = "ol_data_lake_production"
 
+PLATFORM_EDXORG = "edxorg"
+# The mitxonline_migration_* tables hold every other platform, one per value of
+# their source column. Add a platform here when the data platform adds its source.
+MIGRATION_TABLE_PLATFORMS = ("xpro",)
+PLATFORMS = (PLATFORM_EDXORG, *MIGRATION_TABLE_PLATFORMS)
+
 
 def _uses_trino():
     return settings.EDX_MIGRATION_WAREHOUSE == WAREHOUSE_TRINO
@@ -76,10 +85,30 @@ def _warehouse_list(value):
     return list(value)
 
 
+def _platform_table(name, platform):
+    """The table and the WHERE conditions that select one platform's rows"""
+    if platform == PLATFORM_EDXORG:
+        return _warehouse_table(f"edxorg_to_mitxonline_{name}"), []
+    # platform is one of MIGRATION_TABLE_PLATFORMS, so it is safe to inline
+    return _warehouse_table(f"mitxonline_migration_{name}"), [f"source = '{platform}'"]
+
+
+def _select_query(table, conditions, limit=None):
+    query = f"SELECT * FROM {table}"  # noqa: S608
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    if limit is not None:
+        query += f" LIMIT {int(limit)}"
+    return query
+
+
 def _warehouse_datetime(value):
     """Read a timestamp column. StarRocks sends it naive, in the session's time zone,
-    which _connect_to_starrocks sets to UTC.
+    which _connect_to_starrocks sets to UTC. The mitxonline_migration_* tables send
+    ISO 8601 text.
     """
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
     if value is None or value.tzinfo is not None:
         return value
     return value.replace(tzinfo=UTC)
@@ -118,11 +147,39 @@ def _connect_to_starrocks():
     )
 
 
+@dataclass(frozen=True)
+class _CertificateColumns:
+    model: type
+    object_field: str
+    object_column: str
+    uuid_column: str
+    revoked_column: str
+    issued_column: str
+
+
+COURSE_RUN_CERTIFICATE_COLUMNS = _CertificateColumns(
+    model=CourseRunCertificate,
+    object_field="course_run_id",
+    object_column="courserun_id",
+    uuid_column="courseruncertificate_uuid",
+    revoked_column="courseruncertificate_is_revoked",
+    issued_column="courseruncertificate_created_on",
+)
+PROGRAM_CERTIFICATE_COLUMNS = _CertificateColumns(
+    model=ProgramCertificate,
+    object_field="program_id",
+    object_column="program_id",
+    uuid_column="programcertificate_uuid",
+    revoked_column="programcertificate_is_revoked",
+    issued_column="program_certificate_issued_on",
+)
+
+
 class Command(BaseCommand):
     help = (
-        "Migrate the edX data via the data platform's warehouse (Trino or StarRocks, "
-        "per EDX_MIGRATION_WAREHOUSE) to the corresponding models in MITx Online "
-        "e.g Course, CourseRun, CoursePage CertificatePage, etc."
+        "Migrate edX.org, xPRO or other platform data via the data platform's warehouse "
+        "(Trino or StarRocks, per EDX_MIGRATION_WAREHOUSE) to the corresponding models "
+        "in MITx Online e.g Course, CourseRun, CoursePage CertificatePage, etc."
     )
 
     def _connect_to_warehouse(self):
@@ -170,10 +227,6 @@ class Command(BaseCommand):
             - Course instance: The created or retrieved Course model instance
             - boolean: True if a new course was created, False if existing was retrieved
         """
-        department, _ = Department.objects.get_or_create(
-            name=row.get("department_name")
-        )
-
         course, created = Course.objects.get_or_create(
             readable_id=row.get("course_readable_id"),
             defaults={
@@ -182,7 +235,12 @@ class Command(BaseCommand):
                 "live": False,
             },
         )
-        course.departments.add(department)
+        # Only the edX.org table has departments
+        if row.get("department_name"):
+            department, _ = Department.objects.get_or_create(
+                name=row["department_name"]
+            )
+            course.departments.add(department)
         course.save()
 
         return course, created
@@ -225,13 +283,14 @@ class Command(BaseCommand):
 
         return certificate_page
 
-    def _create_course_run(self, course, row):
+    def _create_course_run(self, course, row, *, live=True):
         """
         Create a new CourseRun instance for the given course using data from row.
 
         Args:
             course (Course): Course model instance to create the run for
             row (dict): Dictionary containing course run data from the warehouse
+            live (bool): Whether the new course run is live
 
         Returns:
             tuple: Tuple containing (CourseRun instance, boolean indicating if created)
@@ -246,7 +305,7 @@ class Command(BaseCommand):
                 "enrollment_start": _warehouse_datetime(row.get("enrollment_start")),
                 "enrollment_end": _warehouse_datetime(row.get("enrollment_end")),
                 "title": row.get("courserun_title"),
-                "live": True,
+                "live": live,
                 "is_self_paced": row.get("is_self_paced"),
             },
         )
@@ -288,13 +347,12 @@ class Command(BaseCommand):
         use_default_signatory = options["use_default_signatory"]
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
+        platform = options.get("platform", PLATFORM_EDXORG)
+        is_edxorg = platform == PLATFORM_EDXORG
 
         cur = conn.cursor()
 
-        query = f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_course_runs')}"  # noqa: S608
-        if limit is not None:
-            query += f" LIMIT {int(limit)}"
-        cur.execute(query)
+        cur.execute(_select_query(*_platform_table("course_runs", platform), limit))
         columns = [desc[0] for desc in cur.description]
 
         course_success_count = 0
@@ -307,13 +365,17 @@ class Command(BaseCommand):
 
             for result in results:
                 row = dict(zip(columns, result))
-                # Skip rows with no department courses or any course with no certificates
-                if (
-                    not row.get("department_name")
-                    and row.get("mitxonline_course_id") is None
-                ) or (
-                    row.get("certificate_count") is None
-                    or int(row.get("certificate_count", 0)) < 1
+                # Skip rows with no department courses or any course with no
+                # certificates. The other tables hold only the runs to create.
+                if is_edxorg and (
+                    (
+                        not row.get("department_name")
+                        and row.get("mitxonline_course_id") is None
+                    )
+                    or (
+                        row.get("certificate_count") is None
+                        or int(row.get("certificate_count", 0)) < 1
+                    )
                 ):
                     continue
 
@@ -321,7 +383,12 @@ class Command(BaseCommand):
                     row.get("signatory_names"), use_default_signatory
                 )
 
-                if not signatories and row.get("mitxonline_course_id") is None:
+                # Only the edX.org table has signatory names
+                if (
+                    is_edxorg
+                    and not signatories
+                    and row.get("mitxonline_course_id") is None
+                ):
                     self.stdout.write(
                         self.style.ERROR(
                             f"No valid signatories found with names {row.get('signatory_names')} for course "
@@ -347,7 +414,10 @@ class Command(BaseCommand):
                             )
                         )
 
-                _, run_created = self._create_course_run(course, row)
+                # edX.org runs are always live; the other platforms send their own status
+                _, run_created = self._create_course_run(
+                    course, row, live=is_edxorg or bool(row.get("is_published"))
+                )
                 if run_created:
                     run_success_count += 1
 
@@ -478,18 +548,16 @@ class Command(BaseCommand):
 
     def _migrate_users(self, conn, options):
         """
-        Migrate users from edX to MITx Online. Create User, LegalAddress, and UserProfile instances.
+        Migrate users from edX.org or another platform to MITx Online. Create User, LegalAddress, and UserProfile instances.
         """
         limit = options.get("limit")
         batch_size = options.get("batch_size", 1000)
         dry_run = options.get("dry_run")
+        platform = options.get("platform", PLATFORM_EDXORG)
 
         cur = conn.cursor()
 
-        query = f"SELECT * FROM {_warehouse_table('edxorg_to_mitxonline_users')}"  # noqa: S608
-        if limit is not None:
-            query += f" LIMIT {int(limit)}"
-        cur.execute(query)
+        cur.execute(_select_query(*_platform_table("users", platform), limit))
         columns = [desc[0] for desc in cur.description]
 
         # e.g. {"Male": "m", "Female": "f"}
@@ -690,7 +758,7 @@ class Command(BaseCommand):
                 user_id=row["user_mitxonline_id"],
                 course_run_id=row["courserun_id"],
                 grade=row["courserungrade_grade"],
-                passed=row["courserungrade_is_passing"],
+                passed=bool(row["courserungrade_is_passing"]),
                 letter_grade=row.get("courserungrade_letter_grade"),
             )
             for row in rows
@@ -1380,6 +1448,334 @@ class Command(BaseCommand):
             )
         )
 
+    @staticmethod
+    def _sync_enrollment_status(rows, *, dry_run):
+        """
+        Set active on the existing course run enrollments to match the rows.
+
+        Returns:
+            int: The number of enrollments updated, or that would be updated on a dry run
+        """
+        updated = 0
+        for active in (True, False):
+            match = Q()
+            for row in rows:
+                if bool(row["courserunenrollment_is_active"]) == active:
+                    match |= Q(
+                        user_id=row["user_mitxonline_id"], run_id=row["courserun_id"]
+                    )
+            if not match:
+                continue
+            enrollments = CourseRunEnrollment.all_objects.filter(match).exclude(
+                active=active
+            )
+            updated += (
+                enrollments.count()
+                if dry_run
+                else enrollments.update(active=active, updated_on=now_in_utc())
+            )
+        return updated
+
+    @staticmethod
+    def _sync_grades(rows, batch_size, *, dry_run, call_stack):
+        """
+        Create the missing grades, and update the existing grades to match the rows.
+        A grade that an admin set is not changed.
+
+        Returns:
+            tuple: (grades created, grades updated), or the counts a dry run would write
+        """
+        rows_by_key = {
+            (row["user_mitxonline_id"], row["courserun_id"]): row
+            for row in rows
+            if row["courserungrade_grade"] is not None
+        }
+        if not rows_by_key:
+            return 0, 0
+
+        with transaction.atomic():
+            existing = {
+                (grade.user_id, grade.course_run_id): grade
+                for grade in CourseRunGrade.objects.select_for_update().filter(
+                    user_id__in={user_id for user_id, _ in rows_by_key},
+                    course_run_id__in={run_id for _, run_id in rows_by_key},
+                )
+                if (grade.user_id, grade.course_run_id) in rows_by_key
+            }
+            new_rows = [row for key, row in rows_by_key.items() if key not in existing]
+            grades = [grade for grade in existing.values() if not grade.set_by_admin]
+            if dry_run:
+                return len(new_rows), len(grades)
+
+            # bulk_update skips save_and_log, so the audit rows are written here
+            now = now_in_utc()
+            audits = []
+            for grade in grades:
+                row = rows_by_key[(grade.user_id, grade.course_run_id)]
+                data_before = grade.to_dict()
+                grade.grade = row["courserungrade_grade"]
+                grade.passed = bool(row["courserungrade_is_passing"])
+                grade.letter_grade = row.get("courserungrade_letter_grade")
+                grade.updated_on = now
+                audits.append(
+                    CourseRunGradeAudit(
+                        course_run_grade=grade,
+                        acting_user=None,
+                        call_stack=call_stack,
+                        data_before=data_before,
+                        data_after=grade.to_dict(),
+                    )
+                )
+            CourseRunGrade.objects.bulk_update(
+                grades, ["grade", "passed", "letter_grade", "updated_on"]
+            )
+            CourseRunGradeAudit.objects.bulk_create(audits)
+            created = Command._bulk_create_grades(new_rows, batch_size)
+        return created, len(grades)
+
+    @staticmethod
+    def _course_run_certificate_revisions(run_ids):
+        revisions = {}
+        course_revisions = {}
+        for run in CourseRun.all_objects.filter(id__in=run_ids).select_related(
+            "course"
+        ):
+            if run.course_id not in course_revisions:
+                course_revisions[run.course_id] = (
+                    run.course.get_certificate_page_revision()
+                )
+            revisions[run.id] = course_revisions[run.course_id]
+        return revisions
+
+    @staticmethod
+    def _program_certificate_revisions(program_ids):
+        return {
+            program.id: program.get_certificate_page_revision()
+            for program in Program.objects.filter(id__in=program_ids)
+        }
+
+    @staticmethod
+    def _sync_certificates(rows, columns, revisions, batch_size, *, dry_run):
+        """
+        Create the missing valid certificates, and set is_revoked on the existing
+        certificates to match the rows. A certificate is created only when its
+        course or program has a certificate page.
+
+        Args:
+            rows (list of dict): The warehouse rows
+            columns (_CertificateColumns): The certificate model and its row columns
+            revisions (dict): The certificate page revision for each course run or program id
+            batch_size (int): Number of objects per bulk query
+            dry_run (bool): Count the changes without writing them
+
+        Returns:
+            tuple: (certificates created, certificates updated, rows skipped for a
+            missing certificate page), or the counts a dry run would write
+        """
+        rows_by_key = {
+            (row["user_mitxonline_id"], row[columns.object_column]): row for row in rows
+        }
+        if not rows_by_key:
+            return 0, 0, 0
+
+        existing = {
+            (cert.user_id, getattr(cert, columns.object_field)): cert
+            for cert in columns.model.all_objects.filter(
+                user_id__in={user_id for user_id, _ in rows_by_key},
+                **{
+                    f"{columns.object_field}__in": {
+                        object_id for _, object_id in rows_by_key
+                    }
+                },
+            )
+        }
+
+        now = now_in_utc()
+        to_update = []
+        to_create = []
+        skipped = 0
+        for (user_id, object_id), row in rows_by_key.items():
+            is_revoked = bool(row[columns.revoked_column])
+            cert = existing.get((user_id, object_id))
+            if cert is not None:
+                if cert.is_revoked != is_revoked:
+                    cert.is_revoked = is_revoked
+                    cert.updated_on = now
+                    to_update.append(cert)
+                continue
+            if is_revoked:
+                continue
+            revision = revisions.get(object_id)
+            if revision is None:
+                skipped += 1
+                continue
+            to_create.append(
+                columns.model(
+                    user_id=user_id,
+                    **{columns.object_field: object_id},
+                    # The source's UUID keeps old certificate links working
+                    uuid=row.get(columns.uuid_column) or uuid.uuid4(),
+                    issue_date=_warehouse_datetime(row[columns.issued_column]),
+                    certificate_page_revision=revision,
+                )
+            )
+
+        if not dry_run:
+            columns.model.all_objects.bulk_update(
+                to_update, ["is_revoked", "updated_on"], batch_size=batch_size
+            )
+            columns.model.all_objects.bulk_create(
+                to_create, batch_size=batch_size, ignore_conflicts=True
+            )
+        return len(to_create), len(to_update), skipped
+
+    def _write_totals(self, totals, *, dry_run):
+        counts = ", ".join(
+            f"{count} {name}"
+            for name, count in totals.items()
+            if not name.endswith("skipped")
+        )
+        if dry_run:
+            self.stdout.write(self.style.WARNING(f"[DRY RUN] Would write: {counts}"))
+        else:
+            self.stdout.write(self.style.SUCCESS(f"Migration complete: {counts}"))
+
+    def _write_certificate_skips(self, skipped, kind):
+        if skipped:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Skipped {skipped} {kind} certificates: the {kind} has no live "
+                    "certificate page"
+                )
+            )
+
+    def _migrate_course_enrollments(self, conn, options):
+        """
+        Migrate the course run enrollments, grades and certificates of a platform in
+        the mitxonline_migration_* tables. Each row's migration_status says what to do:
+        new creates the enrollment with its grade and certificate, status_changed
+        sets the enrollment's active status, grade_changed sets the grade, and
+        certificate_changed creates the certificate or sets its revoked status.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+        platform = options["platform"]
+        call_stack = f"migrate_edx_data --platform {platform} --type course_enrollments"
+
+        table, conditions = _platform_table("course_enrollments", platform)
+        # The ids stay null until the user and the run are in MITx Online
+        conditions += ["user_mitxonline_id IS NOT NULL", "courserun_id IS NOT NULL"]
+        courserun_filter, params = self._courserun_filter(options)
+        if courserun_filter:
+            conditions.append(courserun_filter)
+
+        cur = conn.cursor()
+        cur.execute(_select_query(table, conditions, limit), params)
+        columns = [desc[0] for desc in cur.description]
+
+        totals = defaultdict(int)
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows_by_status = defaultdict(list)
+            for result in results:
+                row = dict(zip(columns, result))
+                rows_by_status[row["migration_status"]].append(row)
+            new_rows = rows_by_status["new"]
+
+            # edx_enrolled=True keeps retry_failed_edx_enrollments from pushing
+            # the migrated enrollments to Open edX
+            totals["enrollments created"] += (
+                len(new_rows)
+                if dry_run
+                else self._bulk_create_enrollments(new_rows, batch_size)
+            )
+            totals["enrollments updated"] += self._sync_enrollment_status(
+                rows_by_status["status_changed"], dry_run=dry_run
+            )
+
+            created, updated = self._sync_grades(
+                new_rows + rows_by_status["grade_changed"],
+                batch_size,
+                dry_run=dry_run,
+                call_stack=call_stack,
+            )
+            totals["grades created"] += created
+            totals["grades updated"] += updated
+
+            certificate_rows = [
+                row
+                for row in new_rows
+                if row["courseruncertificate_created_on"] is not None
+            ] + rows_by_status["certificate_changed"]
+            created, updated, skipped = self._sync_certificates(
+                certificate_rows,
+                COURSE_RUN_CERTIFICATE_COLUMNS,
+                self._course_run_certificate_revisions(
+                    {row["courserun_id"] for row in certificate_rows}
+                ),
+                batch_size,
+                dry_run=dry_run,
+            )
+            totals["certificates created"] += created
+            totals["certificates updated"] += updated
+            totals["certificates skipped"] += skipped
+
+        self._write_totals(totals, dry_run=dry_run)
+        self._write_certificate_skips(totals["certificates skipped"], "course")
+
+    def _migrate_platform_program_certificates(self, conn, options):
+        """
+        Migrate the program enrollments and certificates of a platform in the
+        mitxonline_migration_* tables. A new row creates the program enrollment and
+        the certificate. A certificate_changed row sets the certificate's revoked
+        status.
+        """
+        limit = options.get("limit")
+        batch_size = options.get("batch_size", 1000)
+        dry_run = options.get("dry_run")
+
+        table, conditions = _platform_table("program_certificates", options["platform"])
+        # The ids stay null until the user and the program are in MITx Online
+        conditions += ["user_mitxonline_id IS NOT NULL", "program_id IS NOT NULL"]
+
+        cur = conn.cursor()
+        cur.execute(_select_query(table, conditions, limit))
+        columns = [desc[0] for desc in cur.description]
+
+        totals = defaultdict(int)
+        while True:
+            results = cur.fetchmany(batch_size)
+            if not results:
+                break
+
+            rows = [dict(zip(columns, r)) for r in results]
+            new_rows = [row for row in rows if row["migration_status"] == "new"]
+
+            totals["program enrollments created"] += (
+                len(new_rows)
+                if dry_run
+                else self._bulk_create_program_enrollments(new_rows, batch_size)
+            )
+            created, updated, skipped = self._sync_certificates(
+                rows,
+                PROGRAM_CERTIFICATE_COLUMNS,
+                self._program_certificate_revisions(
+                    {row["program_id"] for row in rows}
+                ),
+                batch_size,
+                dry_run=dry_run,
+            )
+            totals["program certificates created"] += created
+            totals["program certificates updated"] += updated
+            totals["program certificates skipped"] += skipped
+
+        self._write_totals(totals, dry_run=dry_run)
+        self._write_certificate_skips(totals["program certificates skipped"], "program")
+
     def add_arguments(self, parser) -> None:
         parser.add_argument(
             "--use-default-signatory",
@@ -1398,19 +1794,31 @@ class Command(BaseCommand):
             help="Number of warehouse rows to process per batch (default: 1000). The whole result is read into memory first.",
         )
         parser.add_argument(
+            "--platform",
+            choices=PLATFORMS,
+            default=PLATFORM_EDXORG,
+            help=(
+                "The platform to migrate from (default: edxorg). edxorg reads the "
+                "edxorg_to_mitxonline_* tables. The other platforms read their rows "
+                "of the mitxonline_migration_* tables."
+            ),
+        )
+        types_by_platform = {
+            platform: list(self._migrations(platform)) for platform in PLATFORMS
+        }
+        parser.add_argument(
             "--type",
-            choices=[
-                "course_runs",
-                "users",
-                "course_certificates",
-                "program_certificates",
-                "entitlements",
-                "future_enrollments",
-                "repair_migrated_profiles",
-                "letter_grades",
-            ],
+            choices=list(
+                dict.fromkeys(t for types in types_by_platform.values() for t in types)
+            ),
             default="course_runs",
-            help="Choose which migration to run: course_runs, users, course_certificates, program_certificates, entitlements, future_enrollments, repair_migrated_profiles, letter_grades (default: course_runs)",
+            help=(
+                "Choose which migration to run (default: course_runs). "
+                + "; ".join(
+                    f"{platform}: {', '.join(types)}"
+                    for platform, types in types_by_platform.items()
+                )
+            ),
         )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -1419,48 +1827,71 @@ class Command(BaseCommand):
             help="Comma-separated list of course run readable IDs to migrate",
         )
 
+    def _migrations(self, platform):
+        """The progress message and the method of each migration type of the platform"""
+        if platform == PLATFORM_EDXORG:
+            return {
+                "course_runs": (
+                    "Migrating the edX course runs ...",
+                    self._migrate_course_runs,
+                ),
+                "users": ("Migrating the edX users ...", self._migrate_users),
+                "course_certificates": (
+                    "Migrating the edX course enrollments, grades and certificates ...",
+                    self._migrate_course_certificates,
+                ),
+                "program_certificates": (
+                    "Migrating the edX program enrollments and certificates ...",
+                    self._migrate_program_certificates,
+                ),
+                "entitlements": (
+                    "Migrating the edX entitlements to program orders and enrollments ...",
+                    self._migrate_entitlements,
+                ),
+                "future_enrollments": (
+                    "Migrating the edX future enrollments  ...",
+                    self._migrate_enrollments,
+                ),
+                "repair_migrated_profiles": (
+                    "Repairing LegalAddress/UserProfile rows missed by a "
+                    "historical bug in the users migration ...",
+                    self._repair_migrated_user_profiles,
+                ),
+                "letter_grades": (
+                    "Backfilling edX.org letter grades ...",
+                    self._backfill_letter_grades,
+                ),
+            }
+        return {
+            "course_runs": (
+                f"Migrating the {platform} course runs ...",
+                self._migrate_course_runs,
+            ),
+            "users": (f"Migrating the {platform} users ...", self._migrate_users),
+            "course_enrollments": (
+                f"Migrating the {platform} course enrollments, grades and "
+                "certificates ...",
+                self._migrate_course_enrollments,
+            ),
+            "program_certificates": (
+                f"Migrating the {platform} program enrollments and certificates ...",
+                self._migrate_platform_program_certificates,
+            ),
+        }
+
     def handle(self, *args, **options):  # pylint: disable=unused-argument # noqa: ARG002
+        platform = options["platform"]
+        migrate_type = options.get("type")
+        migrations = self._migrations(platform)
+        if migrate_type not in migrations:
+            msg = (
+                f"--type {migrate_type} is not available for --platform {platform}. "
+                f"Choose one of: {', '.join(migrations)}"
+            )
+            raise CommandError(msg)
+
         conn = self._connect_to_warehouse()
 
-        migrate_type = options.get("type")
-
-        if migrate_type == "course_runs":
-            self.stdout.write("Migrating the edX course runs ...")
-            self._migrate_course_runs(conn, options)
-
-        if migrate_type == "users":
-            self.stdout.write("Migrating the edX users ...")
-            self._migrate_users(conn, options)
-
-        if migrate_type == "repair_migrated_profiles":
-            self.stdout.write(
-                "Repairing LegalAddress/UserProfile rows missed by a "
-                "historical bug in the users migration ..."
-            )
-            self._repair_migrated_user_profiles(conn, options)
-
-        if migrate_type == "course_certificates":
-            self.stdout.write(
-                "Migrating the edX course enrollments, grades and certificates ..."
-            )
-            self._migrate_course_certificates(conn, options)
-
-        if migrate_type == "program_certificates":
-            self.stdout.write(
-                "Migrating the edX program enrollments and certificates ..."
-            )
-            self._migrate_program_certificates(conn, options)
-
-        if migrate_type == "entitlements":
-            self.stdout.write(
-                "Migrating the edX entitlements to program orders and enrollments ..."
-            )
-            self._migrate_entitlements(conn, options)
-
-        if migrate_type == "future_enrollments":
-            self.stdout.write("Migrating the edX future enrollments  ...")
-            self._migrate_enrollments(conn, options)
-
-        if migrate_type == "letter_grades":
-            self.stdout.write("Backfilling edX.org letter grades ...")
-            self._backfill_letter_grades(conn, options)
+        message, migrate = migrations[migrate_type]
+        self.stdout.write(message)
+        migrate(conn, options)
