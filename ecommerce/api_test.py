@@ -3582,29 +3582,37 @@ def test_generate_checkout_payload_return_urls(
 
 
 @pytest.mark.parametrize(
-    ("order_total", "holds_program", "program_entitled", "restored"),
+    ("order_total", "discount", "holds_program", "program_entitled", "restored"),
     [
-        (10, False, False, True),  # bought the run
-        (0, True, False, True),  # $0 order from a program the learner holds
-        (0, False, True, True),  # $0 order, caller checked the program
-        (0, False, False, False),  # $0 order from a program that was refunded
+        (10, None, False, False, True),  # bought the run
+        (0, "code", False, False, True),  # bought it with a 100%-off code
+        (0, "program", True, False, True),  # free with a program the learner holds
+        (0, "program", False, True, True),  # free with a program, caller checked it
+        (0, "program", False, False, False),  # free with a program that was refunded
     ],
 )
 def test_restore_paid_course_run_enrollment_payment(  # noqa: PLR0913
-    mocker, user, order_total, holds_program, program_entitled, restored
+    mocker, user, order_total, discount, holds_program, program_entitled, restored
 ):
-    """A zero-value program order only counts while the program is still paid for"""
+    """An order that came free with a program only counts while the program is paid for"""
     run = CourseRunFactory.create()
     enrollment = CourseRunEnrollmentFactory.create(
         user=user, run=run, enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE
     )
-    PaidCourseRun.objects.create(
-        user=user,
-        course_run=run,
-        order=OrderFactory.create(
-            purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=order_total
-        ),
+    order = OrderFactory.create(
+        purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=order_total
     )
+    PaidCourseRun.objects.create(user=user, course_run=run, order=order)
+    if discount:
+        DiscountRedemptionFactory.create(
+            redeemed_by=user,
+            redeemed_order=order,
+            redeemed_discount=(
+                InternalDiscountFactory
+                if discount == "program"
+                else UnlimitedUseDiscountFactory
+            ).create(amount=100, discount_type=DISCOUNT_TYPE_PERCENT_OFF),
+        )
     if holds_program:
         program = ProgramFactory.create()
         program.add_requirement(run.course)
@@ -3660,3 +3668,38 @@ def test_restore_paid_course_run_enrollment_no_reenroll(mocker, user, case):
 
     assert result == (enrollment if case == "already_verified" else None)
     mock_enroll.assert_not_called()
+
+
+@pytest.mark.parametrize("edx_enrolled", [True, False])
+def test_restore_paid_course_run_enrollment_resets_edx_retries(
+    mocker, user, edx_enrolled
+):
+    """A restore whose edX call fails gets a fresh repair retry budget"""
+    run = CourseRunFactory.create()
+    enrollment = CourseRunEnrollmentFactory.create(
+        user=user,
+        run=run,
+        enrollment_mode=EDX_ENROLLMENT_AUDIT_MODE,
+        edx_enrolled=edx_enrolled,
+        edx_enrollment_retry_count=5,
+    )
+    PaidCourseRun.objects.create(
+        user=user,
+        course_run=run,
+        order=OrderFactory.create(
+            purchaser=user, state=OrderStatus.FULFILLED, total_price_paid=10
+        ),
+    )
+    mocker.patch(
+        "courses.models.CourseRun.is_upgradable",
+        new_callable=mocker.PropertyMock,
+        return_value=True,
+    )
+    mocker.patch(
+        "ecommerce.api.create_run_enrollments", return_value=([enrollment], True)
+    )
+
+    restore_paid_course_run_enrollment(user, run)
+
+    enrollment.refresh_from_db()
+    assert enrollment.edx_enrollment_retry_count == (5 if edx_enrolled else 0)

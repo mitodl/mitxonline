@@ -2993,15 +2993,27 @@ class PaidCourseRun(TimestampedModel):
             Boolean
         """
 
+        return cls.fulfilled_for(user, run).exists()
+
+    @classmethod
+    def fulfilled_for(cls, user, run):
+        """
+        PaidCourseRuns for the user and run whose order is fulfilled.
+
+        Args:
+            user: a User, or an OuterRef to one
+            run: a CourseRun, or an OuterRef to one
+        Returns:
+            QuerySet of PaidCourseRun
+        """
         # Due to circular dependancy importing locally
         from ecommerce.models import OrderStatus  # noqa: PLC0415
 
-        # PaidCourseRun should only contain fulfilled orders
         return cls.objects.filter(
             user=user,
             course_run=run,
             order__state=OrderStatus.FULFILLED,
-        ).exists()
+        )
 
 
 class PaidProgram(TimestampedModel):

@@ -2072,15 +2072,15 @@ def _is_course_run_paid_for(user, courserun, *, program_entitled):
     """
     Whether the learner holds a fulfilled order for the run that still counts.
 
-    An order with a non-zero total counts. A zero-value one comes from a
-    program (or a full discount) and counts only if program_entitled is set or
+    An order counts unless it was made free by a program's internal discount
+    (a program entitlement). That one counts only if program_entitled is set or
     the learner still holds a fulfilled program purchase that includes the
-    run's course.
+    run's course, since refunding a program leaves those orders fulfilled.
     """
-    paid_runs = PaidCourseRun.objects.filter(
-        user=user, course_run=courserun, order__state=OrderStatus.FULFILLED
-    )
-    if paid_runs.filter(order__total_price_paid__gt=0).exists():
+    paid_runs = PaidCourseRun.fulfilled_for(user, courserun)
+    if paid_runs.exclude(
+        order__discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+    ).exists():
         return True
     if not paid_runs.exists():
         return False
@@ -2110,17 +2110,17 @@ def restore_paid_course_run_enrollment(user, courserun, *, program_entitled=Fals
     - the existing enrollment is inactive or deferred: a deferral keeps the
       payment for a later run, and an inactive enrollment should go through
       the normal enrollment checks
-    - the only order for the run is zero-value and the learner no longer holds
-      the program it came from: refunding a program leaves those orders
-      fulfilled, so they don't prove the run is still paid for
+    - the only order for the run came free with a program the learner no
+      longer holds: refunding a program leaves those orders fulfilled, so they
+      don't prove the run is still paid for
 
     Args:
     - user: The learner.
     - courserun: The course run.
     Kwargs:
     - program_entitled: the caller has checked that the learner holds a
-      verified enrollment in a program that includes the run, so a
-      zero-value program order counts as paid
+      verified enrollment in a program that includes the run, so an order that
+      came free with a program counts as paid
     Returns:
     - CourseRunEnrollment, or None if there's nothing to restore
     Raises:
@@ -2155,7 +2155,15 @@ def restore_paid_course_run_enrollment(user, courserun, *, program_entitled=Fals
         mode=EDX_ENROLLMENT_VERIFIED_MODE,
         keep_failed_enrollments=True,
     )
-    return enrollments[0] if enrollments else None
+    if not enrollments:
+        return None
+    restored = enrollments[0]
+    if not restored.edx_enrolled and restored.edx_enrollment_retry_count:
+        # The edX call failed. The enrollment may have used up its repair
+        # retries while it was on audit, so give the verified sync a fresh start.
+        restored.edx_enrollment_retry_count = 0
+        restored.save(update_fields=["edx_enrollment_retry_count"])
+    return restored
 
 
 def create_verified_program_course_run_enrollment(request, courserun, program):

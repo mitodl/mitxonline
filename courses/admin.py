@@ -1046,16 +1046,9 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
         selection takes longer than a request may last. Inactive and
         non-verified enrollments are skipped.
         """
-        from ecommerce.models import OrderStatus  # noqa: PLC0415
 
         paid = queryset.filter(
-            Exists(
-                PaidCourseRun.objects.filter(
-                    user=OuterRef("user"),
-                    course_run=OuterRef("run"),
-                    order__state=OrderStatus.FULFILLED,
-                )
-            )
+            Exists(PaidCourseRun.fulfilled_for(OuterRef("user"), OuterRef("run")))
         )
         paid_ids = list(paid.values_list("id", flat=True))
         if paid_ids:
