@@ -1541,6 +1541,78 @@ def test_duplicate_redemption_check(peruser):
     assert discount.id in seen_ids
 
 
+def test_duplicate_redemption_check_logs_ids_not_codes(caplog):
+    """The log names the discount, user and orders by ID, not the code or username"""
+    discount = OneTimePerUserDiscountFactory.create()
+    user = UserFactory.create()
+    orders = OrderFactory.create_batch(2, purchaser=user, state=OrderStatus.FULFILLED)
+    for order in orders:
+        DiscountRedemptionFactory.create(
+            redeemed_by=user, redeemed_discount=discount, redeemed_order=order
+        )
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.api"):
+        caplog.clear()
+        assert check_for_duplicate_discount_redemptions() == [discount.id]
+
+    assert f"Discount {discount.id} " in caplog.text
+    assert f"user {user.id} " in caplog.text
+    for order in orders:
+        assert order.reference_number in caplog.text
+    assert discount.discount_code not in caplog.text
+    assert user.username not in caplog.text
+
+
+def test_duplicate_redemption_check_ignores_unfulfilled_per_user_redemptions(caplog):
+    """
+    A one-time-per-user code redeemed on one fulfilled and one unfulfilled order
+    by the same learner isn't a double redemption, even when another learner's
+    fulfilled redemption brings the code's total above one.
+    """
+    discount = OneTimePerUserDiscountFactory.create()
+    user = UserFactory.create()
+    for state in (OrderStatus.FULFILLED, OrderStatus.PENDING):
+        DiscountRedemptionFactory.create(
+            redeemed_by=user,
+            redeemed_discount=discount,
+            redeemed_order=OrderFactory.create(purchaser=user, state=state),
+        )
+    other_user = UserFactory.create()
+    DiscountRedemptionFactory.create(
+        redeemed_by=other_user,
+        redeemed_discount=discount,
+        redeemed_order=OrderFactory.create(
+            purchaser=other_user, state=OrderStatus.FULFILLED
+        ),
+    )
+
+    with caplog.at_level(logging.ERROR, logger="ecommerce.api"):
+        caplog.clear()
+        assert check_for_duplicate_discount_redemptions() == []
+
+    assert caplog.text == ""
+
+
+def test_duplicate_redemption_check_query_count(django_assert_num_queries):
+    """The check runs a fixed number of queries however many redemptions exist"""
+    for discount in [
+        *OneTimeDiscountFactory.create_batch(3),
+        *OneTimePerUserDiscountFactory.create_batch(3),
+    ]:
+        for _ in range(2):
+            user = UserFactory.create()
+            DiscountRedemptionFactory.create(
+                redeemed_by=user,
+                redeemed_discount=discount,
+                redeemed_order=OrderFactory.create(
+                    purchaser=user, state=OrderStatus.FULFILLED
+                ),
+            )
+
+    with django_assert_num_queries(2):
+        check_for_duplicate_discount_redemptions()
+
+
 def test_duplicate_redemption_monitor_flags_shared_source_lines(
     paid_amount_off_source, caplog
 ):

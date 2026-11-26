@@ -1135,6 +1135,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "ecommerce.tasks.perform_cull_stale_pending_orders",
         "schedule": crontab(minute=30, hour=4),
     },
+    "check-for-duplicate-discount-redemptions": {
+        "task": "ecommerce.tasks.perform_check_for_duplicate_discount_redemptions",
+        "schedule": crontab(minute=0, hour=5),
+    },
 }
 
 # django cache back-ends
