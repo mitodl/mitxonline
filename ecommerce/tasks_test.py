@@ -1,14 +1,17 @@
 import pytest
 import reversion
+from django.conf import settings as django_settings
 
 from ecommerce.factories import ProductFactory
 from ecommerce.serializers.serializers_test import create_order_receipt
 from ecommerce.tasks import (
+    perform_check_for_duplicate_discount_redemptions,
     perform_cull_anonymous_baskets,
     perform_cull_stale_pending_orders,
     perform_downgrade_from_order,
     perform_unenrollment_from_order,
 )
+from main.celery import app
 
 
 @pytest.fixture
@@ -33,6 +36,29 @@ def test_perform_cull_stale_pending_orders_calls_api(mocker):
     perform_cull_stale_pending_orders()
 
     mock_cull.assert_called_once()
+
+
+def test_perform_check_for_duplicate_discount_redemptions_runs_both_checks(mocker):
+    """The task should run the duplicate-discount and double-spent-source checks"""
+    mock_discounts = mocker.patch(
+        "ecommerce.api.check_for_duplicate_discount_redemptions"
+    )
+    mock_sources = mocker.patch("ecommerce.api.check_for_double_spent_sources")
+
+    perform_check_for_duplicate_discount_redemptions()
+
+    mock_discounts.assert_called_once_with()
+    mock_sources.assert_called_once_with()
+
+
+def test_duplicate_redemption_check_is_scheduled():
+    """Celery beat should queue the redemption checks, under a registered task name"""
+    task_name = django_settings.CELERY_BEAT_SCHEDULE[
+        "check-for-duplicate-discount-redemptions"
+    ]["task"]
+
+    assert task_name == perform_check_for_duplicate_discount_redemptions.name
+    assert task_name in app.tasks
 
 
 @pytest.mark.skip_nplusone_check
