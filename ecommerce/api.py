@@ -10,9 +10,10 @@ from urllib.parse import urljoin
 import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Q, QuerySet
+from django.db.models import Count, Exists, OuterRef, Q, QuerySet
 from django.urls import reverse
 from ipware import get_client_ip
 from mitol.common.utils.datetime import now_in_utc
@@ -1461,71 +1462,64 @@ def check_for_duplicate_discount_redemptions():
 
     For discounts that are one-time or one-time-per-user redemptions, there's a
     possibility that the code can be redeemed more than once. This will check
-    for that and emit some log messages if so. (This can happen if the code is
-    entered into two orders and those orders are completed simultaneously.)
+    for that and log an error naming the discount and the orders to review.
+    (This can happen if the code is entered into two orders and those orders are
+    completed simultaneously.) Only redemptions on fulfilled orders count.
+
+    The log names the discount and learner by ID rather than code and username:
+    a one-time-per-user code stays redeemable by other learners.
 
     Returns:
-    - List of seen discount IDs
+    - List of the IDs of the discounts redeemed more than once
     """
-
-    redemptions = (
-        DiscountRedemption.objects.filter(
-            Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME)
-            | Q(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME_PER_USER)
+    fulfilled = DiscountRedemption.objects.filter(
+        redeemed_order__state=OrderStatus.FULFILLED
+    )
+    one_time = (
+        fulfilled.filter(redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME)
+        .values("redeemed_discount")
+        .annotate(
+            redemptions=Count("id"),
+            orders=ArrayAgg("redeemed_order__reference_number", distinct=True),
         )
-        .filter(redeemed_order__state=OrderStatus.FULFILLED)
-        .prefetch_related("redeemed_discount")
-        .all()
+        .filter(redemptions__gt=1)
+        .order_by("redeemed_discount")
+    )
+    per_user = (
+        fulfilled.filter(
+            redeemed_discount__redemption_type=REDEMPTION_TYPE_ONE_TIME_PER_USER
+        )
+        .values("redeemed_discount", "redeemed_by")
+        .annotate(
+            redemptions=Count("id"),
+            orders=ArrayAgg("redeemed_order__reference_number", distinct=True),
+        )
+        .filter(redemptions__gt=1)
+        .order_by("redeemed_discount", "redeemed_by")
     )
 
-    seen = []
+    flagged = []
+    for duplicate in one_time:
+        log.error(
+            "Discount %s is a one-time discount redeemed more than once, on "
+            "fulfilled orders %s; review manually.",
+            duplicate["redeemed_discount"],
+            ", ".join(sorted(duplicate["orders"])),
+        )
+        flagged.append(duplicate["redeemed_discount"])
 
-    for redemption in redemptions:
-        if redemption.redeemed_discount.id in seen:
-            continue
+    for duplicate in per_user:
+        log.error(
+            "Discount %s is a one-time-per-user discount that user %s redeemed "
+            "more than once, on fulfilled orders %s; review manually.",
+            duplicate["redeemed_discount"],
+            duplicate["redeemed_by"],
+            ", ".join(sorted(duplicate["orders"])),
+        )
+        if duplicate["redeemed_discount"] not in flagged:
+            flagged.append(duplicate["redeemed_discount"])
 
-        if (
-            redemption.redeemed_discount.redemption_type == REDEMPTION_TYPE_ONE_TIME
-            and redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=OrderStatus.FULFILLED
-            ).count()
-            > 1
-        ):
-            message = f"Discount code {redemption.redeemed_discount.discount_code} is a one-time discount that's been redeemed more than once"
-            log.error(message)
-            seen.append(redemption.redeemed_discount.id)
-
-        if (
-            redemption.redeemed_discount.redemption_type
-            == REDEMPTION_TYPE_ONE_TIME_PER_USER
-            and redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=OrderStatus.FULFILLED
-            ).count()
-            > 1
-        ):
-            seen_user = []
-
-            for (
-                user_redemption
-            ) in redemption.redeemed_discount.order_redemptions.filter(
-                redeemed_order__state=OrderStatus.FULFILLED
-            ).all():
-                if user_redemption.redeemed_by.id in seen_user:
-                    continue
-
-                if (
-                    redemption.redeemed_discount.order_redemptions.filter(
-                        redeemed_by=user_redemption.redeemed_by
-                    ).count()
-                    > 1
-                ):
-                    message = f"Discount code {redemption.redeemed_discount.discount_code} is a one-time per-user discount that's been redeemed more than once by {user_redemption.redeemed_by}"
-                    log.error(message)
-                    seen_user.append(user_redemption.redeemed_by.id)
-
-            seen.append(redemption.redeemed_discount.id)
-
-    return seen
+    return flagged
 
 
 def check_for_double_spent_sources():
