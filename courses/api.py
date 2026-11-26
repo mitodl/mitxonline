@@ -2797,7 +2797,7 @@ def get_verifiable_credentials_payload(
                     "narrative": narrative
                 },
                 "description": cert_page_description
-                or f"{user_name} has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
+                or f"The learner has successfully completed all modules and earned a {achievement_type} Certificate in {certificate_name}.",
                 "name": certificate_name,
             },
         },
