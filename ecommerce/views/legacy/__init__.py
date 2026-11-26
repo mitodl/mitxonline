@@ -1227,6 +1227,13 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             run = items[0].product.purchasable_object
             if not isinstance(run, CourseRun):
                 return False
+            if CourseRunEnrollment.objects.filter(
+                user=request.user,
+                run=run,
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            ).exists():
+                # Already verified: nothing to restore, keep the duplicate message
+                return False
             try:
                 restored = api.restore_paid_course_run_enrollment(request.user, run)
             except (CountryBlockedError, ExportComplianceError):

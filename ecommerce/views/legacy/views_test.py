@@ -1809,6 +1809,12 @@ def test_paid_and_unpaid_courserun_checkout(
     )
     order_flow = order.get_object_flow()
     order_flow.fulfill({"result": "Payment succeeded", "transaction_id": "12345"})
+    # Fulfillment's enrollment call is mocked here, so add the verified enrollment it makes
+    CourseRunEnrollmentFactory.create(
+        user=user,
+        run=product.purchasable_object,
+        enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+    )
 
     basket.delete()
 

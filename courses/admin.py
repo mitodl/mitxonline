@@ -900,7 +900,7 @@ class CourseRunEnrollmentAdmin(ModelAdminRunActionsForAllMixin, AuditableModelAd
             user = form.cleaned_data["user"]
             mode = EDX_ENROLLMENT_AUDIT_MODE
             for run in form.cleaned_data["runs"]:
-                if CourseRunEnrollment.objects.filter(user=user, run=run).exclude(
+                if CourseRunEnrollment.all_objects.filter(user=user, run=run).exclude(
                     enrollment_mode=mode
                 ).exists() and PaidCourseRun.fulfilled_paid_course_run_exists(
                     user, run

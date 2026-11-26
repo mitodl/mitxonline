@@ -637,9 +637,12 @@ def test_downgrade_enrollment_action_skips_paid_runs(mocker, admin_client):
     )
 
 
-def test_enroll_in_runs_skips_paid_verified_enrollment(mocker, admin_client):
+@pytest.mark.parametrize("active", [True, False])
+def test_enroll_in_runs_skips_paid_verified_enrollment(mocker, admin_client, active):
     """Enroll in runs doesn't move a paid verified enrollment to audit"""
     enrollment = _paid_enrollment()
+    enrollment.active = active
+    enrollment.save()
     enrollment.run.courseware_id = "course-v1:MITx+P+0T2026"
     enrollment.run.save()
     mock_enroll = mocker.patch(
