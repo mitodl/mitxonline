@@ -1,17 +1,20 @@
 """Admin management for Ecommerce module"""
 
 import logging
+from functools import partial
 
 import reversion
 from django.contrib import admin, messages
 from django.contrib.admin.decorators import display
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.generic import TemplateView
 from mitol.common.admin import TimestampedModelAdmin
+from mitol.payment_gateway.constants import MITOL_PAYMENT_GATEWAY_STRIPE
 from mitol.payment_gateway.models import StripeWebhookSecret, StripeWebhookSecretRoute
 from reversion.admin import VersionAdmin
 from viewflow import fsm
@@ -41,6 +44,7 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from ecommerce.tasks import expire_cancelled_stripe_checkout
 from main.admin import ReadOnlyModelAdmin
 
 log = logging.getLogger(__name__)
@@ -351,6 +355,27 @@ class PendingOrderAdmin(FlowOrderAdmin):
     def get_queryset(self, request):
         """Filter only to pending orders"""
         return super().get_queryset(request).filter(state=OrderStatus.PENDING)
+
+    def transition_view(self, request, object_id, slug):
+        """
+        Expire the Stripe session of an order staff cancel, as cancelling the
+        order alone leaves its payment page payable.
+        """
+
+        response = super().transition_view(request, object_id, slug)
+
+        canceled_order = Order.objects.filter(
+            pk=object_id,
+            state=OrderStatus.CANCELED,
+            gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+        ).first()
+
+        if slug == "cancel" and request.method == "POST" and canceled_order:
+            transaction.on_commit(
+                partial(expire_cancelled_stripe_checkout.delay, canceled_order.id)
+            )
+
+        return response
 
 
 @admin.register(CanceledOrder)

@@ -93,6 +93,8 @@ from main.constants import (
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
@@ -1559,6 +1561,41 @@ def test_start_checkout_with_discounts(user, user_drf_client, products, discount
     order = Order.objects.filter(purchaser=user).get()
 
     assert order.state == OrderStatus.PENDING
+
+
+@pytest.mark.parametrize("payment_in_progress", [True, False])
+def test_start_checkout_refused_by_earlier_checkout(
+    mocker, user, user_drf_client, payment_in_progress
+):
+    """
+    Checkout refused because of an earlier Stripe checkout returns a 400 with
+    the error, and the order being paid for when that's the reason.
+    """
+
+    paid_order = OrderFactory.create(purchaser=user, state=OrderStatus.PENDING)
+    mocker.patch(
+        "ecommerce.views.v0.generate_checkout_payload",
+        return_value=(
+            {
+                "payment_in_progress": True,
+                "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+                "order": paid_order,
+                "order_id": paid_order.id,
+            }
+            if payment_in_progress
+            else {"checkout_unavailable": True, "error": USER_MSG_TYPE_PAYMENT_ERROR}
+        ),
+    )
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 400
+    if payment_in_progress:
+        assert resp.json()["error"] == USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING
+        assert resp.json()["order_id"] == paid_order.id
+    else:
+        assert resp.json()["error"] == USER_MSG_TYPE_PAYMENT_ERROR
+        assert resp.json()["order_id"] == 0
 
 
 def test_start_checkout_with_no_lines(user, user_drf_client):

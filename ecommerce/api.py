@@ -5,11 +5,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 import stripe
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core import signing
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, QuerySet
@@ -43,6 +44,7 @@ from ecommerce.constants import (
     ALL_PAYMENT_TYPES,
     ALL_REDEMPTION_TYPES,
     CHECKOUT_CANCEL_ROUTE_MAP,
+    CHECKOUT_CANCEL_SIGNING_SALT,
     CHECKOUT_RESULT_ROUTES_WITH_REFERENCE,
     CHECKOUT_SUCCESS_ROUTE_MAP,
     DISCOUNT_TYPE_PERCENT_OFF,
@@ -55,6 +57,7 @@ from ecommerce.constants import (
     REFUND_SUCCESS_STATES,
     STRIPE_CHECKOUT_SESSION_STATUS_COMPLETE,
     STRIPE_CHECKOUT_SESSION_STATUS_OPEN,
+    STRIPE_ERROR_CODE_RESOURCE_MISSING,
     STRIPE_EVENTS_CHECKOUT_SESSION,
     STRIPE_EVENTS_REFUND,
     STRIPE_OBJECT_CHECKOUT_SESSION,
@@ -66,6 +69,7 @@ from ecommerce.constants import (
     STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION,
     STRIPE_PAYMENT_INTENT_STATUS_CANCELLED,
     STRIPE_PAYMENT_INTENT_STATUS_PROCESSING,
+    STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD,
     STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED,
     STRIPE_PAYMENT_STATUS_UNPAID,
     STRIPE_PAYMENT_STATUSES_GOOD,
@@ -105,13 +109,18 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
-from ecommerce.tasks import perform_downgrade_from_order
+from ecommerce.tasks import (
+    expire_cancelled_stripe_checkout,
+    perform_downgrade_from_order,
+)
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from hubspot_sync.task_helpers import sync_hubspot_cart_add, sync_hubspot_deal
 from main import features
 from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_MISSING_ENROLLMENT_CODE,
     USER_MSG_TYPE_B2B_INVALID_BASKET,
+    USER_MSG_TYPE_PAYMENT_ERROR,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
 )
 from main.plugin_manager import get_plugin_manager
 from main.utils import parse_supplied_date
@@ -163,9 +172,33 @@ def get_checkout_cancel_url(gateway_type, reference_number=None):
         msg = f"Gateway {gateway_type} has no cancel route mapped"
         raise ValidationError(msg)
 
-    return _get_checkout_return_url(
+    url = _get_checkout_return_url(
         CHECKOUT_CANCEL_ROUTE_MAP, gateway_type, reference_number
     )
+
+    if gateway_type == MITOL_PAYMENT_GATEWAY_STRIPE:
+        # Cancelling expires the session, so only the URL Stripe was given can
+        # do it, not a link to the (guessable) reference number.
+        url = f"{url}?{urlencode({'token': sign_checkout_cancel(reference_number)})}"
+
+    return url
+
+
+def sign_checkout_cancel(reference_number):
+    """Return the token that lets the Stripe cancel URL cancel this order."""
+
+    return signing.Signer(salt=CHECKOUT_CANCEL_SIGNING_SALT).sign(reference_number)
+
+
+def is_checkout_cancel_signed(reference_number, token) -> bool:
+    """Check the token from a Stripe cancel URL is for this order."""
+
+    try:
+        unsigned = signing.Signer(salt=CHECKOUT_CANCEL_SIGNING_SALT).unsign(token or "")
+    except signing.BadSignature:
+        return False
+
+    return unsigned == reference_number
 
 
 def validate_basket_steps_for_b2b(basket):
@@ -291,6 +324,9 @@ def generate_checkout_payload(  # noqa: PLR0913
         else:
             gateway_type = settings.ECOMMERCE_DEFAULT_PAYMENT_GATEWAY
 
+    # Anything fulfilled from here on got past the preflight duplicate checks.
+    checkout_started_on = now_in_utc()
+
     preflight_error = _run_checkout_preflight(
         request,
         basket,
@@ -344,6 +380,14 @@ def generate_checkout_payload(  # noqa: PLR0913
             "order_id": order.id,
         }
 
+    # A free order (fulfilled above) opens no payment page, so it leaves the
+    # learner's open ones alone.
+    if supersede_error := supersede_open_stripe_checkouts(
+        order, since=checkout_started_on
+    ):
+        order.get_object_flow().cancel()
+        return supersede_error
+
     payload = PaymentGateway.start_payment(
         gateway_type,
         gateway_order,
@@ -356,11 +400,24 @@ def generate_checkout_payload(  # noqa: PLR0913
         # We will have gotten a CheckoutSession object from start_payment above.
         # This needs to be logged as a transaction, or we won't be able to find
         # this again in Stripe if something goes wrong after this step.
-        order_flow = order.get_object_flow()
-        order_flow.create_transaction(
-            payload["payload"].to_dict(for_json=True),
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
-        )
+        # The order is locked for this, as superseding locks it to decide the
+        # order has no session yet. Staff, or a newer checkout, may have
+        # cancelled the order while Stripe was opening the session; there was
+        # no session to expire then, so it's expired here.
+        with transaction.atomic():
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            locked_order.get_object_flow().create_transaction(
+                payload["payload"].to_dict(for_json=True),
+                reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+            )
+            still_pending = locked_order.state == OrderStatus.PENDING
+
+        if not still_pending:
+            expire_cancelled_stripe_checkout.delay(order.id)
+            return {
+                "checkout_unavailable": True,
+                "error": USER_MSG_TYPE_PAYMENT_ERROR,
+            }
 
     return payload
 
@@ -1263,25 +1320,9 @@ def _retrieve_pending_stripe_orders(orders):
     # later in event processing.
 
     for order in orders:
-        checkout_session_transactions = order.transactions.filter(
-            reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION
-        )
+        checkout_session_id = get_stripe_checkout_session_id(order)
 
-        if not checkout_session_transactions.exists():
-            log.info(
-                "Order %s (ref %s) has no apparent CheckoutSession logged.",
-                order.id,
-                order.reference_number,
-            )
-            continue
-
-        session_transaction = checkout_session_transactions.first()
-        checkout_session_id = session_transaction.data.get("id")
-
-        if (
-            session_transaction.data.get("object") != STRIPE_OBJECT_CHECKOUT_SESSION
-            or not checkout_session_id
-        ):
+        if not checkout_session_id:
             log.info(
                 "Order %s (ref %s) has no apparent CheckoutSession logged.",
                 order.id,
@@ -2181,6 +2222,223 @@ def _get_stripe_checkout_session_v1():
 
     stripe_gateway = PaymentGateway.get_gateway_class(MITOL_PAYMENT_GATEWAY_STRIPE)
     return stripe_gateway.stripe_client.v1.checkout.sessions
+
+
+def get_stripe_checkout_session_id(order) -> str | None:
+    """Return the ID of the CheckoutSession recorded for the order, if any."""
+
+    session_transaction = order.transactions.filter(
+        reason=STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION,
+        data__object=STRIPE_OBJECT_CHECKOUT_SESSION,
+    ).first()
+
+    return session_transaction.data.get("id") if session_transaction else None
+
+
+def expire_stripe_checkout_session(order) -> bool:
+    """
+    Expire the order's CheckoutSession, so its payment page can't be used.
+
+    Stripe only expires open sessions, so if the expire call is refused the
+    session's payment is checked instead. Expiring a session makes Stripe send
+    the checkout.session.expired webhook, which cancels the order.
+
+    Args:
+    - order (Order): the Stripe order
+    Returns:
+    - bool: False if the session's payment succeeded or may still succeed,
+      True if the session can no longer be paid
+    """
+
+    session_id = get_stripe_checkout_session_id(order)
+
+    if not session_id:
+        return True
+
+    try:
+        _get_stripe_checkout_session_v1().expire(session_id)
+    except stripe.InvalidRequestError:
+        try:
+            session = process_stripe_checkout_session_status(session_id)
+        except stripe.InvalidRequestError as error:
+            if error.code != STRIPE_ERROR_CODE_RESOURCE_MISSING:
+                raise
+
+            # Stripe has no such session (e.g. it was made with other keys),
+            # so there's no page left to pay on.
+            log.warning(
+                "CheckoutSession %s for order %s doesn't exist in Stripe",
+                session_id,
+                order.reference_number,
+            )
+            return True
+
+        # A failed payment needs a new payment method, which a completed
+        # session won't take, so the learner has to check out again.
+        return session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED or (
+            session["status"] == STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION
+            and session["action_reason"]
+            == STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_PAYMENT_METHOD
+        )
+
+    log.info(
+        "Expired CheckoutSession %s for order %s",
+        session_id,
+        order.reference_number,
+    )
+
+    return True
+
+
+def _cancel_if_no_stripe_session(order) -> str | None:
+    """
+    Cancel a pending Stripe order that has no CheckoutSession logged yet.
+
+    Another checkout may still be opening the session. The order is locked
+    the same way that checkout logs the session, so either the session is
+    logged first and is left for expiring, or the order is cancelled first
+    and that checkout refuses the page.
+
+    Returns:
+    - str|None: None if the order has a session to expire, otherwise the
+      order's state now: canceled, or whatever it moved to meanwhile (e.g.
+      fulfilled by a webhook)
+    """
+
+    with transaction.atomic():
+        locked_order = Order.objects.select_for_update().get(pk=order.pk)
+
+        if locked_order.state != OrderStatus.PENDING:
+            return locked_order.state
+
+        if get_stripe_checkout_session_id(locked_order):
+            return None
+
+        locked_order.get_object_flow().cancel()
+
+    log.info(
+        "Cancelled order %s, superseded before its CheckoutSession was logged",
+        order.reference_number,
+    )
+    return OrderStatus.CANCELED
+
+
+def supersede_open_stripe_checkouts(order, *, since=None) -> dict | None:
+    """
+    Expire the CheckoutSessions of the purchaser's earlier Stripe orders.
+
+    Checking out again (e.g. from another tab) replaces any checkout that's
+    still in flight, so only the newest payment page can be used.
+
+    Args:
+    - order (Order): the new order, which is left alone
+    - since (datetime): when this checkout started. An order fulfilled since
+      then (e.g. by a webhook racing this checkout) for something in this one
+      refuses checkout, as the checkout's duplicate checks ran before it.
+    Returns:
+    - None if the learner can check out, otherwise the error payload: either
+      an earlier order for something in this one has been paid (or is being
+      paid), or Stripe couldn't confirm an earlier session can't be paid
+    """
+
+    earlier_orders = (
+        Order.objects.filter(
+            purchaser=order.purchaser,
+            state=OrderStatus.PENDING,
+            gateway_type=MITOL_PAYMENT_GATEWAY_STRIPE,
+            # A free order never opens a payment page, and is only pending
+            # while it's being fulfilled.
+            total_price_paid__gt=0,
+        )
+        # Only older orders, so two checkouts at once don't cancel each other.
+        .filter(pk__lt=order.pk)
+        .prefetch_related("lines")
+        .order_by("created_on")
+    )
+
+    recently_fulfilled_orders = (
+        Order.objects.filter(
+            purchaser=order.purchaser,
+            state=OrderStatus.FULFILLED,
+            updated_on__gte=since,
+        ).prefetch_related("lines")
+        if since
+        else Order.objects.none()
+    )
+
+    if not earlier_orders and not recently_fulfilled_orders:
+        return None
+
+    products = {
+        (line.purchased_content_type_id, line.purchased_object_id)
+        for line in order.lines.all()
+    }
+
+    def _overlaps(other_order):
+        return any(
+            (line.purchased_content_type_id, line.purchased_object_id) in products
+            for line in other_order.lines.all()
+        )
+
+    paid_order = next(
+        (
+            fulfilled_order
+            for fulfilled_order in recently_fulfilled_orders
+            if _overlaps(fulfilled_order)
+        ),
+        None,
+    )
+    unavailable = False
+
+    for earlier_order in earlier_orders:
+        state_without_session = _cancel_if_no_stripe_session(earlier_order)
+
+        if state_without_session is not None:
+            # A webhook may have fulfilled it since it was read above.
+            if (
+                state_without_session == OrderStatus.FULFILLED
+                and not paid_order
+                and _overlaps(earlier_order)
+            ):
+                paid_order = earlier_order
+            continue
+
+        try:
+            expired = expire_stripe_checkout_session(earlier_order)
+        except stripe.StripeError:
+            log.exception(
+                "Couldn't expire the CheckoutSession for order %s",
+                earlier_order.reference_number,
+            )
+            unavailable = True
+            continue
+
+        if not expired and not paid_order and _overlaps(earlier_order):
+            log.info(
+                "Not checking out user %s again: order %s is already being paid",
+                order.purchaser_id,
+                earlier_order.reference_number,
+            )
+            paid_order = earlier_order
+
+    # Telling the learner a payment is going through beats a retryable error.
+    if paid_order:
+        # It may have been fulfilled since it was read, e.g. during the check.
+        paid_order.refresh_from_db(fields=["state"])
+        return {
+            "payment_in_progress": True,
+            "error": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
+            "order": paid_order,
+            "order_id": paid_order.id,
+        }
+
+    if unavailable:
+        return {
+            "checkout_unavailable": True,
+            "error": USER_MSG_TYPE_PAYMENT_ERROR,
+        }
+
+    return None
 
 
 def process_stripe_checkout_session_status(checkout_session: dict | str):

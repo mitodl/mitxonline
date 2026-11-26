@@ -199,9 +199,15 @@ CHECKOUT_CANCEL_ROUTE_MAP = {
     MITOL_PAYMENT_GATEWAY_STRIPE: CHECKOUT_RESULT_CANCEL_ROUTE,
 }
 
+# Signs the order reference number in the Stripe cancel URL.
+CHECKOUT_CANCEL_SIGNING_SALT = "ecommerce.stripe-checkout-cancel"
+
 STRIPE_TRANSACTION_REASON_INITIAL_CHECKOUTSESSION = "Initial CheckoutSession"
 
 STRIPE_OBJECT_CHECKOUT_SESSION = "checkout.session"
+
+# Stripe's error code for an object it has no record of.
+STRIPE_ERROR_CODE_RESOURCE_MISSING = "resource_missing"
 
 STRIPE_EVENT_CHECKOUT_SESSION_COMPLETED = "checkout.session.completed"
 STRIPE_EVENT_CHECKOUT_SESSION_EXPIRED = "checkout.session.expired"
@@ -243,7 +249,8 @@ STRIPE_CHECKOUT_SESSION_STATUS_OPEN = "open"
 
 STRIPE_PAYMENT_INTENT_STATUS_PROCESSING = "processing"
 STRIPE_PAYMENT_INTENT_STATUS_SUCCEEDED = "succeeded"
-STRIPE_PAYMENT_INTENT_STATUS_CANCELLED = "cancelled"
+# Stripe spells this "canceled".
+STRIPE_PAYMENT_INTENT_STATUS_CANCELLED = "canceled"
 STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_ACTION = "requires_action"
 STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CAPTURE = "requires_capture"
 STRIPE_PAYMENT_INTENT_STATUS_REQUIRES_CONFIRMATION = "requires_confirmation"
