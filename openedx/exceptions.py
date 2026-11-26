@@ -19,6 +19,10 @@ class EdxApiUserDoesNotExistError(Exception):
     """An edX user does not exist"""
 
 
+class EdxEnrollmentsJwtError(Exception):
+    """A new enrollments JWT, requested after edX rejected the cached one, could not be got"""
+
+
 class EdxApiEnrollErrorException(Exception):  # noqa: N818
     """An edX enrollment API call resulted in an error response"""
 

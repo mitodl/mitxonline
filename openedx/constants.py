@@ -29,6 +29,8 @@ OPENEDX_REPAIR_GRACE_PERIOD_MINS = 5
 OPENEDX_ENROLLMENT_REPAIR_MAX_RETRIES = 5
 
 OPENEDX_USERNAME_MAX_LEN = 30
+# How long before an Open edX JWT expires to stop reusing it
+OPENEDX_JWT_EXPIRY_MARGIN_SECONDS = 60
 
 # The course-level Open edX roles we mirror, and the ones we treat as granting
 # courseware access before a run's start date.

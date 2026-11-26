@@ -10,7 +10,7 @@ To sync enrollments for specific user and from both direction, use sync_enrollme
 from django.core.management.base import BaseCommand
 
 from courses.models import CourseRun, CourseRunEnrollment, User
-from openedx.api import get_edx_api_service_client
+from openedx.api import get_edx_api_enrollments_client
 
 
 class Command(BaseCommand):
@@ -32,7 +32,7 @@ class Command(BaseCommand):
 
         courseware_ids = options["runs"]
 
-        edx_client = get_edx_api_service_client()
+        enrollments_client = get_edx_api_enrollments_client()
 
         created_count = {}
         for courseware_id in courseware_ids:
@@ -44,7 +44,7 @@ class Command(BaseCommand):
                     )
                 )
 
-            edx_enrollments = edx_client.enrollments.get_enrollments(
+            edx_enrollments = enrollments_client.get_enrollments(
                 course_id=courseware_id
             )
 
