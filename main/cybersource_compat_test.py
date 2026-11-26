@@ -1,11 +1,19 @@
-"""Tests for the CyberSource REST SDK urllib3 compatibility shim."""
+"""
+Tests for the CyberSource REST SDK urllib3 compatibility shim.
+
+The shim lives in mitol-django-payment-gateway and PaymentGatewayApp.ready() installs it;
+these tests check that it is in effect in this project and that the SDK works end to end.
+"""
 
 import pytest
 from CyberSource import rest
+from mitol.payment_gateway.cybersource_compat import (
+    CompatUrllib3,
+    apply_cybersource_urllib3_compat,
+)
 
 from compliance.api import get_latest_export_compliance_log, verify_user_with_exports
 from courses.factories import CourseRunFactory
-from main.cybersource_compat import CompatUrllib3, apply_cybersource_urllib3_compat
 from users.factories import UserFactory
 
 pytestmark = pytest.mark.django_db
@@ -30,7 +38,7 @@ def _isolate_sdk_globals():
 
 
 def test_shim_is_installed_at_startup():
-    """RootConfig.ready() should have swapped CyberSource.rest's urllib3 for the shim."""
+    """PaymentGatewayApp.ready() should have swapped CyberSource.rest's urllib3 for the shim."""
     assert isinstance(rest.urllib3, CompatUrllib3)
 
 
