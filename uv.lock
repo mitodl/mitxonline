@@ -2222,8 +2222,6 @@ dependencies = [
     { name = "pyjwt" },
     { name = "pymysql" },
     { name = "pynacl" },
-    { name = "pyopenssl" },
-    { name = "pyparsing" },
     { name = "python-redis-lock" },
     { name = "redis" },
     { name = "requests" },
@@ -2233,7 +2231,6 @@ dependencies = [
     { name = "setuptools" },
     { name = "tabulate" },
     { name = "trino" },
-    { name = "ulid-py" },
     { name = "urllib3" },
     { name = "urllib3-future" },
     { name = "user-util" },
@@ -2344,8 +2341,6 @@ requires-dist = [
     { name = "pyjwt", specifier = "==2.15.1" },
     { name = "pymysql", specifier = ">=1.1.1,<2" },
     { name = "pynacl", specifier = ">=1.6.2" },
-    { name = "pyopenssl", specifier = ">=26,<27" },
-    { name = "pyparsing", specifier = ">=3.2,<4" },
     { name = "python-redis-lock", specifier = ">=4.0.0,<5" },
     { name = "redis", specifier = ">=5.0.0,<6" },
     { name = "requests", specifier = ">=2.28.2,<3" },
@@ -2355,7 +2350,6 @@ requires-dist = [
     { name = "setuptools", specifier = "<80.11" },
     { name = "tabulate", specifier = ">=0.9.0,<0.10" },
     { name = "trino", specifier = ">=0.336.0,<0.337" },
-    { name = "ulid-py", specifier = ">=1.1.0,<2" },
     { name = "urllib3", specifier = ">=2.0.0,<3" },
     { name = "urllib3-future", directory = "shims/urllib3-future" },
     { name = "user-util", specifier = ">=0.1.5,<0.2" },
@@ -3224,19 +3218,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyopenssl"
-version = "26.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cryptography" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8e/11/a62e1d33b373da2b2c2cd9eb508147871c80f12b1cacde3c5d314922afdd/pyopenssl-26.0.0.tar.gz", hash = "sha256:f293934e52936f2e3413b89c6ce36df66a0b34ae1ea3a053b8c5020ff2f513fc", size = 185534, upload-time = "2026-03-15T14:28:26.353Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/7d/d4f7d908fa8415571771b30669251d57c3cf313b36a856e6d7548ae01619/pyopenssl-26.0.0-py3-none-any.whl", hash = "sha256:df94d28498848b98cc1c0ffb8ef1e71e40210d3b0a8064c9d29571ed2904bf81", size = 57969, upload-time = "2026-03-15T14:28:24.864Z" },
-]
-
-[[package]]
 name = "pyparsing"
 version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -4051,15 +4032,6 @@ version = "202602"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/10/4a/ce8a586f7376f6bceabfe5f12f5e542db998517f08a461bb18294ff19bd1/ua_parser_builtins-202602-py3-none-any.whl", hash = "sha256:07e44db44e916076cf999cbe2ccc37f25bd689844e8748511caec23e961a04cb", size = 89403, upload-time = "2026-02-02T16:44:09.075Z" },
-]
-
-[[package]]
-name = "ulid-py"
-version = "1.1.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3b/53/d14a8ec344048e21431821cb49e9a6722384f982b889c2dd449428dbdcc1/ulid-py-1.1.0.tar.gz", hash = "sha256:dc6884be91558df077c3011b9fb0c87d1097cb8fc6534b11f310161afd5738f0", size = 22514, upload-time = "2020-09-15T15:35:09.414Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/7c/a12c879fe6c2b136a718c142115ff99397fbf62b4929d970d58ae386d55f/ulid_py-1.1.0-py2.py3-none-any.whl", hash = "sha256:b56a0f809ef90d6020b21b89a87a48edc7c03aea80e5ed5174172e82d76e3987", size = 25753, upload-time = "2020-09-15T15:35:08.075Z" },
 ]
 
 [[package]]
