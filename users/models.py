@@ -373,15 +373,6 @@ class User(
             or self.groups.filter(name=CMS_EDITORS_GROUP_NAME).exists()
         )
 
-    @cached_property
-    def b2b_organization_sso_ids(self):
-        """Just the UUIDs for the organizations the user is in."""
-        return list(
-            self.b2b_organizations.filter(
-                sso_organization_id__isnull=False
-            ).values_list("sso_organization_id", flat=True)
-        )
-
     @property
     def should_skip_onboarding(self):
         user_profile = getattr(self, "user_profile", None)

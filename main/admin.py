@@ -17,14 +17,6 @@ class AuditableModelAdmin(admin.ModelAdmin):
         obj.save_and_log(request.user)
 
 
-class SingletonModelAdmin(admin.ModelAdmin):
-    """A ModelAdmin which enforces a singleton model"""
-
-    def has_add_permission(self, request):  # noqa: ARG002
-        """Overridden method - prevent adding an object if one already exists"""
-        return self.model.objects.count() == 0
-
-
 class ModelAdminRunActionsForAllMixin:
     """
     Mixin to allow admin actions to run even when no items are selected.
