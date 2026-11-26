@@ -399,6 +399,8 @@ class UserOrganizationAdmin(admin.ModelAdmin):
         "added_to_keycloak_at",
     ]
     readonly_fields = ["added_to_keycloak_at"]
+    # A <select> of every User OOMKills the web pod rendering the change form.
+    raw_id_fields = ["user"]
 
 
 @admin.register(OrganizationProvisioningAudit)
