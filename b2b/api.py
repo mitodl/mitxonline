@@ -1679,7 +1679,7 @@ def _prepare_basket_for_b2b_enrollment(
     Returns:
         The prepared basket.
     """
-    from ecommerce.api import establish_basket  # noqa: PLC0415
+    from ecommerce.api import add_product_to_basket, establish_basket  # noqa: PLC0415
 
     # Establish and clear the basket. If the user doesn't have an edX username,
     # don't wait to create one.
@@ -1687,10 +1687,7 @@ def _prepare_basket_for_b2b_enrollment(
     basket.basket_items.all().delete()
     basket.discounts.all().delete()
 
-    item = BasketItem.objects.create(
-        product=product, basket=basket, quantity=1, b2b_contract=contract
-    )
-    item.save()
+    add_product_to_basket(request, basket, product, b2b_contract=contract)
 
     # Sync with HubSpot for CourseRun
     sync_hubspot_cart_add(

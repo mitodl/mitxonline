@@ -145,3 +145,43 @@ def checkout_finalize_basket(request, basket):
     - dict|None: an error payload (with an "error" key) to stop checkout, or
       None to continue
     """
+
+
+@hookspec
+def basket_pre_update(request, basket, update):
+    """
+    Run before the contents of a basket change.
+
+    The basket APIs in ecommerce.api bracket a change with this hook and
+    basket_post_update. Today that's adding a product (add_product_to_basket)
+    and claiming an anonymous basket; removing items and discounts doesn't go
+    through them yet (hq#14486). Work that should happen before the basket
+    changes belongs here: finding out where the user is, and (later) checking
+    that the user may buy the item.
+
+    To stop the change, raise an exception; the caller won't make the change.
+    Return values are ignored.
+
+    Args:
+    request (HttpRequest): the current request
+    basket (Basket): the basket that's about to change
+    update (BasketUpdate): what's changing
+    """
+
+
+@hookspec
+def basket_post_update(request, basket, update):
+    """
+    Run after the contents of a basket change.
+
+    Work that depends on the new contents of the basket belongs here, such
+    as (later) checking that the basket's discounts still apply and
+    calculating tax. Callers apply automatic discounts after this hook runs.
+
+    Return values are ignored.
+
+    Args:
+    request (HttpRequest): the current request
+    basket (Basket): the basket that changed
+    update (BasketUpdate): what changed; basket_item is set for item changes
+    """

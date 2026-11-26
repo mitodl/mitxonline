@@ -87,7 +87,7 @@ from ecommerce.serializers import (
     UserDiscountMetaSerializer,
     UserDiscountSerializer,
 )
-from ecommerce.views.utils import AttachDiscountProductMixin
+from ecommerce.views.utils import AddBasketItemMixin, AttachDiscountProductMixin
 from flexiblepricing.api import determine_courseware_flexible_price_discount
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
@@ -273,7 +273,11 @@ class BasketViewSet(
     ]
 )
 class BasketItemViewSet(
-    NestedViewSetMixin, ListCreateAPIView, mixins.DestroyModelMixin, GenericViewSet
+    NestedViewSetMixin,
+    AddBasketItemMixin,
+    ListCreateAPIView,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
 ):
     """API view set for BasketItem"""
 
@@ -682,10 +686,10 @@ class CheckoutApiViewSet(ViewSet):
                 )
             message = "Product already in cart"
             if allow_multiple_items:
-                # Check if product already exists in basket
-                if not basket.basket_items.filter(product=product).exists():
-                    # Add new item to basket
-                    BasketItem.objects.create(basket=basket, product=product)
+                # Run the add even if the product is already in the basket, so
+                # the basket hooks see it (it isn't added twice).
+                _, created = api.add_product_to_basket(self.request, basket, product)
+                if created:
                     message = "Product added to cart"
 
                     sync_hubspot_cart_add(
@@ -706,7 +710,7 @@ class CheckoutApiViewSet(ViewSet):
                     )
             else:
                 # Legacy behavior: add single item
-                BasketItem.objects.create(basket=basket, product=product)
+                api.add_product_to_basket(self.request, basket, product)
                 message = "Product added to cart"
 
                 sync_hubspot_cart_add(
@@ -1052,7 +1056,7 @@ class CheckoutProductView(RedirectView):
                 )
             )
             for product in Product.objects.filter(id__in=all_product_ids):
-                BasketItem.objects.create(basket=basket, product=product)
+                api.add_product_to_basket(self.request, basket, product)
 
         return super().get_redirect_url(*args, **kwargs)
 

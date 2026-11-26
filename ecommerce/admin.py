@@ -193,8 +193,10 @@ class BasketAdmin(VersionAdmin):
 
     model = Basket
     search_fields = ["user__email", "user__username"]
-    list_display = ["id", "user"]
+    list_display = ["id", "user", "location_country_code", "location_source"]
+    list_filter = ["location_source"]
     raw_id_fields = ("user",)
+    readonly_fields = Basket.LOCATION_FIELDS
 
 
 @admin.register(BasketItem)
@@ -345,11 +347,18 @@ class BaseOrderAdmin(TimestampedModelAdmin):
         "purchaser__username",
         "reference_number",
     ]
-    list_display = ["id", "state", "gateway_type", "get_purchaser", "total_price_paid"]
+    list_display = [
+        "id",
+        "state",
+        "gateway_type",
+        "get_purchaser",
+        "total_price_paid",
+        "location_country_code",
+    ]
     list_fields = ["state"]
-    list_filter = ["state"]
+    list_filter = ["state", "location_source"]
     inlines = [OrderLineInline, OrderDiscountInline, OrderTransactionInline]
-    readonly_fields = ["reference_number"]
+    readonly_fields = ["reference_number", *Order.LOCATION_FIELDS]
 
     def has_change_permission(self, request, obj=None):  # noqa: ARG002
         return False

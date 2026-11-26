@@ -2514,3 +2514,109 @@ def test_order_receipt_reports_when_a_request_was_decided(user, user_drf_client)
 
     assert receipt["refund_status"] == "denied"
     assert parse_datetime(receipt["refund_reviewed_on"]) == request.updated_on
+
+
+@pytest.mark.parametrize("multiple", [False, True])
+def test_basket_add_records_location(settings, user, user_client, multiple):
+    """Adding a product to the basket records the user's location, and returns it."""
+
+    settings.LOCATION_FORCE_COUNTRY = "IN"
+    product = ProductFactory.create()
+
+    if multiple:
+        resp = user_client.post(
+            reverse("v0:baskets_api-create_with_products"),
+            data={"product_ids": [{"product_id": product.id, "quantity": 1}]},
+            content_type="application/json",
+        )
+    else:
+        resp = user_client.post(
+            reverse(
+                "v0:baskets_api-create_from_product",
+                kwargs={"product_id": product.id},
+            )
+        )
+
+    assert resp.status_code in (200, 201)
+    basket = Basket.objects.get(user=user)
+    assert basket.location_country_code == "IN"
+    assert basket.location_source == "geoip"
+    assert resp.json()["location_country_code"] == "IN"
+    assert resp.json()["location_source"] == "geoip"
+
+
+def test_add_basket_item_to_another_users_basket(user_drf_client, user):
+    """A user can't add an item to someone else's basket."""
+
+    other_basket = BasketFactory.create()
+    BasketFactory.create(user=user)
+
+    resp = user_drf_client.post(
+        reverse("v0:baskets_api-items-list", args=[other_basket.id]),
+        data={"product": ProductFactory.create().id, "basket": other_basket.id},
+        follow=True,
+    )
+
+    assert resp.status_code == 404
+    assert other_basket.basket_items.count() == 0
+    other_basket.refresh_from_db()
+    assert other_basket.location_data == []
+
+
+def test_add_basket_item_keeps_existing_quantity(user_drf_client, user):
+    """Adding a product that's already in the basket doesn't reset its quantity."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket, quantity=3)
+
+    resp = user_drf_client.post(
+        reverse("v0:baskets_api-items-list", args=[basket.id]),
+        data={"product": item.product.id, "basket": basket.id},
+        follow=True,
+    )
+
+    assert resp.status_code == 201
+    item.refresh_from_db()
+    assert item.quantity == 3
+    assert basket.basket_items.count() == 1
+
+
+@pytest.mark.parametrize("method", ["put", "patch"])
+@pytest.mark.parametrize("field", ["basket", "product"])
+def test_update_basket_item_cant_move_it(user_drf_client, user, method, field):
+    """An item can't be moved to another basket, or given another product."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket)
+    other_basket = BasketFactory.create()
+    changes = {
+        "basket": {"basket": other_basket.id, "product": item.product.id},
+        "product": {"basket": basket.id, "product": ProductFactory.create().id},
+    }[field]
+
+    resp = getattr(user_drf_client, method)(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, item.id]),
+        data=changes,
+        format="json",
+    )
+
+    assert resp.status_code == 400
+    assert field in resp.json()["errors"]
+    item.refresh_from_db()
+    assert item.basket == basket
+    assert other_basket.basket_items.count() == 0
+
+
+def test_update_basket_item_unchanged(user_drf_client, user):
+    """An update that changes nothing still succeeds."""
+
+    basket = BasketFactory.create(user=user)
+    item = BasketItemFactory.create(basket=basket)
+
+    resp = user_drf_client.put(
+        reverse("v0:baskets_api-items-detail", args=[basket.id, item.id]),
+        data={"basket": basket.id, "product": item.product.id},
+        format="json",
+    )
+
+    assert resp.status_code == 200

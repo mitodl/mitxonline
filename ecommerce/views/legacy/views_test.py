@@ -1239,6 +1239,7 @@ def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
 ):
     """When multiple cart items are enabled, duplicate adds should not emit a second tracking event."""
     settings.ENABLE_MULTIPLE_CART_ITEMS = True
+    settings.LOCATION_FORCE_COUNTRY = "IN"
     mock_sync = mocker.patch("ecommerce.views.legacy.sync_hubspot_cart_add")
 
     product = ProductFactory.create()
@@ -1253,6 +1254,10 @@ def test_add_to_cart_does_not_trigger_hubspot_for_duplicate_product(
     assert resp.status_code == status.HTTP_200_OK
     assert resp.json()["message"] == "Product already in cart"
     mock_sync.assert_not_called()
+    assert basket.basket_items.count() == 1
+    # The basket hooks still ran, so the location is current.
+    basket.refresh_from_db()
+    assert basket.location_country_code == "IN"
 
 
 def test_add_to_cart_anonymous_creates_basket():

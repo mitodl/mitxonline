@@ -5,7 +5,25 @@ from rest_framework import status
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
+from ecommerce.api import add_product_to_basket
 from ecommerce.models import Discount, DiscountProduct, Product
+
+
+class AddBasketItemMixin:
+    """
+    perform_create for a basket item viewset: add the item through the basket
+    API, so the basket hooks run. Subclasses check the basket is the caller's.
+    """
+
+    def perform_create(self, serializer):
+        """Add the validated product to the validated basket."""
+
+        item, _ = add_product_to_basket(
+            self.request,
+            serializer.validated_data["basket"],
+            serializer.validated_data["product"],
+        )
+        serializer.instance = item
 
 
 class AttachDiscountProductMixin:

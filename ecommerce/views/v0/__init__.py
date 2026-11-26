@@ -27,7 +27,7 @@ from mitol.common.utils import now_in_utc
 from rest_framework import status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import NotFound, ParseError, ValidationError
 from rest_framework.generics import CreateAPIView, RetrieveAPIView
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -51,6 +51,7 @@ from courses.models import (
 )
 from courses.utils import is_uai_course_run, is_uai_program, is_xpro_course_run
 from ecommerce.api import (
+    add_product_to_basket,
     apply_discount_to_basket,
     establish_basket,
     establish_basket_for_request,
@@ -95,7 +96,7 @@ from ecommerce.serializers.v0 import (
     requests,
 )
 from ecommerce.tasks import process_refund_request
-from ecommerce.views.utils import AttachDiscountProductMixin
+from ecommerce.views.utils import AddBasketItemMixin, AttachDiscountProductMixin
 from flexiblepricing.models import FlexiblePriceTier
 from flexiblepricing.serializers import FlexiblePriceTierSerializer
 from hubspot_sync.task_helpers import sync_hubspot_cart_add
@@ -125,7 +126,7 @@ User = get_user_model()
         ),
     ],
 )
-class BasketItemViewSet(ModelViewSet):
+class BasketItemViewSet(AddBasketItemMixin, ModelViewSet):
     """ViewSet for handling BasketItem operations."""
 
     permission_classes = (IsAuthenticated,)
@@ -139,6 +140,38 @@ class BasketItemViewSet(ModelViewSet):
         # BasketItem has no Meta.ordering, so without this the row order is
         # whatever Postgres hands back - it varies between requests.
         return BasketItem.objects.filter(basket__user=self.request.user).order_by("id")
+
+    def perform_create(self, serializer):
+        """
+        Add the item through the basket API, so the basket hooks run.
+
+        The basket comes from the request body, so check it's the caller's.
+        """
+
+        if serializer.validated_data["basket"].user_id != self.request.user.id:
+            raise NotFound
+
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        """
+        Refuse to move an item to another basket or change its product.
+
+        Those are the only fields an update could change, and either would
+        change a basket's contents without the basket API (and so without its
+        ownership check and hooks). Add a new item instead.
+        """
+
+        item = serializer.instance
+        for field in ("basket", "product"):
+            if field in serializer.validated_data and serializer.validated_data[
+                field
+            ] != getattr(item, field):
+                raise ValidationError(
+                    {field: "A basket item's basket and product can't be changed."}
+                )
+
+        serializer.save()
 
 
 @extend_schema_view(
@@ -263,10 +296,8 @@ def _create_basket_from_product(
             # Don't clear discounts here — the read→delete→reapply logic below
             # already preserves and re-checks them correctly.
 
-        # FUTURE: This is where the basket_add hook was called.
-
-        (_, created) = BasketItem.objects.update_or_create(
-            basket=basket, product=product, defaults={"quantity": quantity}
+        (_, created) = add_product_to_basket(
+            request, basket, product, quantity=quantity
         )
 
         if request.user.is_authenticated:
@@ -458,10 +489,7 @@ def create_basket_with_products(request):
 
     try:
         for product, quantity in products:
-            # FUTURE: this is where the basket_add hook is called
-            BasketItem.objects.update_or_create(
-                basket=basket, product=product, defaults={"quantity": quantity}
-            )
+            add_product_to_basket(request, basket, product, quantity=quantity)
 
             sync_hubspot_cart_add(
                 request.user,

@@ -1,5 +1,7 @@
 """Models for locations."""
 
+from dataclasses import asdict
+
 import reversion
 from django.db import models
 from django_countries.fields import CountryField
@@ -7,6 +9,10 @@ from mitol.common.models import TimestampedModel, TimestampedModelQuerySet
 from mitol.common.utils.datetime import now_in_utc
 
 from location.constants import (
+    GEOLOCATION_TYPE_CHOICES,
+    GEOLOCATION_TYPE_GEOIP,
+    GEOLOCATION_TYPE_NONE,
+    GEOLOCATION_TYPE_PROFILE,
     LOCATION_FLAG_RULE_CHOICES,
     LOCATION_FLAG_RULE_DEFINITIONS,
     LOCATION_FLAG_TYPE_CHOICES,
@@ -162,3 +168,83 @@ class LocationFlag(SoftDeleteTimestampedModel, ValidateOnSaveMixin):
             return bool(decisions) and all(decisions)
 
         return any(decisions)
+
+
+class UserLocationModel(models.Model):
+    """
+    Records where we determined the user was.
+
+    Holds the location data as values rather than links, so the record says
+    where we placed the user at the time even if their profile changes later.
+
+    - location_country_code / location_source: the location we settled on and
+      how we found it. GeoIP wins over the profile, since it says where the
+      user is now.
+    - location_data: every location we found, so location flag rules (which
+      can need more than one source) can be checked against the record later.
+    """
+
+    location_country_code = CountryField(blank=True, default="")
+    location_source = models.CharField(
+        help_text="How the location was determined.",
+        max_length=20,
+        choices=GEOLOCATION_TYPE_CHOICES,
+        default=GEOLOCATION_TYPE_NONE,
+    )
+    location_data = models.JSONField(
+        help_text="Every location found for the user, with its source.",
+        default=list,
+        blank=True,
+    )
+    location_determined_on = models.DateTimeField(null=True, blank=True)
+
+    LOCATION_FIELDS = (
+        "location_country_code",
+        "location_source",
+        "location_data",
+        "location_determined_on",
+    )
+
+    class Meta:
+        """Flag this model as abstract."""
+
+        abstract = True
+
+    def set_location(self, locations: list[UserCalculatedLocation]):
+        """
+        Record the locations found for the user. Doesn't save.
+
+        Args:
+        - locations (list[UserCalculatedLocation]): from determine_user_location
+        """
+
+        by_type = {location.lookup_type: location for location in locations}
+        primary = by_type.get(GEOLOCATION_TYPE_GEOIP) or by_type.get(
+            GEOLOCATION_TYPE_PROFILE
+        )
+
+        self.location_country_code = (
+            primary.country_code if primary and primary.country_code else ""
+        )
+        self.location_source = (
+            primary.lookup_type
+            if primary and primary.country_code
+            else GEOLOCATION_TYPE_NONE
+        )
+        self.location_data = [asdict(location) for location in locations]
+        self.location_determined_on = now_in_utc()
+
+    def copy_location_from(self, other: "UserLocationModel | None"):
+        """Copy the location fields from another record, if given. Doesn't save."""
+
+        if other is None:
+            return
+
+        for field in self.LOCATION_FIELDS:
+            setattr(self, field, getattr(other, field))
+
+    @property
+    def user_locations(self) -> list[UserCalculatedLocation]:
+        """Return the recorded locations, for LocationFlag.evaluate."""
+
+        return [UserCalculatedLocation(**location) for location in self.location_data]

@@ -46,6 +46,7 @@ from courses.models import PaidCourseRun
 from ecommerce.api import (
     ANONYMOUS_BASKET_SESSION_KEY,
     _retrieve_pending_cybersource_orders,
+    add_product_to_basket,
     apply_discount_to_basket,
     apply_user_discounts,
     auto_refund_request,
@@ -83,6 +84,8 @@ from ecommerce.api import (
 )
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
+    BASKET_UPDATE_ADD_ITEM,
+    BASKET_UPDATE_CLAIM,
     DISCOUNT_TYPE_FIXED_PRICE,
     DISCOUNT_TYPE_PERCENT_OFF,
     PAYMENT_TYPE_FINANCIAL_ASSISTANCE,
@@ -120,6 +123,8 @@ from ecommerce.exceptions import (
     VerifiedProgramNoProductError,
 )
 from ecommerce.factories import (
+    BasketFactory,
+    BasketItemFactory,
     DiscountRedemptionFactory,
     InternalDiscountFactory,
     LineFactory,
@@ -163,6 +168,8 @@ from flexiblepricing.factories import (
     FlexiblePriceTierFactory,
     approve_flexible_price,
 )
+from location import api as location_api
+from location.constants import GEOLOCATION_TYPE_GEOIP
 from main.constants import USER_MSG_TYPE_PROFILE_INCOMPLETE
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from openedx.factories import OpenEdxUserFactory
@@ -3578,3 +3585,199 @@ def test_generate_checkout_payload_return_urls(
     else:
         assert success_url.endswith(reverse("checkout-result-callback"))
         assert cancel_url.endswith(reverse("checkout-result-callback"))
+
+
+@pytest.fixture
+def basket_hooks(mocker):
+    """Spy on the basket update hooks, recording the order they run in."""
+
+    calls = []
+    pm = mocker.Mock()
+    pm.hook.basket_pre_update.side_effect = lambda **kwargs: calls.append(
+        ("pre", kwargs)
+    )
+    pm.hook.basket_post_update.side_effect = lambda **kwargs: calls.append(
+        ("post", kwargs)
+    )
+    mocker.patch("ecommerce.api.get_plugin_manager", return_value=pm)
+    return calls
+
+
+def test_add_product_to_basket_runs_hooks(user, basket_hooks):
+    """add_product_to_basket runs the pre hook, adds the item, then the post hook."""
+
+    product = ProductFactory.create()
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    item, created = add_product_to_basket(request, basket, product, quantity=2)
+
+    assert created is True
+    assert item.basket == basket
+    assert item.product == product
+    assert item.quantity == 2
+
+    assert [stage for stage, _ in basket_hooks] == ["pre", "post"]
+    pre, post = basket_hooks[0][1], basket_hooks[1][1]
+    for kwargs in (pre, post):
+        assert kwargs["request"] is request
+        assert kwargs["basket"] is basket
+        assert kwargs["update"].operation == BASKET_UPDATE_ADD_ITEM
+        assert kwargs["update"].product == product
+    assert pre["update"].basket_item is None
+    assert post["update"].basket_item == item
+
+
+def test_add_product_to_basket_existing_item(user, basket_hooks):
+    """Adding a product that's already in the basket updates its quantity."""
+
+    basket = BasketFactory.create(user=user)
+    existing = BasketItemFactory.create(basket=basket, quantity=1)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    item, created = add_product_to_basket(request, basket, existing.product, quantity=3)
+
+    assert created is False
+    assert item.id == existing.id
+    assert item.quantity == 3
+    assert basket.basket_items.count() == 1
+
+    # Without a quantity, an existing item's quantity is left alone.
+    item, created = add_product_to_basket(request, basket, existing.product)
+
+    assert created is False
+    assert item.quantity == 3
+
+
+def test_add_product_to_basket_default_quantity(user, basket_hooks):
+    """A new item defaults to a quantity of 1."""
+
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    item, created = add_product_to_basket(request, basket, ProductFactory.create())
+
+    assert created is True
+    assert item.quantity == 1
+
+
+@pytest.mark.parametrize("pass_contract", [True, False])
+def test_add_product_to_basket_contract(user, basket_hooks, pass_contract):
+    """A contract is set when given, and an existing one kept when not."""
+
+    contract = ContractPageFactory.create()
+    basket = BasketFactory.create(user=user)
+    existing = BasketItemFactory.create(basket=basket, b2b_contract=contract)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    item, _ = add_product_to_basket(
+        request,
+        basket,
+        existing.product,
+        b2b_contract=contract if pass_contract else None,
+    )
+
+    assert item.b2b_contract == contract
+
+
+def test_add_product_to_basket_pre_hook_can_stop_the_add(user, mocker):
+    """An exception from a pre hook stops the item being added."""
+
+    pm = mocker.Mock()
+    pm.hook.basket_pre_update.side_effect = ValueError("no")
+    mocker.patch("ecommerce.api.get_plugin_manager", return_value=pm)
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    with pytest.raises(ValueError, match="no"):
+        add_product_to_basket(request, basket, ProductFactory.create())
+
+    assert basket.basket_items.count() == 0
+    pm.hook.basket_post_update.assert_not_called()
+
+
+def test_add_product_to_basket_records_location(settings, user):
+    """With the real hooks, adding an item records the user's location."""
+
+    settings.LOCATION_FORCE_COUNTRY = "IN"
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    add_product_to_basket(request, basket, ProductFactory.create())
+
+    basket.refresh_from_db()
+    assert basket.location_country_code == "IN"
+    assert basket.location_source == GEOLOCATION_TYPE_GEOIP
+
+
+def test_claim_anonymous_basket_runs_hooks(user, basket_hooks):
+    """Claiming an anonymous basket runs the basket update hooks."""
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    claim_anonymous_basket(claim_request)
+
+    assert [stage for stage, _ in basket_hooks] == ["pre", "post"]
+    for _, kwargs in basket_hooks:
+        assert kwargs["basket"].id == anon_basket.id
+        assert kwargs["basket"].user_id == user.id
+        assert kwargs["update"].operation == BASKET_UPDATE_CLAIM
+
+
+def test_claim_anonymous_basket_pre_hook_can_stop_the_claim(user, mocker):
+    """An exception from a pre hook leaves both baskets and the session alone."""
+
+    pm = mocker.Mock()
+    pm.hook.basket_pre_update.side_effect = ValueError("no")
+    mocker.patch("ecommerce.api.get_plugin_manager", return_value=pm)
+    existing_basket = BasketFactory.create(user=user)
+
+    anon_request = RequestFactory().get("/")
+    anon_request.session = {}
+    anon_request.user = AnonymousUser()
+    anon_basket = establish_basket_for_request(anon_request)
+
+    claim_request = RequestFactory().get("/")
+    claim_request.session = anon_request.session
+    claim_request.user = user
+
+    with pytest.raises(ValueError, match="no"):
+        claim_anonymous_basket(claim_request)
+
+    assert Basket.objects.filter(pk=existing_basket.pk, user=user).exists()
+    anon_basket.refresh_from_db()
+    assert anon_basket.user is None
+    assert anon_basket.anonymous_id is not None
+    assert ANONYMOUS_BASKET_SESSION_KEY in claim_request.session
+    pm.hook.basket_post_update.assert_not_called()
+
+
+def test_add_product_to_basket_locates_once_per_request(settings, user, mocker):
+    """Adding several products in one request looks the location up once."""
+
+    settings.LOCATION_FORCE_COUNTRY = "IN"
+    locate = mocker.spy(location_api, "determine_user_location")
+    basket = BasketFactory.create(user=user)
+    request = RequestFactory().get("/")
+    request.user = user
+
+    for _ in range(3):
+        add_product_to_basket(request, basket, ProductFactory.create())
+
+    locate.assert_called_once_with(request)
+    assert basket.basket_items.count() == 3
+    basket.refresh_from_db()
+    assert basket.location_country_code == "IN"

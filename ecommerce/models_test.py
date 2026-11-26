@@ -2,9 +2,12 @@ import random
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from importlib import import_module
+from types import SimpleNamespace
 
 import pytest
 import reversion
+from django.apps import apps as django_apps
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
@@ -83,6 +86,12 @@ from ecommerce.models import (
     Transaction,
     UserDiscount,
 )
+from location.constants import (
+    GEOLOCATION_TYPE_GEOIP,
+    GEOLOCATION_TYPE_NONE,
+    GEOLOCATION_TYPE_PROFILE,
+)
+from location.dataclasses import UserCalculatedLocation
 from openedx.constants import EDX_ENROLLMENT_AUDIT_MODE, EDX_ENROLLMENT_VERIFIED_MODE
 from users.factories import UserFactory
 
@@ -671,33 +680,38 @@ def test_pending_order_from_same_product_is_fresh():
     assert first_order.reference_number != second_order.reference_number
 
 
-def test_duplicate_basket_products_create_one_order_line(basket):
-    """A repeated basket item for one purchasable object is charged only once."""
+# A basket can't hold the same product twice (and a purchasable object has one
+# product), so these give _create_with_data the repeats directly.
+
+
+def test_duplicate_order_products_create_one_order_line(user):
+    """A repeated product for one purchasable object is charged only once."""
     with reversion.create_revision():
         product = ProductFactory.create(price=Decimal("100.00"))
-    BasketItemFactory.create(basket=basket, product=product)
-    BasketItemFactory.create(basket=basket, product=product)
 
-    order = PendingOrder.create_from_basket(basket)
+    order = PendingOrder._create_with_data(  # noqa: SLF001
+        PendingOrder, [(product, None), (product, None)], user
+    )
 
     assert order.lines.count() == 1
     assert order.total_price_paid == Decimal("100.00")
 
 
-def test_duplicate_basket_products_with_conflicting_contracts_are_rejected(basket):
-    """Duplicate basket entries must agree on their contract."""
+def test_duplicate_order_products_with_conflicting_contracts_are_rejected(user):
+    """Repeated products must agree on their contract."""
     product = ProductFactory.create()
-    BasketItemFactory.create(
-        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
-    )
-    BasketItemFactory.create(
-        basket=basket, product=product, b2b_contract=ContractPageFactory.create()
-    )
 
     with pytest.raises(ValidationError, match="conflicting contracts"):
-        PendingOrder.create_from_basket(basket)
+        PendingOrder._create_with_data(  # noqa: SLF001
+            PendingOrder,
+            [
+                (product, ContractPageFactory.create()),
+                (product, ContractPageFactory.create()),
+            ],
+            user,
+        )
 
-    assert not Order.objects.filter(purchaser=basket.user).exists()
+    assert not Order.objects.filter(purchaser=user).exists()
 
 
 def test_pending_order_with_bad_product_versions(basket):
@@ -2297,3 +2311,122 @@ def test_line_product_resolves_its_own_courseware_when_the_ids_disagree(
 
     with django_assert_num_queries(1):
         assert line.product.purchasable_object == snapshotted
+
+
+@pytest.mark.parametrize("from_basket", [True, False])
+def test_pending_order_copies_location(settings, user, from_basket):
+    """An order made from a basket records the basket's location; one made from a product doesn't."""
+
+    with reversion.create_revision():
+        product = ProductFactory.create()
+
+    basket = BasketFactory.create(user=user)
+    BasketItem.objects.create(basket=basket, product=product)
+    basket.set_location(
+        [
+            UserCalculatedLocation("US", GEOLOCATION_TYPE_PROFILE, ""),
+            UserCalculatedLocation("IN", GEOLOCATION_TYPE_GEOIP, "1.2.3.4"),
+        ]
+    )
+    basket.save()
+
+    if from_basket:
+        order = PendingOrder.create_from_basket(basket)
+    else:
+        order = PendingOrder.create_from_product(product, user)
+
+    order.refresh_from_db()
+    if from_basket:
+        assert order.location_country_code == "IN"
+        assert order.location_source == GEOLOCATION_TYPE_GEOIP
+        assert order.user_locations == basket.user_locations
+        assert order.location_determined_on == basket.location_determined_on
+    else:
+        assert order.location_country_code == ""
+        assert order.location_source == GEOLOCATION_TYPE_NONE
+        assert order.user_locations == []
+        assert order.location_determined_on is None
+
+
+def test_basket_item_unique_per_basket_and_product():
+    """A basket can't hold two rows for the same product."""
+
+    item = BasketItemFactory.create()
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        BasketItem.objects.create(basket=item.basket, product=item.product)
+
+
+def _basket_row(row_id, quantity=1, contract_id=None):
+    return SimpleNamespace(id=row_id, quantity=quantity, b2b_contract_id=contract_id)
+
+
+@pytest.mark.parametrize(
+    ("rows", "expected_keep", "expected_quantity", "expected_deletes"),
+    [
+        # Same contract (or none): fold into the oldest row, largest quantity.
+        ([(1, 1, None), (2, 3, None)], 1, 3, [2]),
+        ([(1, 2, 7), (2, 1, 7), (3, 1, 7)], 1, 2, [2, 3]),
+        # Different contracts, or a contract and none: remove them all.
+        ([(1, 1, 7), (2, 1, 8)], None, None, [1, 2]),
+        ([(1, 1, None), (2, 1, 7)], None, None, [1, 2]),
+    ],
+)
+def test_merge_duplicate_basket_items_plan(
+    rows, expected_keep, expected_quantity, expected_deletes
+):
+    """Duplicates merge only when they agree on their contract."""
+
+    migration = import_module("ecommerce.migrations.0061_merge_duplicate_basket_items")
+    items = [_basket_row(*row) for row in rows]
+
+    keep, quantity, delete_ids = migration.plan_merge(items)
+
+    assert (keep.id if keep else None) == expected_keep
+    assert quantity == expected_quantity
+    assert delete_ids == expected_deletes
+
+
+def test_merge_duplicate_basket_items_migration(caplog):
+    """The migration merges agreeing duplicates and removes conflicting ones."""
+
+    migration = import_module("ecommerce.migrations.0061_merge_duplicate_basket_items")
+
+    # Duplicates can't be made with the constraint in place. Dropping it here is
+    # undone when the test's transaction rolls back.
+    with connection.schema_editor() as editor:
+        editor.remove_constraint(
+            BasketItem,
+            next(
+                constraint
+                for constraint in BasketItem._meta.constraints  # noqa: SLF001
+                if constraint.name == "unique_basket_product"
+            ),
+        )
+
+    contract, other_contract = ContractPageFactory.create_batch(2)
+    agreeing = BasketItemFactory.create(quantity=1, b2b_contract=contract)
+    BasketItemFactory.create(
+        basket=agreeing.basket,
+        product=agreeing.product,
+        quantity=3,
+        b2b_contract=contract,
+    )
+    conflicting = BasketItemFactory.create(
+        basket=agreeing.basket, b2b_contract=contract
+    )
+    BasketItemFactory.create(
+        basket=agreeing.basket,
+        product=conflicting.product,
+        b2b_contract=other_contract,
+    )
+    untouched = BasketItemFactory.create(basket=agreeing.basket)
+
+    migration.merge_duplicate_basket_items(django_apps, None)
+
+    remaining = BasketItem.objects.filter(basket=agreeing.basket)
+    assert set(remaining.values_list("id", flat=True)) == {agreeing.id, untouched.id}
+    agreeing.refresh_from_db()
+    assert agreeing.quantity == 3
+    assert agreeing.b2b_contract == contract
+    assert f"Removing product {conflicting.product.id}" in caplog.text

@@ -4684,9 +4684,18 @@ components:
           items:
             $ref: '#/components/schemas/BasketItem'
           readOnly: true
+        location_country_code:
+          type: string
+          readOnly: true
+        location_source:
+          allOf:
+          - $ref: '#/components/schemas/LocationSourceEnum'
+          readOnly: true
       required:
       - basket_items
       - id
+      - location_country_code
+      - location_source
     BasketDiscountDetail:
       type: object
       description: BasketDiscount model serializer
@@ -4765,11 +4774,20 @@ components:
           items:
             $ref: '#/components/schemas/BasketDiscountDetail'
           readOnly: true
+        location_country_code:
+          type: string
+          readOnly: true
+        location_source:
+          allOf:
+          - $ref: '#/components/schemas/LocationSourceEnum'
+          readOnly: true
       required:
       - basket_items
       - discounted_price
       - discounts
       - id
+      - location_country_code
+      - location_source
       - total_price
     BlankEnum:
       enum:
@@ -6623,6 +6641,20 @@ components:
       - id
       - price
       - purchasable_object
+    LocationSourceEnum:
+      enum:
+      - profile
+      - geoip
+      - none
+      type: string
+      description: |-
+        * `profile` - Profile
+        * `geoip` - GeoIP
+        * `none` - None
+      x-enum-descriptions:
+      - Profile
+      - GeoIP
+      - None
     ManagerContractDetail:
       type: object
       description: Serializer for detailed contract view with statistics.
@@ -7163,11 +7195,20 @@ components:
           format: date-time
           nullable: true
           readOnly: true
+        location_country_code:
+          type: string
+          readOnly: true
+        location_source:
+          allOf:
+          - $ref: '#/components/schemas/LocationSourceEnum'
+          readOnly: true
       required:
       - created_on
       - discounts
       - id
       - lines
+      - location_country_code
+      - location_source
       - purchaser
       - refund_deadline
       - refund_eligible

@@ -194,6 +194,8 @@ def test_basket_serializer(mock_context):
             "user": basket.user.id,
             "id": basket.id,
             "basket_items": [basket_item_serialized],
+            "location_country_code": "",
+            "location_source": "none",
         },
     )
 

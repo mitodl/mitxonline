@@ -3,6 +3,7 @@
 import pluggy
 
 from ecommerce import hookspecs as ecommerce_hookspecs
+from ecommerce.hooks.basket_location import BasketLocation
 from ecommerce.hooks.checkout_preflight import CheckoutPreflight
 from ecommerce.hooks.process_transaction_line import CreateEnrollments
 from ecommerce.hooks.stripe_webhooks import CheckoutSessionEvents, RefundEvents
@@ -15,6 +16,7 @@ def get_plugin_manager():
 
     pm.add_hookspecs(ecommerce_hookspecs)
 
+    pm.register(BasketLocation())
     pm.register(CheckoutPreflight())
     pm.register(CreateEnrollments())
     pm.register(CheckoutSessionEvents())

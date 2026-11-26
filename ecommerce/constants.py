@@ -263,3 +263,12 @@ STRIPE_OVERALL_CHECKOUT_STATUS_PENDING_ACTION = "pending-action"
 STRIPE_OVERALL_CHECKOUT_STATUS_PAID = "paid"
 STRIPE_OVERALL_CHECKOUT_STATUS_CANCELLED = "cancelled"
 STRIPE_OVERALL_CHECKOUT_STATUS_ERROR = "error"
+
+# Basket update operations, passed to the basket_pre_update and
+# basket_post_update hooks.
+BASKET_UPDATE_ADD_ITEM = "add_item"
+BASKET_UPDATE_CLAIM = "claim"
+BASKET_UPDATE_OPERATIONS = [
+    BASKET_UPDATE_ADD_ITEM,
+    BASKET_UPDATE_CLAIM,
+]
