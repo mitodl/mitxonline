@@ -875,11 +875,14 @@ def _create_course_enrollment_from_program(request, courserun_id, program_enroll
     )
 
     if CourseRunEnrollment.objects.filter(
+        Q(enrollment_mode=effective_enrollment_mode)
+        # Never downgrade a verified seat here: it may be paid for, and
+        # moving it to audit would leave that order behind.
+        | Q(enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE),
         run__courseware_id=courserun_id,
         user=request.user,
-        enrollment_mode=effective_enrollment_mode,
     ).exists():
-        # Learner already has a matching enrollment, so nothing to do.
+        # Learner already has a matching (or better) enrollment, so nothing to do.
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     # Check if:

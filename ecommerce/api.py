@@ -34,8 +34,11 @@ from courses.api import (
     deactivate_run_enrollment,
     downgrade_program_enrollment_and_verified_runs,
 )
-from courses.constants import ENROLL_CHANGE_STATUS_REFUNDED
-from courses.models import CourseRunEnrollment, Program
+from courses.constants import (
+    ENROLL_CHANGE_STATUS_DEFERRED,
+    ENROLL_CHANGE_STATUS_REFUNDED,
+)
+from courses.models import CourseRunEnrollment, PaidCourseRun, PaidProgram, Program
 from courses.utils import is_uai_course_run, is_xpro_course_run
 from ecommerce.constants import (
     ADMIN_FULFILLED_PAYMENT_DATA,
@@ -2065,6 +2068,104 @@ def create_verified_program_course_run_order(user, courserun, program):
     return courserun.enrollments.filter(user=user).get()
 
 
+def _is_course_run_paid_for(user, courserun, *, program_entitled):
+    """
+    Whether the learner holds a fulfilled order for the run that still counts.
+
+    An order counts unless it was made free by a program's internal discount
+    (a program entitlement). That one counts only if program_entitled is set or
+    the learner still holds a fulfilled program purchase that includes the
+    run's course, since refunding a program leaves those orders fulfilled.
+    """
+    paid_runs = PaidCourseRun.fulfilled_for(user, courserun)
+    if paid_runs.exclude(
+        order__discounts__redeemed_discount__redemption_type=REDEMPTION_TYPE_INTERNAL
+    ).exists():
+        return True
+    if not paid_runs.exists():
+        return False
+    if program_entitled:
+        return True
+    return any(
+        paid_program.program.courses_qset_recursive.filter(
+            id=courserun.course_id
+        ).exists()
+        for paid_program in PaidProgram.objects.filter(
+            user=user, order__state=OrderStatus.FULFILLED
+        ).select_related("program")
+    )
+
+
+def restore_paid_course_run_enrollment(user, courserun, *, program_entitled=False):
+    """
+    Restore the verified enrollment a learner already paid for.
+
+    A learner can hold a fulfilled order for a run while their enrollment in it
+    is no longer verified (e.g. it was set to audit). Checkout refuses a second
+    order for the run as a duplicate, so an upgrade would fail; this re-enrolls
+    them as verified against the existing order instead.
+
+    Nothing is restored when:
+    - the run can't be upgraded (e.g. its upgrade deadline has passed)
+    - the existing enrollment is inactive or deferred: a deferral keeps the
+      payment for a later run, and an inactive enrollment should go through
+      the normal enrollment checks
+    - the only order for the run came free with a program the learner no
+      longer holds: refunding a program leaves those orders fulfilled, so they
+      don't prove the run is still paid for
+
+    Args:
+    - user: The learner.
+    - courserun: The course run.
+    Kwargs:
+    - program_entitled: the caller has checked that the learner holds a
+      verified enrollment in a program that includes the run, so an order that
+      came free with a program counts as paid
+    Returns:
+    - CourseRunEnrollment, or None if there's nothing to restore
+    Raises:
+    - CountryBlockedError or ExportComplianceError if the enrollment is blocked
+    """
+    if (
+        not _is_course_run_paid_for(user, courserun, program_entitled=program_entitled)
+        or not courserun.is_upgradable
+    ):
+        return None
+
+    existing = CourseRunEnrollment.all_objects.filter(user=user, run=courserun).first()
+    if existing is not None and (
+        not existing.active or existing.change_status == ENROLL_CHANGE_STATUS_DEFERRED
+    ):
+        return None
+    if (
+        existing is not None
+        and existing.enrollment_mode == EDX_ENROLLMENT_VERIFIED_MODE
+    ):
+        # Nothing to restore; don't re-run the enrollment (edX call, email).
+        return existing
+
+    log.info(
+        "User %s already paid for %s; restoring the verified enrollment",
+        user.id,
+        courserun.courseware_id,
+    )
+    enrollments, _ = create_run_enrollments(
+        user,
+        [courserun],
+        mode=EDX_ENROLLMENT_VERIFIED_MODE,
+        keep_failed_enrollments=True,
+    )
+    if not enrollments:
+        return None
+    restored = enrollments[0]
+    if not restored.edx_enrolled and restored.edx_enrollment_retry_count:
+        # The edX call failed. The enrollment may have used up its repair
+        # retries while it was on audit, so give the verified sync a fresh start.
+        restored.edx_enrollment_retry_count = 0
+        restored.save(update_fields=["edx_enrollment_retry_count"])
+    return restored
+
+
 def create_verified_program_course_run_enrollment(request, courserun, program):
     """
     Create a verified course run enrollment in a course that is associated with
@@ -2104,6 +2205,12 @@ def create_verified_program_course_run_enrollment(request, courserun, program):
     product, discount = _get_verified_program_course_run_product_and_discount(
         request.user, courserun, program
     )
+
+    restored = restore_paid_course_run_enrollment(
+        request.user, courserun, program_entitled=True
+    )
+    if restored is not None:
+        return restored
 
     basket = establish_basket(request)
 

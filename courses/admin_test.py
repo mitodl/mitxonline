@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from django.contrib import admin as django_admin
+from django.forms.models import model_to_dict
 from django.urls import reverse
 from mitol.common.utils.datetime import now_in_utc
 from requests.exceptions import HTTPError
@@ -23,7 +24,11 @@ from courses.factories import (
     PartnerSchoolProgramFactory,
     ProgramFactory,
 )
-from courses.models import CourseRun, CourseRunEnrollment
+from courses.forms import (
+    PAID_RUN_AUDIT_BLOCKED_MESSAGE,
+    CourseRunEnrollmentAdminForm,
+)
+from courses.models import CourseRun, CourseRunEnrollment, PaidCourseRun
 from main.features import IGNORE_EDX_FAILURES
 from openedx.constants import (
     EDX_ENROLLMENT_AUDIT_MODE,
@@ -567,3 +572,89 @@ def test_downgrade_enrollment_action(mocker, admin_client):
     assert sorted(mock_task.call_args.args[0]) == sorted(e.id for e in selected)
     message_texts = [str(m) for m in response.context["messages"]]
     assert any("Queued 3 enrollment(s)" in t for t in message_texts)
+
+
+def _paid_enrollment(mode=EDX_ENROLLMENT_VERIFIED_MODE):
+    """An enrollment backed by a fulfilled order for its run"""
+    from ecommerce.factories import OrderFactory  # noqa: PLC0415
+    from ecommerce.models import OrderStatus  # noqa: PLC0415
+
+    enrollment = CourseRunEnrollmentFactory.create(enrollment_mode=mode)
+    PaidCourseRun.objects.create(
+        user=enrollment.user,
+        course_run=enrollment.run,
+        order=OrderFactory.create(
+            purchaser=enrollment.user, state=OrderStatus.FULFILLED
+        ),
+    )
+    return enrollment
+
+
+@pytest.mark.parametrize("paid", [True, False])
+def test_enrollment_admin_form_blocks_audit_for_paid_run(paid):
+    """Staff can't set a paid enrollment to audit; an unpaid one is fine"""
+    enrollment = (
+        _paid_enrollment()
+        if paid
+        else CourseRunEnrollmentFactory.create(
+            enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+        )
+    )
+    data = {
+        field: value
+        for field, value in model_to_dict(enrollment).items()
+        if value is not None
+    }
+    data["enrollment_mode"] = EDX_ENROLLMENT_AUDIT_MODE
+
+    form = CourseRunEnrollmentAdminForm(data=data, instance=enrollment)
+
+    assert form.is_valid() is not paid
+    if paid:
+        assert form.errors["enrollment_mode"] == [PAID_RUN_AUDIT_BLOCKED_MESSAGE]
+
+
+def test_downgrade_enrollment_action_skips_paid_runs(mocker, admin_client):
+    """The bulk downgrade skips paid enrollments and tells staff why"""
+    paid = _paid_enrollment()
+    unpaid = CourseRunEnrollmentFactory.create()
+    mock_task = mocker.patch("courses.admin.downgrade_enrollments.delay")
+
+    response = admin_client.post(
+        reverse("admin:courses_courserunenrollment_changelist"),
+        {
+            "action": "downgrade_enrollment",
+            "_selected_action": [str(paid.id), str(unpaid.id)],
+        },
+        follow=True,
+    )
+
+    mock_task.assert_called_once_with([unpaid.id])
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any(
+        f"IDs {paid.id}" in t and PAID_RUN_AUDIT_BLOCKED_MESSAGE in t
+        for t in message_texts
+    )
+
+
+@pytest.mark.parametrize("active", [True, False])
+def test_enroll_in_runs_skips_paid_verified_enrollment(mocker, admin_client, active):
+    """Enroll in runs doesn't move a paid verified enrollment to audit"""
+    enrollment = _paid_enrollment()
+    enrollment.active = active
+    enrollment.save()
+    enrollment.run.courseware_id = "course-v1:MITx+P+0T2026"
+    enrollment.run.save()
+    mock_enroll = mocker.patch(
+        "courses.admin.create_run_enrollments", return_value=([mocker.Mock()], True)
+    )
+
+    response = admin_client.post(
+        reverse(ENROLL_IN_RUNS_URL),
+        {"user": str(enrollment.user.id), "runs": [enrollment.run.id]},
+        follow=True,
+    )
+
+    mock_enroll.assert_not_called()
+    message_texts = [str(m) for m in response.context["messages"]]
+    assert any(PAID_RUN_AUDIT_BLOCKED_MESSAGE in t for t in message_texts)

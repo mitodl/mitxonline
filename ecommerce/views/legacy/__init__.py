@@ -14,7 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse, HttpResponseRedirect
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -40,6 +40,8 @@ from rest_framework.viewsets import (
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from b2b.api import is_product_courserun, is_product_program
+from compliance.exceptions import ExportComplianceError
+from courses.exceptions import CountryBlockedError
 from courses.models import (
     Course,
     CourseRun,
@@ -1137,6 +1139,10 @@ class CheckoutProductView(RedirectView):
             VerifiedProgramNoProductError,
             VerifiedProgramInvalidBasketError,
             VerifiedProgramInvalidOrderError,
+            # Restoring a run the learner already paid for enrolls directly, so
+            # a block surfaces as these rather than as a checkout result.
+            CountryBlockedError,
+            ExportComplianceError,
         ):
             log.exception(
                 "Failed to create verified program course enrollment for user id %s, run %s",
@@ -1199,6 +1205,50 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             )
         return ga_purchase_payload
 
+    def _restore_paid_basket_runs(self, request):
+        """
+        If the basket holds just a course run the learner already paid for,
+        restore that verified enrollment and empty the basket.
+
+        Checkout refuses it as a duplicate purchase, but the learner reaches it
+        by upgrading an enrollment that was moved off verified (e.g. set to
+        audit), so give them back what the existing order paid for. An upgrade
+        puts a single run in the basket; anything else keeps the duplicate
+        message rather than restoring part of the basket.
+
+        Returns:
+        - bool: True if the enrollment was restored
+        """
+        with transaction.atomic():
+            basket = api.establish_basket_for_request(request, for_update=True)
+            items = list(basket.basket_items.select_related("product"))
+            if len(items) != 1:
+                return False
+            run = items[0].product.purchasable_object
+            if not isinstance(run, CourseRun):
+                return False
+            if CourseRunEnrollment.objects.filter(
+                user=request.user,
+                run=run,
+                enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE,
+            ).exists():
+                # Already verified: nothing to restore, keep the duplicate message
+                return False
+            try:
+                restored = api.restore_paid_course_run_enrollment(request.user, run)
+            except (CountryBlockedError, ExportComplianceError):
+                log.exception(
+                    "Couldn't restore the paid enrollment for user id %s, run %s",
+                    request.user.id,
+                    run.courseware_id,
+                )
+                return False
+            if restored is None:
+                return False
+            basket.basket_items.all().delete()
+            BasketDiscount.objects.filter(redeemed_basket=basket).delete()
+        return True
+
     def get(self, request):  # noqa: PLR0911, C901
         try:
             checkout_payload = api.generate_checkout_payload(request)
@@ -1229,6 +1279,8 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
         if "no_checkout" in checkout_payload:
             return _learn_dashboard_redirect(checkout_payload["order"])
         if "purchased_same_courserun" in checkout_payload:
+            if self._restore_paid_basket_runs(request):
+                return redirect(reverse("user-dashboard"))
             return redirect_with_user_message(
                 reverse("cart"),
                 {"type": USER_MSG_TYPE_ENROLL_DUPLICATED},
