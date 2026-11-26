@@ -1683,17 +1683,6 @@ class Line(TimestampedModel):
         """
         return self.discounted_unit_price.quantize(Decimal("0.01"))
 
-    def record_b2b_contract(self, contract):
-        """
-        Record the contract this line is bought under and save it.
-
-        Skips the write when the contract is unchanged.
-        """
-        contract_id = contract.id if contract else None
-        if self.b2b_contract_id != contract_id:
-            self.b2b_contract_id = contract_id
-            self.save(update_fields=["b2b_contract", "updated_on"])
-
     def record_discounted_unit_price(self):
         """
         Record the post-discount unit price and save it.

@@ -2420,55 +2420,6 @@ def _find_target_deal_id_by_unique_app_id(
     return None
 
 
-def _find_target_line_item_id_by_unique_app_id(
-    hubspot_client: HubspotApi, unique_app_id: str
-) -> str | None:
-    """Find line item id in target account by unique_app_id."""
-    wait_for_hubspot_rate_limit()
-    try:
-        response = hubspot_client.crm.objects.search_api.do_search(
-            object_type=HubspotObjectType.LINES.value,
-            public_object_search_request=PublicObjectSearchRequest(
-                filter_groups=[
-                    FilterGroup(
-                        filters=[
-                            Filter(
-                                property_name="unique_app_id",
-                                operator="EQ",
-                                value=unique_app_id,
-                            )
-                        ]
-                    )
-                ],
-                limit=1,
-            ),
-        )
-        if response.results:
-            return response.results[0].id
-        else:
-            return None
-    except TooManyRequestsException:
-        # Re-raise rate limit errors so calling code can retry
-        # to avoid creating duplicates when we can't search
-        log.warning(
-            "Rate limited searching for line item with unique_app_id %s",
-            unique_app_id,
-        )
-        raise
-    except ApiException:
-        log.exception(
-            "Failed to search for line item with unique_app_id %s",
-            unique_app_id,
-        )
-        return None
-    except Exception:
-        log.exception(
-            "Unexpected error searching for line item with unique_app_id %s",
-            unique_app_id,
-        )
-        return None
-
-
 def _find_target_deal_line_item_id_by_product(
     hubspot_client: HubspotApi, deal_id: str, hs_product_id: str
 ) -> str | None:
