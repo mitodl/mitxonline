@@ -98,7 +98,7 @@ from main.constants import (
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.settings import TIME_ZONE
-from main.test_utils import assert_drf_json_equal
+from main.test_utils import assert_drf_json_equal, assert_matches_openapi_response
 from openedx.constants import EDX_ENROLLMENT_VERIFIED_MODE
 
 pytestmark = pytest.mark.django_db
@@ -1581,7 +1581,22 @@ def test_start_checkout_compliance_declined(
     assert resp.status_code == 400
     assert resp.json()["error"] == USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED
     assert resp.json()["reason_code"] == "CS_700"
+    assert_matches_openapi_response(resp, "/api/v0/baskets/checkout/", "get")
     assert not Order.objects.filter(purchaser=user).exists()
+
+
+def test_start_checkout_no_basket_matches_spec(mocker, user_drf_client):
+    """Checkout's "No basket" 400 is one of the 400 bodies the spec documents."""
+    mocker.patch(
+        "ecommerce.views.v0.generate_checkout_payload",
+        side_effect=Basket.DoesNotExist,
+    )
+
+    resp = user_drf_client.get(reverse("v0:baskets_api-checkout"))
+
+    assert resp.status_code == 400
+    assert resp.json() == "No basket"
+    assert_matches_openapi_response(resp, "/api/v0/baskets/checkout/", "get")
 
 
 def test_start_checkout_with_no_lines(user, user_drf_client):

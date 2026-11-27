@@ -2315,7 +2315,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckoutPayload'
+                oneOf:
+                - $ref: '#/components/schemas/CheckoutPayload'
+                - type: string
+                  enum:
+                  - No basket
           description: ''
   /api/v0/baskets/clear/:
     delete:
@@ -4335,6 +4339,17 @@ components:
           maxLength: 255
       required:
       - email
+    B2BEnrollRequestFieldErrors:
+      type: object
+      properties:
+        program_id:
+          type: array
+          items:
+            type: string
+        contract_slug:
+          type: array
+          items:
+            type: string
     B2BEnrollRequestRequest:
       type: object
       description: |-
@@ -4352,6 +4367,31 @@ components:
         contract_slug:
           type: string
           description: The slug for the contract the user is in.
+    B2BEnrollRequestValidationError:
+      type: object
+      description: Default DRF is_valid(raise_exception=True) error shape for B2BEnrollRequestSerializer.
+      properties:
+        errors:
+          $ref: '#/components/schemas/B2BEnrollRequestFieldErrors'
+      required:
+      - errors
+    B2BEnrollmentFailure:
+      type: object
+      description: |-
+        A create_b2b_enrollment result that isn't a success, for the API docs.
+
+        Only result is always there. A b2b-error-requires-checkout result adds
+        price, and checkout_result when the checkout attempt itself failed.
+      properties:
+        result:
+          $ref: '#/components/schemas/ResultEnum'
+        price:
+          type: string
+          format: decimal
+        checkout_result:
+          $ref: '#/components/schemas/GenerateCheckoutPayload'
+      required:
+      - result
     BaseContractPage:
       type: object
       description: Simplified serializer for the ContractPage model.
@@ -5396,8 +5436,9 @@ components:
       - result
     CreateB2BEnrollmentError:
       oneOf:
-      - $ref: '#/components/schemas/CreateB2BEnrollment'
+      - $ref: '#/components/schemas/B2BEnrollmentFailure'
       - $ref: '#/components/schemas/EnrollmentError'
+      - $ref: '#/components/schemas/B2BEnrollRequestValidationError'
     CreateBasketWithProductIDRequest:
       type: object
       description: Defines the schema for a product ID and quantity in the CreateBasketWithProductsSerializer.

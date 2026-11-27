@@ -534,7 +534,15 @@ def clear_basket(request):
 @extend_schema(
     description=("Returns the payload necessary to start the payment process."),
     methods=["GET"],
-    responses={200: CheckoutPayloadSerializer, 400: CheckoutPayloadSerializer},
+    responses={
+        200: CheckoutPayloadSerializer,
+        400: {
+            "oneOf": [
+                {"$ref": "#/components/schemas/CheckoutPayload"},
+                {"type": "string", "enum": ["No basket"]},
+            ],
+        },
+    },
 )
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

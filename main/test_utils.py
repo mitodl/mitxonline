@@ -7,10 +7,15 @@ import tempfile
 import traceback
 from collections import Counter
 from contextlib import contextmanager
+from functools import cache
+from pathlib import Path
 
+import jsonschema
 import pytest
+import yaml
 from deepdiff import DeepDiff
 from deepdiff.helper import COLORED_VIEW
+from django.conf import settings
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.core.files.uploadedfile import SimpleUploadedFile
 from requests.exceptions import HTTPError
@@ -47,6 +52,47 @@ def assert_drf_json_equal(obj1, obj2, ignore_order=False):  # noqa: FBT002
 
     if diff != {}:
         pytest.fail(f"Values differ:\n\n{diff!s}")
+
+
+def _openapi_to_jsonschema(node):
+    """Rewrite OpenAPI 3.0's `nullable: true` as JSON Schema's null type."""
+    if isinstance(node, list):
+        return [_openapi_to_jsonschema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    node = {key: _openapi_to_jsonschema(value) for key, value in node.items()}
+    if node.get("nullable") is True:
+        del node["nullable"]
+        return {"anyOf": [node, {"type": "null"}]}
+    return node
+
+
+@cache
+def _openapi_spec(version):
+    """The committed OpenAPI spec for an API version, as JSON Schema."""
+    spec_path = Path(settings.BASE_DIR) / "openapi" / "specs" / f"{version}.yaml"
+    with spec_path.open() as spec_file:
+        return _openapi_to_jsonschema(yaml.safe_load(spec_file))
+
+
+def assert_matches_openapi_response(response, path, method, *, version="v0"):
+    """
+    Assert that a response's JSON body is valid against the schema the committed
+    OpenAPI spec documents for the operation and the response's status code,
+    i.e. a client validating responses against the spec would accept it.
+
+    Args:
+        response: the test client response
+        path (str): the operation's path as it appears in the spec
+        method (str): the HTTP method
+        version (str): the API version whose spec to check against
+    """
+    spec = _openapi_spec(version)
+    schema = spec["paths"][path][method.lower()]["responses"][
+        str(response.status_code)
+    ]["content"]["application/json"]["schema"]
+    # Carry the components along so the schema's $refs resolve.
+    jsonschema.validate(response.json(), {**schema, "components": spec["components"]})
 
 
 class MockResponse:

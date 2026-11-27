@@ -34,7 +34,9 @@ from b2b.models import (
     OrganizationPage,
 )
 from b2b.serializers.v0 import (
+    B2BEnrollmentFailureSerializer,
     B2BEnrollRequestSerializer,
+    B2BEnrollRequestValidationErrorSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
     DataConsentSerializer,
@@ -167,7 +169,11 @@ class Enroll(APIView):
             201: CreateB2BEnrollmentSerializer,
             400: PolymorphicProxySerializer(
                 component_name="CreateB2BEnrollmentError",
-                serializers=[CreateB2BEnrollmentSerializer, EnrollmentErrorSerializer],
+                serializers=[
+                    B2BEnrollmentFailureSerializer,
+                    EnrollmentErrorSerializer,
+                    B2BEnrollRequestValidationErrorSerializer,
+                ],
                 resource_type_field_name=None,
             ),
         },

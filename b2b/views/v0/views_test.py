@@ -45,9 +45,12 @@ from main.constants import (
     USER_MSG_TYPE_B2B_ERROR_NOT_ENROLLABLE,
     USER_MSG_TYPE_B2B_ERROR_REQUIRES_CHECKOUT,
 )
+from main.test_utils import assert_matches_openapi_response
 from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
+
+B2B_ENROLL_SPEC_PATH = "/api/v0/b2b/enroll/{readable_id}/"
 
 
 def test_b2b_contract_attachment_bad_code(user):
@@ -596,7 +599,32 @@ def test_b2b_enroll_compliance_declined(mocker, settings, mocked_export_complian
         "detail": "Unable to complete enrollment. Error code: CS_700.",
         "reason_code": "CS_700",
     }
+    assert_matches_openapi_response(resp, B2B_ENROLL_SPEC_PATH, "post")
     assert not CourseRunEnrollment.objects.filter(user=user, run=courserun).exists()
+
+
+@pytest.mark.skip_nplusone_check
+def test_b2b_enroll_invalid_request_matches_spec(mocker, settings):
+    """An invalid request body's 400 is one of the 400 bodies the spec documents."""
+    mocker.patch("openedx.tasks.clone_courserun.delay")
+    settings.OPENEDX_SERVICE_WORKER_API_TOKEN = "a token"  # noqa: S105
+    contract = ContractPageFactory.create(membership_type=CONTRACT_MEMBERSHIP_MANAGED)
+    source_courserun = CourseRunFactory.create(
+        is_source_run=True, language="en", is_primary_language=True
+    )
+    [(courserun, _)] = create_contract_run(contract, source_courserun.course)
+    client = APIClient()
+    client.force_login(UserFactory.create())
+
+    resp = client.post(
+        reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id}),
+        {"program_id": ["not", "a", "string"]},
+        format="json",
+    )
+
+    assert resp.status_code == 400
+    assert resp.json() == {"errors": {"program_id": ["Not a valid string."]}}
+    assert_matches_openapi_response(resp, B2B_ENROLL_SPEC_PATH, "post")
 
 
 @pytest.mark.skip_nplusone_check
@@ -667,6 +695,9 @@ def test_b2b_enroll(  # noqa: PLR0915, PLR0913, C901
 
     url = reverse("b2b:enroll-user", kwargs={"readable_id": courserun.courseware_id})
     resp = client.post(url)
+
+    if resp.status_code == 400:
+        assert_matches_openapi_response(resp, B2B_ENROLL_SPEC_PATH, "post")
 
     if contract_active in ["date", "flag"]:
         assert resp.status_code == 400
