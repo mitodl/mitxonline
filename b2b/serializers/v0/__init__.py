@@ -227,6 +227,50 @@ class CreateB2BEnrollmentSerializer(serializers.Serializer):
     checkout_result = GenerateCheckoutPayloadSerializer(required=False)
 
 
+class B2BEnrollmentFailureSerializer(serializers.Serializer):
+    """
+    A create_b2b_enrollment result that isn't a success, for the API docs.
+
+    Only result is always there. A b2b-error-requires-checkout result adds
+    price, and checkout_result when the checkout attempt itself failed.
+    """
+
+    result = serializers.ChoiceField(choices=USER_MSG_TYPE_B2B_CHOICES)
+    price = serializers.DecimalField(max_digits=None, decimal_places=2, required=False)
+    checkout_result = GenerateCheckoutPayloadSerializer(required=False)
+
+
+class EnrollmentErrorSerializer(serializers.Serializer):
+    """
+    Body of a courses.exceptions.EnrollmentError, for the API docs.
+
+    reason_code and missing_fields are only there when the cause declares
+    them (e.g. CS_700 for a compliance decline, CS_701 for profile fields).
+    """
+
+    detail = serializers.CharField()
+    reason_code = serializers.CharField(required=False)
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(), required=False
+    )
+
+
+class B2BEnrollRequestValidationErrorSerializer(serializers.Serializer):
+    """Default DRF is_valid(raise_exception=True) error shape for B2BEnrollRequestSerializer."""
+
+    errors = inline_serializer(
+        name="B2BEnrollRequestFieldErrors",
+        fields={
+            "program_id": serializers.ListField(
+                child=serializers.CharField(), required=False
+            ),
+            "contract_slug": serializers.ListField(
+                child=serializers.CharField(), required=False
+            ),
+        },
+    )
+
+
 class DataConsentSerializer(serializers.Serializer):
     """
     Records whether a user has consented to data sharing for a contract

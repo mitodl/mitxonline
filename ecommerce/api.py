@@ -210,7 +210,12 @@ def validate_basket_steps_for_b2b(basket):
 
 
 def _run_checkout_preflight(
-    request, basket, *, skip_discount_check=False, raise_compliance_data_errors=False
+    request,
+    basket,
+    *,
+    skip_discount_check=False,
+    raise_compliance_data_errors=False,
+    raise_compliance_declines=False,
 ):
     """
     Run the checkout pre-flight hooks, in order.
@@ -230,6 +235,7 @@ def _run_checkout_preflight(
         basket=basket,
         options={
             "raise_compliance_data_errors": raise_compliance_data_errors,
+            "raise_compliance_declines": raise_compliance_declines,
         },
     ):
         return result
@@ -253,6 +259,7 @@ def generate_checkout_payload(  # noqa: PLR0913
     skip_receipt=False,
     gateway_type=None,
     raise_compliance_data_errors=False,
+    raise_compliance_declines=False,
 ):
     """
     Generate the checkout payload for the current basket.
@@ -276,6 +283,8 @@ def generate_checkout_payload(  # noqa: PLR0913
     - gateway_type: specify specific gateway type (default None)
     - raise_compliance_data_errors: raise ExportComplianceDataError rather than
       returning a profile_incomplete payload (default False)
+    - raise_compliance_declines: raise ExportComplianceError rather than
+      returning a compliance_declined payload (default False)
     """
     if basket is None:
         basket = establish_basket(request)
@@ -296,6 +305,7 @@ def generate_checkout_payload(  # noqa: PLR0913
         basket,
         skip_discount_check=skip_discount_check,
         raise_compliance_data_errors=raise_compliance_data_errors,
+        raise_compliance_declines=raise_compliance_declines,
     )
 
     if preflight_error:

@@ -8,6 +8,7 @@ import * as api from "./api"
 import {
   USER_MSG_COOKIE_NAME,
   USER_MSG_TYPE_COMPLETED_AUTH,
+  USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
   USER_MSG_TYPE_ENROLL_FAILED,
   USER_MSG_TYPE_ENROLLED,
   USER_MSG_TYPE_PAYMENT_ERROR,
@@ -75,6 +76,19 @@ describe("notifications API", () => {
         }),
         {
           text: `Something went wrong with your enrollment. Please contact support at ${SETTINGS.support_email}.`,
+          type: "danger"
+        }
+      )
+    })
+
+    it("returns the support code given an 'enroll compliance declined' message cookie value", () => {
+      assert.deepEqual(
+        notificationsApi.parseStoredUserMessage({
+          type: USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
+          code: "CS_700"
+        }),
+        {
+          text: `Unable to complete enrollment. Please contact support at ${SETTINGS.support_email} and mention error code CS_700.`,
           type: "danger"
         }
       )

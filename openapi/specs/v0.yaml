@@ -259,7 +259,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CreateB2BEnrollment'
+                $ref: '#/components/schemas/CreateB2BEnrollmentError'
           description: ''
   /api/v0/b2b/manager/organizations/:
     get:
@@ -2361,6 +2361,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/CheckoutPayload'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/CheckoutPayload'
+                - type: string
+                  enum:
+                  - No basket
+          description: ''
   /api/v0/baskets/clear/:
     delete:
       operationId: baskets_clear_destroy
@@ -4382,6 +4392,17 @@ components:
           maxLength: 255
       required:
       - email
+    B2BEnrollRequestFieldErrors:
+      type: object
+      properties:
+        program_id:
+          type: array
+          items:
+            type: string
+        contract_slug:
+          type: array
+          items:
+            type: string
     B2BEnrollRequestRequest:
       type: object
       description: |-
@@ -4399,6 +4420,31 @@ components:
         contract_slug:
           type: string
           description: The slug for the contract the user is in.
+    B2BEnrollRequestValidationError:
+      type: object
+      description: Default DRF is_valid(raise_exception=True) error shape for B2BEnrollRequestSerializer.
+      properties:
+        errors:
+          $ref: '#/components/schemas/B2BEnrollRequestFieldErrors'
+      required:
+      - errors
+    B2BEnrollmentFailure:
+      type: object
+      description: |-
+        A create_b2b_enrollment result that isn't a success, for the API docs.
+
+        Only result is always there. A b2b-error-requires-checkout result adds
+        price, and checkout_result when the checkout attempt itself failed.
+      properties:
+        result:
+          $ref: '#/components/schemas/ResultEnum'
+        price:
+          type: string
+          format: decimal
+        checkout_result:
+          $ref: '#/components/schemas/GenerateCheckoutPayload'
+      required:
+      - result
     BaseContractPage:
       type: object
       description: Simplified serializer for the ContractPage model.
@@ -4957,6 +5003,7 @@ components:
             Error message for the order, if there is one.
 
             * `enroll-blocked` - enroll-blocked
+            * `enroll-compliance-declined` - enroll-compliance-declined
             * `enroll-duplicated` - enroll-duplicated
             * `course-non-upgradable` - course-non-upgradable
             * `discount-invalid` - discount-invalid
@@ -4970,6 +5017,12 @@ components:
             type: string
           readOnly: true
           description: With a profile-incomplete error, the profile fields to fix.
+        reason_code:
+          type: string
+          readOnly: true
+          nullable: true
+          description: With an enroll-compliance-declined error, the support code
+            (CS_700).
       required:
       - error
       - method
@@ -4977,6 +5030,7 @@ components:
       - no_checkout
       - order_id
       - payload
+      - reason_code
       - url
     CompanySizeEnum:
       enum:
@@ -5433,6 +5487,11 @@ components:
       - order
       - price
       - result
+    CreateB2BEnrollmentError:
+      oneOf:
+      - $ref: '#/components/schemas/B2BEnrollmentFailure'
+      - $ref: '#/components/schemas/EnrollmentError'
+      - $ref: '#/components/schemas/B2BEnrollRequestValidationError'
     CreateBasketWithProductIDRequest:
       type: object
       description: Defines the schema for a product ID and quantity in the CreateBasketWithProductsSerializer.
@@ -5926,9 +5985,28 @@ components:
       - clicked
       - failed
       - pending
+    EnrollmentError:
+      type: object
+      description: |-
+        Body of a courses.exceptions.EnrollmentError, for the API docs.
+
+        reason_code and missing_fields are only there when the cause declares
+        them (e.g. CS_700 for a compliance decline, CS_701 for profile fields).
+      properties:
+        detail:
+          type: string
+        reason_code:
+          type: string
+        missing_fields:
+          type: array
+          items:
+            type: string
+      required:
+      - detail
     ErrorEnum:
       enum:
       - enroll-blocked
+      - enroll-compliance-declined
       - enroll-duplicated
       - course-non-upgradable
       - discount-invalid
@@ -5939,6 +6017,7 @@ components:
       type: string
       description: |-
         * `enroll-blocked` - enroll-blocked
+        * `enroll-compliance-declined` - enroll-compliance-declined
         * `enroll-duplicated` - enroll-duplicated
         * `course-non-upgradable` - course-non-upgradable
         * `discount-invalid` - discount-invalid
@@ -5948,6 +6027,7 @@ components:
         * `profile-incomplete` - profile-incomplete
       x-enum-descriptions:
       - enroll-blocked
+      - enroll-compliance-declined
       - enroll-duplicated
       - course-non-upgradable
       - discount-invalid

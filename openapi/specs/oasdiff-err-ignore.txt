@@ -61,3 +61,13 @@ GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/faq_url`
 GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/CoursePageItem]/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
 GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/faq_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
 GET /api/v2/pages/{id}/ the `oneOf[#/components/schemas/ProgramPageItem]/video_url` response's property `type/format` changed from `string/uri` to `any` for status `200`
+
+# B2B enroll 400 schema correction (PR #4315). No response changes on the
+# wire: the 400 was documented as CreateB2BEnrollment, which requires
+# `order`, but create_b2b_enrollment only returns `order` on success (201).
+# A 400 body has `result`, plus `price`/`checkout_result` when checkout is
+# required, so no real 400 ever matched the old schema or carried `order`.
+#
+# Delete this block once the change has shipped to `release`.
+POST /api/v0/b2b/enroll/{readable_id}/ the response body was restructured into a oneOf, so a field that was previously guaranteed may no longer be present
+POST /api/v0/b2b/enroll/{readable_id}/ removed the required property `order` from the response with the `400` status

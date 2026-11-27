@@ -98,6 +98,7 @@ from main.constants import (
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
     USER_MSG_TYPE_DISCOUNT_INVALID,
     USER_MSG_TYPE_ENROLL_BLOCKED,
+    USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -1208,6 +1209,17 @@ class CheckoutInterstitialView(LoginRequiredMixin, TemplateView):
             return redirect_with_user_message(
                 reverse("user-dashboard"),
                 {"type": USER_MSG_TYPE_ENROLL_BLOCKED},
+            )
+        if "compliance_declined" in checkout_payload:
+            # Support recognizes the code and does a manual review. Back to
+            # the cart, since the dashboard is now on MIT Learn and wouldn't
+            # show this message.
+            return redirect_with_user_message(
+                reverse("cart"),
+                {
+                    "type": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
+                    "code": checkout_payload["reason_code"],
+                },
             )
         if "profile_incomplete" in checkout_payload:
             # The cart opens its profile dialog on these fields. It can't edit

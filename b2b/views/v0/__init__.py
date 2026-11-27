@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
+    PolymorphicProxySerializer,
     extend_schema,
     inline_serializer,
 )
@@ -33,11 +34,14 @@ from b2b.models import (
     OrganizationPage,
 )
 from b2b.serializers.v0 import (
+    B2BEnrollmentFailureSerializer,
     B2BEnrollRequestSerializer,
+    B2BEnrollRequestValidationErrorSerializer,
     ContractPageSerializer,
     CreateB2BEnrollmentSerializer,
     DataConsentSerializer,
     DataConsentValidationErrorSerializer,
+    EnrollmentErrorSerializer,
     OrganizationPageSerializer,
 )
 from courses.models import CourseRun
@@ -163,7 +167,15 @@ class Enroll(APIView):
         request=B2BEnrollRequestSerializer,
         responses={
             201: CreateB2BEnrollmentSerializer,
-            400: CreateB2BEnrollmentSerializer,
+            400: PolymorphicProxySerializer(
+                component_name="CreateB2BEnrollmentError",
+                serializers=[
+                    B2BEnrollmentFailureSerializer,
+                    EnrollmentErrorSerializer,
+                    B2BEnrollRequestValidationErrorSerializer,
+                ],
+                resource_type_field_name=None,
+            ),
         },
     )
     @csrf_exempt

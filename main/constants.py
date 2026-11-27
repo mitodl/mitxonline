@@ -4,6 +4,7 @@ USER_MSG_COOKIE_MAX_AGE = 20
 USER_MSG_TYPE_ENROLLED = "enrolled"
 USER_MSG_TYPE_ENROLL_FAILED = "enroll-failed"
 USER_MSG_TYPE_ENROLL_BLOCKED = "enroll-blocked"
+USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED = "enroll-compliance-declined"
 USER_MSG_TYPE_ENROLL_DUPLICATED = "enroll-duplicated"
 USER_MSG_TYPE_COMPLETED_AUTH = "completed-auth"
 USER_MSG_TYPE_COURSE_NON_UPGRADABLE = "course-non-upgradable"

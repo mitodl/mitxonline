@@ -2,6 +2,7 @@ import operator as op
 import random
 import uuid
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import freezegun
@@ -79,6 +80,7 @@ from main import features
 from main.constants import (
     USER_MSG_COOKIE_NAME,
     USER_MSG_TYPE_COURSE_NON_UPGRADABLE,
+    USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED,
     USER_MSG_TYPE_ENROLL_DUPLICATED,
     USER_MSG_TYPE_ENROLL_FAILED,
     USER_MSG_TYPE_PAYMENT_CANCELLED,
@@ -1728,6 +1730,29 @@ def test_checkout_interstitial_incomplete_profile(
     assert resp.url == f"{reverse('cart')}?profile_incomplete=street_address_1"
     assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
         {"type": USER_MSG_TYPE_PROFILE_INCOMPLETE}
+    )
+    assert not PendingOrder.objects.filter(purchaser=user).exists()
+
+
+@pytest.mark.skip_nplusone_check
+def test_checkout_interstitial_compliance_declined(
+    mocked_export_compliance, user, user_client, products
+):
+    """
+    An export compliance decline sends the learner back to the cart with its
+    CS_700 support code, not a country block message (mitodl/hq#14499).
+    """
+    mocked_export_compliance.return_value = SimpleNamespace(
+        accepted=False, decision="DECLINED", reason_code=700, request_id="x"
+    )
+    create_basket_with_product(user, products[0])
+
+    resp = user_client.get(reverse("checkout_interstitial_page"))
+
+    assert resp.status_code == 302
+    assert resp.url == reverse("cart")
+    assert resp.cookies[USER_MSG_COOKIE_NAME].value == encode_json_cookie_value(
+        {"type": USER_MSG_TYPE_ENROLL_COMPLIANCE_DECLINED, "code": "CS_700"}
     )
     assert not PendingOrder.objects.filter(purchaser=user).exists()
 

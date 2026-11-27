@@ -17,7 +17,7 @@ from reversion.models import Version
 
 from b2b.factories import ContractPageFactory
 from compliance.api import ExportComplianceResult
-from compliance.exceptions import ExportComplianceDataError
+from compliance.exceptions import ExportComplianceDataError, ExportComplianceError
 from courses.factories import (
     BlockedCountryFactory,
     CourseRunEnrollmentFactory,
@@ -2029,9 +2029,12 @@ def test_has_user_blocked_products(mocker, blocked_country, compliance):
     )
     user.save()
 
-    assert basket_item.basket.has_user_blocked_products(user) == (
-        blocked_country or compliance
-    )
+    if compliance:
+        # A decline is raised, not reported as a country block (mitodl/hq#14499)
+        with pytest.raises(ExportComplianceError):
+            basket_item.basket.has_user_blocked_products(user)
+    else:
+        assert basket_item.basket.has_user_blocked_products(user) == blocked_country
     mocked_compliance_check.assert_called_once_with(user, courserun)
 
 
