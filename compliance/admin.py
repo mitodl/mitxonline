@@ -1,6 +1,7 @@
 """Admin for the compliance app"""
 
 from django.contrib import admin, messages
+from django.contrib.admin.utils import display_for_value
 from django.core.exceptions import ValidationError
 from django_object_actions import DjangoObjectActions, action
 from mitol.common.admin import TimestampedModelAdmin
@@ -80,6 +81,7 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         "courseware_content_type",
         "courseware_object_id",
         "decision",
+        "approval_expires_on",
     )
     list_filter = (
         ExportComplianceDecisionFilter,
@@ -88,8 +90,23 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
         ExportComplianceManuallyApprovedFilter,
     )
     search_fields = ("user__email", "user__username")
-    readonly_fields = get_field_names(ExportComplianceLog)
+    readonly_fields = [*get_field_names(ExportComplianceLog), "approval_expires_on"]
     change_actions = ["mark_manually_approved"]
+
+    @admin.display(description="Approval expires on")
+    def approval_expires_on(self, obj):
+        """Show when a manual approval stops covering new enrollments."""
+        # Format it like the model's other datetime fields on the change page.
+        return display_for_value(
+            obj.approval_expires_on, self.get_empty_value_display()
+        )
+
+    def get_change_actions(self, request, object_id, form_url):
+        """Hide the approve button from staff who can't change logs."""
+        actions = super().get_change_actions(request, object_id, form_url)
+        if not self.has_change_permission(request):
+            return [a for a in actions if a != "mark_manually_approved"]
+        return actions
 
     def has_add_permission(self, request):  # noqa: ARG002
         return False
@@ -100,9 +117,20 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
     @action(
         label="Mark Manually Approved",
         description="Mark this log as manually approved",
+        # POST with a CSRF token, so a cross-site link can't approve a learner.
+        methods=("POST",),
+        button_type="form",
     )
     def mark_manually_approved(self, request, obj):
         """Approve this log, setting approved_by/approved_on to the current admin user and now."""
+        # django-object-actions only checks admin-site access, not model perms.
+        if not self.has_change_permission(request, obj):
+            self.message_user(
+                request,
+                "You don't have permission to approve export compliance logs.",
+                level=messages.ERROR,
+            )
+            return
         obj.decision = ExportComplianceDecision.MANUALLY_APPROVED
         obj.approved_by = request.user
         obj.approved_on = now_in_utc()
@@ -116,4 +144,8 @@ class ExportComplianceLogAdmin(DjangoObjectActions, TimestampedModelAdmin):
             )
             return
         obj.save()
-        self.message_user(request, f"Manually approved log {obj.id}.")
+        self.message_user(
+            request,
+            f"Manually approved log {obj.id}. The learner can enroll in any "
+            f"course run or program until {obj.approval_expires_on:%Y-%m-%d}.",
+        )

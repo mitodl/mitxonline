@@ -1,6 +1,8 @@
 """Tests for compliance admin views"""
 
 import pytest
+from django.contrib.admin.utils import display_for_value
+from django.contrib.auth.models import Permission
 from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.urls import reverse
@@ -8,6 +10,7 @@ from mitol.common.utils.datetime import now_in_utc
 
 from compliance.factories import ExportComplianceLogFactory
 from compliance.models import ExportComplianceDecision
+from users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db]
 
@@ -27,13 +30,60 @@ def test_mark_manually_approved_action(client, admin_user):
         decision=ExportComplianceDecision.DECLINED
     )
 
-    response = client.get(_action_url(log_entry), follow=True)
+    response = client.post(_action_url(log_entry), follow=True)
 
     assert response.status_code == 200
     log_entry.refresh_from_db()
     assert log_entry.decision == ExportComplianceDecision.MANUALLY_APPROVED
     assert log_entry.approved_by == admin_user
     assert log_entry.approved_on is not None
+    expires_on = f"{log_entry.approval_expires_on:%Y-%m-%d}"
+    assert any(
+        expires_on in str(message) for message in get_messages(response.wsgi_request)
+    )
+    # The change page formats it like the other datetime fields, not raw.
+    content = response.content.decode()
+    assert display_for_value(log_entry.approval_expires_on, "-") in content
+    assert str(log_entry.approval_expires_on) not in content
+
+
+def test_mark_manually_approved_action_rejects_get(client, admin_user):
+    """A GET must not approve the log, so a cross-site link can't approve anyone"""
+    client.force_login(admin_user)
+    log_entry = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+
+    response = client.get(_action_url(log_entry))
+
+    assert response.status_code == 405
+    log_entry.refresh_from_db()
+    assert log_entry.decision == ExportComplianceDecision.DECLINED
+    assert log_entry.approved_on is None
+
+
+def test_mark_manually_approved_action_requires_change_permission(client):
+    """Staff who can only view logs can't approve one, and don't see the button"""
+    viewer = UserFactory.create(is_staff=True)
+    viewer.user_permissions.add(
+        Permission.objects.get(codename="view_exportcompliancelog")
+    )
+    client.force_login(viewer)
+    log_entry = ExportComplianceLogFactory.create(
+        decision=ExportComplianceDecision.DECLINED
+    )
+    change_url = reverse(
+        "admin:compliance_exportcompliancelog_change", args=(log_entry.pk,)
+    )
+
+    assert "Mark Manually Approved" not in client.get(change_url).content.decode()
+    response = client.post(_action_url(log_entry), follow=True)
+
+    messages = [str(message) for message in get_messages(response.wsgi_request)]
+    assert any("permission" in message for message in messages)
+    log_entry.refresh_from_db()
+    assert log_entry.decision == ExportComplianceDecision.DECLINED
+    assert log_entry.approved_on is None
 
 
 def test_mark_manually_approved_action_reports_validation_errors(
@@ -49,7 +99,7 @@ def test_mark_manually_approved_action_reports_validation_errors(
         side_effect=ValidationError("boom"),
     )
 
-    response = client.get(_action_url(log_entry), follow=True)
+    response = client.post(_action_url(log_entry), follow=True)
 
     assert response.status_code == 200
     messages = [str(message) for message in get_messages(response.wsgi_request)]

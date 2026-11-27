@@ -15,6 +15,7 @@ import faker
 import pytest
 import responses
 import reversion
+from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, connection
@@ -46,7 +47,7 @@ from compliance.exceptions import (
     ExportComplianceError,
 )
 from compliance.factories import ExportComplianceLogFactory
-from compliance.models import ExportComplianceDecision
+from compliance.models import ExportComplianceDecision, ExportComplianceLog
 from courses.api import (
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED,
     VERIFIABLE_CREDENTIAL_STATUS_DISABLED_NO_CRITERIA,
@@ -2256,6 +2257,58 @@ def test_defer_enrollment_blocked_by_prior_decline(settings, mocker, course):
     assert existing_enrollment.change_status is None
     audit_enrollment.refresh_from_db()
     assert audit_enrollment.active is True
+
+
+@pytest.mark.parametrize("approval_active", [True, False])
+def test_defer_enrollment_with_manual_approval_and_later_decline(
+    settings, mocker, course, approval_active
+):
+    """An unexpired manual approval lets a deferral past a decline; an expired one doesn't."""
+    settings.FEATURES[features.EXPORT_COMPLIANCE_CHECK_ENABLED] = True
+    settings.EXPORT_COMPLIANCE_MANUAL_APPROVAL_MONTHS = 12
+    from_run, to_run = CourseRunFactory.create_batch(2, course=course)
+    existing_enrollment = CourseRunEnrollmentFactory.create(
+        run=from_run, enrollment_mode=EDX_ENROLLMENT_VERIFIED_MODE
+    )
+    user = existing_enrollment.user
+    approved_on = now_in_utc() - (
+        timedelta(days=30) if approval_active else relativedelta(months=13)
+    )
+    approval = ExportComplianceLogFactory.create(
+        user=user,
+        decision=ExportComplianceDecision.MANUALLY_APPROVED,
+        approved_by=UserFactory.create(),
+        approved_on=approved_on,
+    )
+    # The admin action approves the declined row in place, so it keeps its
+    # original created_on, and a decline logged after that is still DECLINED.
+    decline = ExportComplianceLogFactory.create(
+        user=user, decision=ExportComplianceDecision.DECLINED
+    )
+    ExportComplianceLog.objects.filter(pk=approval.pk).update(
+        created_on=approved_on - timedelta(days=10)
+    )
+    ExportComplianceLog.objects.filter(pk=decline.pk).update(
+        created_on=approved_on - timedelta(days=5)
+    )
+    patched_verify = mocker.patch("courses.api.verify_user_with_exports")
+    mocker.patch("courses.api.enroll_in_edx_course_runs")
+    mocker.patch("courses.api.mail_api.send_course_run_enrollment_email")
+    mocker.patch("courses.tasks.subscribe_edx_course_emails.delay")
+
+    if approval_active:
+        _, to_enrollment = defer_enrollment(
+            user, from_run.courseware_id, to_run.courseware_id, force=True
+        )
+        assert to_enrollment.run == to_run
+    else:
+        with pytest.raises(ExportComplianceError):
+            defer_enrollment(
+                user, from_run.courseware_id, to_run.courseware_id, force=True
+            )
+        existing_enrollment.refresh_from_db()
+        assert existing_enrollment.active is True
+    patched_verify.assert_not_called()
 
 
 @pytest.mark.parametrize("active", [True, False])
