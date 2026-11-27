@@ -28,6 +28,7 @@ from requests.exceptions import RequestException
 from rest_framework import serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
@@ -52,6 +53,7 @@ from b2b.exceptions import (
     AliasCollisionError,
     ContractProgramOrderError,
     ContractVariantError,
+    IdentityProviderPulumiManagedError,
     InvalidLifecycleTransitionError,
     OrganizationNameCollisionError,
     OrganizationNotProvisionedError,
@@ -73,6 +75,7 @@ from b2b.provisioning import (
     parse_identity_provider_metadata,
     refresh_identity_provider_metadata,
     set_onboarding_state,
+    set_organization_logo,
     transition_identity_provider,
     update_identity_provider,
     update_organization,
@@ -97,6 +100,7 @@ from b2b.serializers.v0.provisioning import (
     IdentityProviderTransitionSerializer,
     OrganizationIdentityProviderDetailSerializer,
     OrganizationIdentityProviderSerializer,
+    OrganizationLogoSerializer,
     OrganizationOnboardingSerializer,
     OrganizationProvisioningAuditSerializer,
     ParseMetadataSerializer,
@@ -142,6 +146,7 @@ class ProvisioningExceptionMixin:
         if isinstance(
             exc,
             AliasCollisionError
+            | IdentityProviderPulumiManagedError
             | OrganizationNameCollisionError
             | OrganizationNotProvisionedError,
         ):
@@ -306,6 +311,44 @@ class OrganizationProvisioningViewSet(
         return Response(
             self.get_serializer(self._with_keycloak(organization, connection)).data
         )
+
+    @extend_schema(
+        request={"multipart/form-data": OrganizationLogoSerializer},
+        responses={200: ProvisionedOrganizationSerializer},
+    )
+    @action(detail=True, methods=["put"], parser_classes=[MultiPartParser])
+    def logo(self, request, org_key=None):  # noqa: ARG002
+        """
+        Replace the organization's logo.
+
+        The logo is stored only in MITx Online, so this works for an
+        organization with no Keycloak record, and the response does not read
+        domains or redirect_url from Keycloak (they are null, as in the list).
+        """
+
+        organization = self.get_object()
+
+        request_serializer = OrganizationLogoSerializer(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        organization = set_organization_logo(
+            organization,
+            request_serializer.validated_data["logo"],
+            actor=request.user,
+        )
+
+        return Response(self.get_serializer(organization).data)
+
+    @extend_schema(request=None, responses={200: ProvisionedOrganizationSerializer})
+    @logo.mapping.delete
+    def delete_logo(self, request, org_key=None):  # noqa: ARG002
+        """Remove the organization's logo."""
+
+        organization = set_organization_logo(
+            self.get_object(), None, actor=request.user
+        )
+
+        return Response(self.get_serializer(organization).data)
 
     @extend_schema(
         request=SetOnboardingStateSerializer,

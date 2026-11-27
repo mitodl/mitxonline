@@ -105,6 +105,7 @@ from main.constants import (
     USER_MSG_TYPE_PAYMENT_DECLINED,
     USER_MSG_TYPE_PAYMENT_ERROR,
     USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN,
+    USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING,
     USER_MSG_TYPE_PROFILE_INCOMPLETE,
 )
 from main.utils import redirect_with_user_message
@@ -115,10 +116,10 @@ from users.models import User
 log = logging.getLogger(__name__)
 
 
-def _learn_dashboard_redirect(order):
+def _learn_dashboard_redirect(order, order_status=OrderStatus.FULFILLED):
     """Build an HttpResponseRedirect to the Learn dashboard with order info."""
     return HttpResponseRedirect(
-        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status=fulfilled&order_id={order.id}"
+        f"{settings.MIT_LEARN_DASHBOARD_URL}?order_status={order_status}&order_id={order.id}"
     )
 
 
@@ -911,6 +912,52 @@ class CheckoutCallbackView(View):
                 return _learn_dashboard_redirect(order)
 
         return HttpResponseRedirect(reverse("user-dashboard"))
+
+
+class CheckoutResultSuccessView(View):
+    """
+    Landing page for a user returning from a successful Stripe checkout.
+
+    Stripe sends the actual result of the transaction to the webhook
+    asynchronously, so landing here doesn't mean the payment went through.
+    This only redirects the user to their dashboard with a message saying the
+    payment is being processed; it doesn't touch the order.
+    """
+
+    def get(self, request, reference_number):
+        """Redirect the user to the appropriate dashboard."""
+
+        order = (
+            Order.objects.filter(
+                reference_number=reference_number, purchaser=request.user
+            ).first()
+            if request.user.is_authenticated
+            else None
+        )
+
+        if order:
+            return _learn_dashboard_redirect(order, order_status=order.state)
+
+        return redirect_with_user_message(
+            reverse("user-dashboard"),
+            {"type": USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING},
+        )
+
+
+class CheckoutResultCancelView(LoginRequiredMixin, View):
+    """
+    Landing page for a user who cancelled a Stripe checkout.
+
+    This only redirects the user back to the cart; the order is left for the
+    webhook to resolve when Stripe expires the checkout session.
+    """
+
+    def get(self, request, reference_number):  # noqa: ARG002
+        """Redirect the user to the cart with the payment cancelled message."""
+
+        return redirect_with_user_message(
+            reverse("cart"), {"type": USER_MSG_TYPE_PAYMENT_CANCELLED}
+        )
 
 
 # Add a serializer for the cybersource payment response

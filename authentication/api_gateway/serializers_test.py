@@ -162,3 +162,31 @@ def test_register_details_serializer_allows_numeric_only_name(  # noqa: PLR0913
     assert serializer.is_valid(), (
         f"Serializer should accept numeric name '{name}'. Errors: {serializer.errors}"
     )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("empty_profile", [False, True])
+def test_register_details_serializer_creates_missing_related_rows(
+    mocker, valid_address_dict, user_profile_dict, rf, empty_profile
+):
+    """A user with no LegalAddress or UserProfile row can still finish onboarding"""
+    mocker.patch("openedx.api.create_edx_user")
+    mocker.patch("openedx.api.create_edx_auth_token")
+    user = UserFactory.create(legal_address=None, user_profile=None)
+
+    request = rf.post("/api/profile/details/")
+    request.user = user
+    data = {
+        "name": "John Doe",
+        "username": "johndoe",
+        "legal_address": valid_address_dict,
+        "user_profile": {} if empty_profile else user_profile_dict,
+    }
+
+    serializer = RegisterDetailsSerializer(data=data, context={"request": request})
+    assert serializer.is_valid(), serializer.errors
+    serializer.save()
+
+    user.refresh_from_db()
+    assert user.legal_address.country == valid_address_dict["country"]
+    assert user.user_profile.year_of_birth == (None if empty_profile else 1980)

@@ -1067,6 +1067,56 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedOrganizationProvisioningAuditList'
           description: ''
+  /api/v0/b2b/provisioning/organizations/{org_key}/logo/:
+    put:
+      operationId: b2b_provisioning_organizations_logo_update
+      description: |-
+        Replace the organization's logo.
+
+        The logo is stored only in MITx Online, so this works for an
+        organization with no Keycloak record, and the response does not read
+        domains or redirect_url from Keycloak (they are null, as in the list).
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OrganizationLogoRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
+    delete:
+      operationId: b2b_provisioning_organizations_logo_destroy
+      description: Remove the organization's logo.
+      parameters:
+      - in: path
+        name: org_key
+        schema:
+          type: string
+          description: The short key used for the organization (for edX).
+        required: true
+      tags:
+      - b2b
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionedOrganization'
+          description: ''
   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/:
     post:
       operationId: b2b_provisioning_organizations_onboarding_create
@@ -4296,6 +4346,7 @@ components:
       - organization_updated
       - onboarding_changed
       - identity_provider_created
+      - identity_provider_adopted
       - identity_provider_updated
       - identity_provider_transitioned
       - identity_provider_metadata_refreshed
@@ -4308,6 +4359,7 @@ components:
         * `organization_updated` - Organization updated
         * `onboarding_changed` - Onboarding state changed
         * `identity_provider_created` - Identity provider created
+        * `identity_provider_adopted` - Identity provider adopted
         * `identity_provider_updated` - Identity provider updated
         * `identity_provider_transitioned` - Identity provider state changed
         * `identity_provider_metadata_refreshed` - Identity provider metadata refreshed
@@ -4319,6 +4371,7 @@ components:
       - Organization updated
       - Onboarding state changed
       - Identity provider created
+      - Identity provider adopted
       - Identity provider updated
       - Identity provider state changed
       - Identity provider metadata refreshed
@@ -5633,13 +5686,19 @@ components:
           default: ''
           maxLength: 255
         metadata_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         metadata_xml:
           type: string
         discovery_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         client_id:
           type: string
         client_secret:
@@ -5671,9 +5730,12 @@ components:
           pattern: ^[A-Za-z0-9_.\-]+$
           maxLength: 30
         org_key_prefix:
-          type: string
-          pattern: ^[A-Za-z0-9_.\-]+$
-          maxLength: 30
+          oneOf:
+          - type: string
+            pattern: ^[A-Za-z0-9_.\-]+$
+            maxLength: 30
+          - type: string
+            maxLength: 0
         domains:
           type: array
           items:
@@ -7332,6 +7394,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7362,6 +7431,7 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
     OrganizationIdentityProviderDetail:
@@ -7412,6 +7482,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        pulumi_managed:
+          type: boolean
+          readOnly: true
+          description: Created by ol-infrastructure and still in its Pulumi state.
+            The provisioning API won't change it until it is released, because the
+            next pulumi up would revert the change, and a metadata refresh can drop
+            settings Pulumi chose on purpose.
         service_provider:
           allOf:
           - $ref: '#/components/schemas/IdentityProviderServiceProvider'
@@ -7454,8 +7531,18 @@ components:
       - metadata_fetched_at
       - metadata_source
       - protocol
+      - pulumi_managed
       - service_provider
       - updated_on
+    OrganizationLogoRequest:
+      type: object
+      description: Request body for replacing an organization's logo.
+      properties:
+        logo:
+          type: string
+          format: binary
+      required:
+      - logo
     OrganizationManagerCheck:
       type: object
       description: Response shape for the org-manager check.
@@ -7498,6 +7585,7 @@ components:
         logo:
           type: string
           format: uri
+          nullable: true
           readOnly: true
           description: The organization's logo. Will be displayed in the app in various
             places.
@@ -7964,8 +8052,11 @@ components:
         protocol:
           $ref: '#/components/schemas/IdentityProviderProtocolEnum'
         metadata_url:
-          type: string
-          format: uri
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
         metadata_xml:
           type: string
       required:
@@ -8558,6 +8649,13 @@ components:
           type: string
           readOnly: true
           description: Any useful extra information about the organization
+        logo:
+          type: string
+          format: uri
+          nullable: true
+          readOnly: true
+          description: The organization's logo. Will be displayed in the app in various
+            places.
         slug:
           type: string
           readOnly: true
@@ -8597,6 +8695,7 @@ components:
       - domains
       - id
       - identity_providers
+      - logo
       - name
       - onboarding
       - org_key
@@ -9314,6 +9413,7 @@ components:
         logo:
           type: string
           format: uri
+          nullable: true
           readOnly: true
           description: The organization's logo. Will be displayed in the app in various
             places.

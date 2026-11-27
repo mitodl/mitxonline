@@ -18,6 +18,7 @@ USER_MSG_TYPE_PAYMENT_DECLINED = "payment-declined"
 USER_MSG_TYPE_PAYMENT_ERROR = "payment-error"
 USER_MSG_TYPE_PAYMENT_CANCELLED = "payment-cancelled"
 USER_MSG_TYPE_PAYMENT_REVIEW = "payment-review"
+USER_MSG_TYPE_PAYMENT_PENDING_PROCESSING = "payment-pending-processing"
 USER_MSG_TYPE_PAYMENT_ERROR_UNKNOWN = "payment-error-unknown"
 
 USER_MSG_TYPE_B2B_DISALLOWED = "b2b-disallowed"

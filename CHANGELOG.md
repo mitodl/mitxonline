@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026.11.24.1] - 2026-11-24
+
+### Changes
+
+- **Record the identity providers Pulumi created in Keycloak** (#4321) by tmacey@mit.edu
+- **Upload an organization's logo from the staff dashboard** (#4319) by tmacey@mit.edu
+- **Move the uv.lock revision check to v1.1.0** (#4329) by rhysyngsun@users.noreply.github.com
+
+## [2026.11.23.1] - 2026-11-23
+
+### Changes
+
+- **Test that mpd-parser parses a DASH manifest through xmldom** (#4309) by 1447295+shaidar@users.noreply.github.com
+- **Update dependency drf-spectacular to >=0.30,<0.31** (#4134) by 29139614+renovate[bot]@users.noreply.github.com
+- **Add geolocation and location flagging API** (#4244) by jkachel@mit.edu
+- **Split the Stripe checkout return into success and cancel endpoints** (#4297) by jkachel@mit.edu
+- **Update nginx:1.30 Docker digest to 7fad6c0** (#4292) by 29139614+renovate[bot]@users.noreply.github.com
+- **Call the shared uv.lock revision action** (#4313) by rhysyngsun@users.noreply.github.com
+- **Update dependency opentelemetry-api to v1.45.2 [SECURITY]** (#4287) by 29139614+renovate[bot]@users.noreply.github.com
+- **Update dependency dnspython to v2.9.2 [SECURITY]** (#4291) by 29139614+renovate[bot]@users.noreply.github.com
+- **Bump mitol-django-apigateway to 2026.11.10** (#4302) by tmacey@mit.edu
+- **fix: downgrade every selected enrollment in the admin downgrade action** (#4308) by 88967643+Anas12091101@users.noreply.github.com
+- **Add users to Keycloak organizations as a membership-only service account** (#4225) by tmacey@mit.edu
+- **Fix the order-history N+1 allowlisted in #4126** (#4187) by christopher.chudzicki@gmail.com
+- **Install local-dev's dev deps before the source copy** (#4307) by christopher.chudzicki@gmail.com
+- **Docs on verifiable credentials backfill options** (#4306) by dsubak@users.noreply.github.com
+- **chore(deps): mitol-django-scim 2026.4.29 -> 2026.11.13** (#4290) by tmacey@mit.edu
+- **chore: move to Yarn 4.18.1 with a 7-day npm age gate** (#4310) by 1447295+shaidar@users.noreply.github.com
+- **Redirect the MITx Online home page to MIT Learn and remove it** (#4300) by christopher.chudzicki@gmail.com
+- **Fix program refund enrollment downgrades** (#4284) by collinp@mit.edu
+- **fix: link enrollment, receipt and refund emails to MIT Learn** (#4281) by 88967643+Anas12091101@users.noreply.github.com
+- **Drop the courses_courserun.b2b_contract_id column** (#4304) by christopher.chudzicki@gmail.com
+
 ## [2026.11.18.2] - 2026-11-18
 
 ### Changes

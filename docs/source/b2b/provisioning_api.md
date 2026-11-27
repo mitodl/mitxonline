@@ -48,6 +48,56 @@ given) and returns 409 if the alias is taken.
 The organizations Pulumi already declares are still Pulumi's. Don't modify one
 of them through this API; the next `pulumi up` will revert the change.
 
+### Adopting the IdPs Pulumi created
+
+An organization's IdPs show in the staff dashboard only when they have an
+`OrganizationIdentityProvider` row, and only this API wrote those, so the IdPs
+Pulumi created were missing there. `manage.py adopt_keycloak_identity_providers
+[--dry-run] [--source ALIAS=URL_OR_PATH ...] [org_key ...]` records each IdP
+that Keycloak links to an organization here (read from
+`organizations/{id}/identity-providers`) and has no row yet. It doesn't write to
+Keycloak, it's audited as "Identity provider adopted", and recorded IdPs are
+skipped, so it is safe to re-run. A Keycloak error listing one organization's
+IdPs is reported and the run carries on with the rest. A run without org keys
+also lists the realm IdPs that no organization here links to; those aren't
+recorded. Org keys limit which organizations' IdPs are recorded, but every
+linked organization is still read, so an IdP Keycloak links to more than one
+organization is found and skipped: a row belongs to one organization, and
+deleting the IdP through it would remove it for the others. Pulumi links each
+IdP to one organization, so only a link added in the Keycloak console can
+cause this.
+
+An adopted IdP is recorded as follows:
+
+- `lifecycle_state` is `active` if Keycloak has it enabled and `disabled`
+  otherwise. Testing and active set the same Keycloak flags, and Pulumi only
+  declares IdPs partners sign in through.
+- `metadata_source` is a SAML IdP's `metadataDescriptorUrl`, or
+  `{issuer}/.well-known/openid-configuration` for an OIDC IdP. `--source` sets
+  it instead, as a URL or a file holding the metadata XML. Use it for a SAML IdP
+  Pulumi configured from inline XML (pass the saved copy from
+  `ol-infrastructure`'s `files/olapps/`), and for an OIDC IdP whose discovery
+  URL isn't under its issuer. An IdP with no source, or of another provider
+  type, is reported and skipped without failing the run.
+- `metadata_artifact` stays empty.
+- `pulumi_managed` is set.
+
+The provisioning API refuses to edit, refresh, transition or delete a
+`pulumi_managed` IdP (409), and the dashboard shows it as "Managed by Pulumi"
+with no actions. Pulumi would revert those changes on its next run, and a
+refresh is worse than reverted: it replaces settings Pulumi chose on purpose
+with whatever the partner's metadata says (e.g. turning off signed
+AuthnRequests a partner asked for), which can break logins until that run.
+Once an IdP has left Pulumi state, `manage.py release_pulumi_identity_providers
+ALIAS ...` clears the flag, audited as an IdP update, and the API can change it.
+
+Releasing doesn't make a refresh safe. A refresh still replaces every setting
+the partner's metadata covers, and with Pulumi gone nothing puts a deliberate
+override back. Before refreshing a released IdP, check its old `olapps.py`
+block for overrides such as `want_authn_requests_signed` (UKM) or
+`name_id_format` (NTUA). Keeping those through a refresh is still to do, and
+has to land before the Pulumi handover releases any IdP.
+
 ## Organizations
 
 ```
@@ -55,6 +105,8 @@ GET    /api/v0/b2b/provisioning/organizations/
 POST   /api/v0/b2b/provisioning/organizations/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/
 PATCH  /api/v0/b2b/provisioning/organizations/{org_key}/
+PUT    /api/v0/b2b/provisioning/organizations/{org_key}/logo/
+DELETE /api/v0/b2b/provisioning/organizations/{org_key}/logo/
 POST   /api/v0/b2b/provisioning/organizations/{org_key}/onboarding/
 GET    /api/v0/b2b/provisioning/organizations/{org_key}/events/
 ```
@@ -98,6 +150,20 @@ configured. The list response doesn't make a Keycloak call per row, so those
 two fields are null there. The list filters on `q` (name or org key) and
 `onboarding_state`.
 
+### Logo
+
+`PUT .../logo/` takes a multipart body with one `logo` file, which must be an
+image Pillow can open (the same check the Wagtail form made). `DELETE
+.../logo/` clears it. Both return the organization with `logo` as a URL (or
+null), and both are audited.
+
+The logo is stored only in MITx Online, so these routes work for an
+organization with no Keycloak record and don't call Keycloak; `domains` and
+`redirect_url` are null in their responses, as in the list. A replaced file is
+left in storage because older Wagtail revisions still name it. Every field on
+the Wagtail organization page's content tab is read-only, logo included; the
+Promote tab still allows editing the slug.
+
 ### Onboarding state
 
 Each organization has one `OrganizationOnboarding` record answering "how far
@@ -113,7 +179,7 @@ start at `org_created`, and so do organizations the reconciler adopts.
 
 Every change made through the provisioning functions writes an
 `OrganizationProvisioningAudit` row in the same transaction: organization
-create and update, onboarding changes, and IdP create, update, transition,
+create and update, logo changes, onboarding changes, and IdP create, update, transition,
 metadata refresh and delete. Each row records who made the change and the data before
 and after it. `GET .../events/` returns them newest first.
 
@@ -443,6 +509,8 @@ changes an existing `org_key`.
 
 - Pulumi handover. The per-organization resources Pulumi already declares
   need to be moved out of Pulumi state without deleting them from Keycloak.
+  Recording their IdPs here (see "Adopting the IdPs Pulumi created") is the
+  first step.
 - Orphaned organizations. As of April 2026, about 24 `OrganizationPage`
   records from before Keycloak was the source of truth had no
   `sso_organization_id` (mitodl/hq#10552). They need Keycloak organizations created and their

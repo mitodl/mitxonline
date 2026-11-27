@@ -1,6 +1,6 @@
 [project]
 name = "mitxonline"
-version = "2026.11.18.2"
+version = "2026.11.24.1"
 description = "MITx Online"
 authors = [{ name = "MIT ODL" }]
 requires-python = "~=3.11.0"
@@ -33,13 +33,13 @@ dependencies = [
     "django-webpack-loader>=3.0.0,<4",
     "djangorestframework==3.18.3",
     "drf-extensions>=0.8.0,<0.9",
-    "drf-spectacular>=0.29.0,<0.30",
+    "drf-spectacular>=0.30,<0.31",
     "edx-api-client>=1.14.0,<2",
     "hubspot-api-client>=12.0.0,<13",
     "ipython>=9.13,<10",
     "mitol-django-apigateway==2026.11.10",
     "mitol-django-common==2026.10.29",
-    "mitol-django-hubspot-api==2026.4.29",
+    "mitol-django-hubspot-api==2026.10.30",
     "mitol-django-mail==2026.4.29",
     "mitol-django-openedx==2026.4.29",
     "mitol-django-payment-gateway==2026.8.5",
@@ -89,7 +89,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-prek = ["prek==0.5.5"]
+prek = ["prek==0.5.11"]
 dev = [
     { include-group = "prek" },
     "anys>=0.3.1,<0.4",
@@ -397,7 +397,7 @@ markers = [
 pythonpath = ["."]
 
 [tool.bumpversion]
-current_version = "2026.11.18.2"
+current_version = "2026.11.24.1"
 commit = false
 tag = false
 parse = "(?P<release>(?:[1-9][0-9]{3})\\.(?:1[0-2]|[1-9])\\.(?:3[0-1]|[12][0-9]|[1-9]))\\.(?P<build>\\d+)"

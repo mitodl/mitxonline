@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlsplit
 import faker
 import pytest
 from authlib.integrations.base_client.errors import OAuthError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from requests.exceptions import ConnectionError as RequestsConnectionError
 from requests.exceptions import HTTPError, Timeout
@@ -303,6 +304,82 @@ def test_patching_an_unprovisioned_organization_is_a_conflict(admin_drf_client):
 
     assert response.status_code == status.HTTP_409_CONFLICT
     assert "LEGACYU" in response.json()["detail"]
+
+
+def _logo_url(org_key):
+    return reverse(
+        "b2b:b2b-provisioning-organization-logo", kwargs={"org_key": org_key}
+    )
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_put_logo_stores_it_without_keycloak(
+    admin_drf_client, logo_upload, mocked_connection
+):
+    """The logo is stored and returned as a URL, and Keycloak isn't asked."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    response = admin_drf_client.put(
+        _logo_url(organization.org_key),
+        {"logo": logo_upload()},
+        format="multipart",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    organization.refresh_from_db()
+    assert organization.logo.name.startswith("organization_logos/logo")
+    assert response.json()["logo"].endswith(organization.logo.url)
+    assert response.json()["domains"] is None
+    mocked_connection.organizations.get.assert_not_called()
+    assert OrganizationProvisioningAudit.objects.filter(
+        organization=organization
+    ).exists()
+
+
+def test_put_logo_rejects_a_file_that_is_not_an_image(admin_drf_client, logo_upload):
+    """A file Pillow can't open is a 400 and leaves the logo alone."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    logo_upload()  # isolates MEDIA_ROOT
+
+    response = admin_drf_client.put(
+        _logo_url(organization.org_key),
+        {"logo": SimpleUploadedFile("logo.png", b"not an image")},
+        format="multipart",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "logo" in response.json()["errors"]
+    organization.refresh_from_db()
+    assert not organization.logo
+
+
+@pytest.mark.zeal_allow("wagtailcore.Page", "get()")
+def test_delete_logo_clears_it(admin_drf_client, logo_upload):
+    """DELETE removes the logo."""
+
+    organization = OrganizationPageFactory.create(
+        org_key="EXAMPLEU", logo=logo_upload()
+    )
+
+    response = admin_drf_client.delete(_logo_url(organization.org_key))
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["logo"] is None
+    organization.refresh_from_db()
+    assert not organization.logo
+
+
+@pytest.mark.parametrize("method", ["put", "delete"])
+def test_logo_is_staff_only(user_drf_client, method):
+    """A non-staff user cannot change an organization's logo."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+
+    response = getattr(user_drf_client, method)(_logo_url(organization.org_key))
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_set_onboarding_state(admin_drf_client):
@@ -733,6 +810,29 @@ def test_transition_rejects_skipping_testing(admin_drf_client):
 
     identity_provider.refresh_from_db()
     assert identity_provider.lifecycle_state == IDP_STATE_DRAFT
+
+
+def test_changing_a_pulumi_managed_idp_is_a_conflict(
+    admin_drf_client, mocked_connection
+):
+    """An IdP Pulumi still declares is a 409 naming it, and Keycloak isn't called."""
+
+    organization = OrganizationPageFactory.create(org_key="EXAMPLEU")
+    identity_provider = _identity_provider(organization, state=IDP_STATE_ACTIVE)
+    identity_provider.pulumi_managed = True
+    identity_provider.save()
+
+    response = admin_drf_client.post(
+        _identity_provider_url(organization.org_key, "exampleu", suffix="transition"),
+        {"state": IDP_STATE_TESTING},
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert "exampleu" in response.json()["detail"]
+    mocked_connection.identity_providers.update.assert_not_called()
+    identity_provider.refresh_from_db()
+    assert identity_provider.lifecycle_state == IDP_STATE_ACTIVE
 
 
 def test_transition_to_testing(admin_drf_client, mocker):

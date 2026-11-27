@@ -182,6 +182,7 @@ export interface IOrganizationIdentityProvider {
     metadata_source: string;
     metadata_artifact: Record<string, string> | null;
     metadata_fetched_at: string | null;
+    pulumi_managed: boolean;
     created_on: string;
     updated_on: string;
     service_provider: IServiceProviderDetails;
@@ -200,6 +201,7 @@ export interface IProvisionedOrganization {
     org_key: string;
     org_key_prefix: string;
     description: string;
+    logo: string | null;
     slug: string;
     sso_organization_id: string | null;
     domains: string[] | null;
