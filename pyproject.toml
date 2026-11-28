@@ -40,7 +40,7 @@ dependencies = [
     "mitol-django-apigateway==2026.11.10",
     "mitol-django-common==2026.10.29",
     "mitol-django-hubspot-api==2026.10.30",
-    "mitol-django-mail==2026.4.29",
+    "mitol-django-mail==2026.10.30",
     "mitol-django-openedx==2026.4.29",
     "mitol-django-payment-gateway==2026.8.5",
     "mitol-django-scim==2026.11.13",
