@@ -1923,7 +1923,7 @@ wheels = [
 
 [[package]]
 name = "mitol-django-apigateway"
-version = "2026.11.10"
+version = "2026.11.24"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "channels" },
@@ -1931,9 +1931,9 @@ dependencies = [
     { name = "django-stubs" },
     { name = "mitol-django-common" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/47/1b/9d054bfb2d0922879fa88de2df158b3e3970b6b1d0ef9e97b36c8a2d1796/mitol_django_apigateway-2026.11.10.tar.gz", hash = "sha256:68f30a00e60d356837d4880902997647f23fd5cebe9d2a99908f788720ff5bb2", size = 14834, upload-time = "2026-11-10T22:03:01.571Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/27/02c0e341b757daad6564fd1e551946c9cd80607181b4e14e2677e0d7ce57/mitol_django_apigateway-2026.11.24.tar.gz", hash = "sha256:61793311bc479d37331858ba464fa4279788316abf8dd10a64cc65a6bc91845e", size = 15062, upload-time = "2026-11-24T21:46:31.414Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/79/abc2d68a232781973927f2fb1394314773b6a3c0100df59c83553889884e/mitol_django_apigateway-2026.11.10-py3-none-any.whl", hash = "sha256:a912109bd4b9368ff47c7e01fff64768e21d7933fb83accd75d97bf0e19e17d4", size = 23948, upload-time = "2026-11-10T22:03:00.397Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/76/132b552b667993515ccb1293b2b433cb4d657630d39d6806ecb2af1267d0/mitol_django_apigateway-2026.11.24-py3-none-any.whl", hash = "sha256:96ed4e8379e050d9ace7785cd7172b51f63d7208e7246dec90e0b954b24c5ec8", size = 24171, upload-time = "2026-11-24T21:46:30.214Z" },
 ]
 
 [[package]]
@@ -2321,7 +2321,7 @@ requires-dist = [
     { name = "granian", specifier = ">=2.5.4,<3" },
     { name = "hubspot-api-client", specifier = ">=12.0.0,<13" },
     { name = "ipython", specifier = ">=9.13,<10" },
-    { name = "mitol-django-apigateway", specifier = "==2026.11.10" },
+    { name = "mitol-django-apigateway", specifier = "==2026.11.24" },
     { name = "mitol-django-common", specifier = "==2026.10.29" },
     { name = "mitol-django-geoip", specifier = ">=2026.11.13" },
     { name = "mitol-django-google-sheets", specifier = ">=2025.6.13,<2026" },
